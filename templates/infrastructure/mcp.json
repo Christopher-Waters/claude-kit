@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp"]
+    },
+    "mongodb": {
+      "command": "npx",
+      "args": ["-y", "mongodb-mcp-server"],
+      "env": {
+        "MDB_MCP_CONNECTION_STRING": "${MONGODB_CONNECTION_STRING}"
+      }
+    },
+    "teams": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-teams-server"],
+      "env": {
+        "TEAMS_TENANT_ID": "${TEAMS_TENANT_ID}",
+        "TEAMS_CLIENT_ID": "${TEAMS_CLIENT_ID}",
+        "TEAMS_CLIENT_SECRET": "${TEAMS_CLIENT_SECRET}"
+      }
+    },
+    "stripe": {
+      "command": "npx",
+      "args": ["-y", "@stripe/mcp"],
+      "env": {
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
+      }
+    },
+    "azure": {
+      "command": "npx",
+      "args": ["-y", "@azure/mcp@latest", "server", "start"]
+    }
+  }
+}

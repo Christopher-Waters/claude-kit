@@ -1,0 +1,41 @@
+{
+  "name": "@caresolutions/ai-infrastructure",
+  "version": "1.0.0",
+  "description": "Care Solutions Personal AI Infrastructure for Claude Code — agents, hooks, MCP servers, and workflow automation",
+  "type": "module",
+  "bin": {
+    "care-solutions-ai": "./bin/cli.js"
+  },
+  "scripts": {
+    "test": "node bin/cli.js --help"
+  },
+  "keywords": [
+    "claude-code",
+    "ai-infrastructure",
+    "mcp",
+    "agents",
+    "hooks",
+    "care-solutions"
+  ],
+  "author": "Care Solutions <chriswaters@caresolutions.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://dev.azure.com/caresolutionsinc/Glasswing%20and%20Monarch/_git/care-solutions-ai"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/",
+    "templates/",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "fs-extra": "^11.3.4",
+    "inquirer": "^13.3.2",
+    "ora": "^9.3.0"
+  }
+}
