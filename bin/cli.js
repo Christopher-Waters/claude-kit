@@ -19,7 +19,8 @@ const args = process.argv.slice(2);
 const showHelp = args.includes('--help') || args.includes('-h');
 const globalOnly = args.includes('--global-only');
 const installAll = args.includes('--all');
-const targetArg = args.find(a => !a.startsWith('--'));
+const dbFlag = args.find(a => a.startsWith('--db='))?.split('=')[1] || null;
+const targetArg = args.find(a => !a.startsWith('--') && a !== 'init');
 
 if (showHelp) {
   console.log(`
@@ -31,9 +32,13 @@ Usage:
   npx @caresolutions/ai-infrastructure init --global-only  Global agents only
 
 Options:
-  --all          Install all components without prompts
-  --global-only  Only install global agents to ~/.claude/agents/
-  --help, -h     Show this help
+  --all              Install all components (skips identical files, still asks DB type)
+  --all --db=mongo   Install all with MongoDB (no prompts at all)
+  --all --db=mssql   Install all with SQL Server
+  --all --db=azuresql  Install all with Azure SQL
+  --all --db=postgres  Install all with PostgreSQL
+  --global-only      Only install global agents to ~/.claude/agents/
+  --help, -h         Show this help
 `);
   process.exit(0);
 }
@@ -58,20 +63,25 @@ async function installFile(src, dest, label) {
       console.log(chalk.gray(`  = ${label} (identical, skipped)`));
       return false;
     }
-    if (!installAll) {
-      const { action } = await inquirer.prompt([{
-        type: 'list',
-        name: 'action',
-        message: `${label} already exists:`,
-        choices: [
-          { name: 'Overwrite', value: 'overwrite' },
-          { name: 'Skip', value: 'skip' },
-        ],
-      }]);
-      if (action === 'skip') {
-        console.log(chalk.gray(`  ⊘ ${label} (skipped)`));
-        return false;
-      }
+    if (installAll) {
+      // --all mode: overwrite non-identical files silently
+      await fs.ensureDir(dirname(dest));
+      await fs.copy(src, dest);
+      console.log(chalk.green(`  ✓ ${label} (updated)`));
+      return true;
+    }
+    const { action } = await inquirer.prompt([{
+      type: 'list',
+      name: 'action',
+      message: `${label} already exists:`,
+      choices: [
+        { name: 'Overwrite', value: 'overwrite' },
+        { name: 'Skip', value: 'skip' },
+      ],
+    }]);
+    if (action === 'skip') {
+      console.log(chalk.gray(`  ⊘ ${label} (skipped)`));
+      return false;
     }
   }
   await fs.ensureDir(dirname(dest));
@@ -217,7 +227,24 @@ async function main() {
 
     let mcpChoices;
     if (installAll) {
-      mcpChoices = { servers: ['playwright', 'teams', 'azure'], db: 'mongo', stripe: true };
+      // --all mode: use --db flag or prompt just for database type
+      let db = dbFlag;
+      if (!db) {
+        const { dbAnswer } = await inquirer.prompt([{
+          type: 'list',
+          name: 'dbAnswer',
+          message: 'What database does this project use?',
+          choices: [
+            { name: 'MongoDB', value: 'mongo' },
+            { name: 'SQL Server (local/VM)', value: 'mssql' },
+            { name: 'Azure SQL', value: 'azuresql' },
+            { name: 'PostgreSQL', value: 'postgres' },
+            { name: 'None / Skip', value: 'none' },
+          ],
+        }]);
+        db = dbAnswer;
+      }
+      mcpChoices = { servers: ['playwright', 'teams', 'azure'], db, stripe: false };
     } else {
       // Database selection
       const { db } = await inquirer.prompt([{
@@ -311,6 +338,12 @@ async function main() {
 
     const mcpPath = join(targetDir, '.mcp.json');
     if (await fs.pathExists(mcpPath)) {
+      // In --all mode, check if content is identical first
+      const newContent = JSON.stringify(mcpConfig, null, 2);
+      const existingContent = await fs.readFile(mcpPath, 'utf8');
+      if (newContent.trim() === existingContent.trim()) {
+        console.log(chalk.gray('  = .mcp.json (identical, skipped)'));
+      } else {
       const { action } = installAll
         ? { action: 'overwrite' }
         : await inquirer.prompt([{
@@ -335,6 +368,7 @@ async function main() {
       } else {
         console.log(chalk.gray('  ⊘ .mcp.json (skipped)'));
       }
+      } // close identical check else
     } else {
       await fs.writeJson(mcpPath, mcpConfig, { spaces: 2 });
       console.log(chalk.green('  ✓ .mcp.json'));
