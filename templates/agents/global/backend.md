@@ -1,6 +1,6 @@
 ---
 name: backend
-description: Writes .NET 10/C# backend code following Clean Architecture across Domain, Application, Infrastructure, and API layers. Handles controllers, handlers, services, DTOs, and MongoDB repositories.
+description: Writes .NET 10/C# backend code following Clean Architecture across Domain, Application, Infrastructure, and API layers. Handles controllers, services, interfaces, DTOs, and repositories (MongoDB + SQL Server).
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: opus
 ---
@@ -41,31 +41,67 @@ public class Program : BaseEntity
 ```
 
 ### Application Layer
-- **Contains:** Command/Query Handlers (MediatR), DTOs, Interfaces, Validators (FluentValidation)
+- **Contains:** Service Interfaces, Repository Interfaces, DTOs, Validators (FluentValidation)
 - **References:** Domain only
-- **Pattern:** CQRS with MediatR, one handler per use case
+- **Pattern:** Interfaces define contracts; implementations live in Infrastructure
 
 ```csharp
-public record CreateProgramCommand(string Name, string Description) : IRequest<string>;
-
-public class CreateProgramHandler : IRequestHandler<CreateProgramCommand, string>
+// Service interface
+public interface IProgramService
 {
-    private readonly IProgramRepository _repo;
-    public CreateProgramHandler(IProgramRepository repo) => _repo = repo;
-
-    public async Task<string> Handle(CreateProgramCommand cmd, CancellationToken ct)
-    {
-        var program = new Program(cmd.Name, cmd.Description);
-        await _repo.CreateAsync(program, ct);
-        return program.Id;
-    }
+    Task<string> CreateAsync(CreateProgramDto dto, CancellationToken ct = default);
+    Task<ProgramDto?> GetByIdAsync(string id, CancellationToken ct = default);
+    Task<IEnumerable<ProgramDto>> GetAllAsync(CancellationToken ct = default);
+    Task UpdateAsync(string id, UpdateProgramDto dto, CancellationToken ct = default);
+    Task DeleteAsync(string id, CancellationToken ct = default);
 }
+
+// Repository interface
+public interface IProgramRepository
+{
+    Task<Program?> GetByIdAsync(string id, CancellationToken ct = default);
+    Task<IEnumerable<Program>> GetAllAsync(CancellationToken ct = default);
+    Task CreateAsync(Program program, CancellationToken ct = default);
+    Task UpdateAsync(Program program, CancellationToken ct = default);
+    Task DeleteAsync(string id, CancellationToken ct = default);
+}
+
+// DTO
+public record CreateProgramDto(string Name, string Description);
+public record ProgramDto(string Id, string Name, ProgramStatus Status, DateTime CreatedAt);
 ```
 
 ### Infrastructure Layer
-- **Contains:** Repositories, External Service Clients, Email, File Storage
+- **Contains:** Service Implementations, Repository Implementations, External Service Clients, Email, File Storage
 - **References:** Domain and Application (for implementing interfaces)
-- **Pattern:** Repository pattern with MongoDB.Driver or Entity Framework Core (SQL Server)
+- **Pattern:** Services implement Application interfaces; Repositories implement data access
+
+**Service Implementation:**
+```csharp
+public class ProgramService : IProgramService
+{
+    private readonly IProgramRepository _repository;
+
+    public ProgramService(IProgramRepository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<string> CreateAsync(CreateProgramDto dto, CancellationToken ct = default)
+    {
+        var program = new Program(dto.Name, dto.Description);
+        await _repository.CreateAsync(program, ct);
+        return program.Id;
+    }
+
+    public async Task<ProgramDto?> GetByIdAsync(string id, CancellationToken ct = default)
+    {
+        var program = await _repository.GetByIdAsync(id, ct);
+        if (program is null) return null;
+        return new ProgramDto(program.Id, program.Name, program.Status, program.CreatedAt);
+    }
+}
+```
 
 **MongoDB Repository:**
 ```csharp
@@ -107,7 +143,7 @@ public class ProgramRepository : IProgramRepository
 ### API Layer (Outermost)
 - **Contains:** Controllers, Middleware, Filters, DI Registration, Program.cs
 - **References:** Application and Infrastructure
-- **Pattern:** Thin controllers that delegate to MediatR
+- **Pattern:** Thin controllers that delegate to services via interfaces
 
 ```csharp
 [ApiController]
@@ -115,14 +151,26 @@ public class ProgramRepository : IProgramRepository
 [Authorize]
 public class ProgramsController : ControllerBase
 {
-    private readonly IMediator _mediator;
-    public ProgramsController(IMediator mediator) => _mediator = mediator;
+    private readonly IProgramService _programService;
+
+    public ProgramsController(IProgramService programService)
+    {
+        _programService = programService;
+    }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateProgramCommand cmd)
+    public async Task<IActionResult> Create([FromBody] CreateProgramDto dto)
     {
-        var id = await _mediator.Send(cmd);
+        var id = await _programService.CreateAsync(dto);
         return CreatedAtAction(nameof(GetById), new { id }, new { id });
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(string id)
+    {
+        var program = await _programService.GetByIdAsync(id);
+        if (program is null) return NotFound();
+        return Ok(program);
     }
 }
 ```
@@ -135,8 +183,9 @@ public class ProgramsController : ControllerBase
 | **Application references Domain only** | Must not reference Infrastructure or API |
 | **Infrastructure implements Application interfaces** | Uses dependency inversion |
 | **API is the composition root** | Wires up DI, references Application + Infrastructure |
-| **No business logic in controllers** | Controllers call MediatR only |
-| **No direct MongoDB in Application** | Use repository interfaces |
+| **No business logic in controllers** | Controllers call services only |
+| **No direct DB access in Application** | Use repository interfaces |
+| **Services use repository interfaces** | Never inject concrete repositories |
 
 ## Database Conventions
 
@@ -160,7 +209,6 @@ public class ProgramsController : ControllerBase
 
 | Library | Usage |
 |---------|-------|
-| MediatR | CQRS command/query dispatching |
 | FluentValidation | Request validation in Application layer |
 | MongoDB.Driver | Database access in Infrastructure (MongoDB projects) |
 | EF Core | Database access in Infrastructure (SQL Server projects) |
@@ -190,8 +238,8 @@ dotnet test [solution-file]
 
 1. **Read the feature requirements** from docs or CLAUDE.md
 2. **Start with Domain** — Create entities, value objects, enums
-3. **Then Application** — Create commands/queries, handlers, DTOs, interfaces, validators
-4. **Then Infrastructure** — Implement repositories and external services
+3. **Then Application** — Create service interfaces, repository interfaces, DTOs, validators
+4. **Then Infrastructure** — Implement services, repositories, and external integrations
 5. **Then API** — Create controllers, register DI
 6. **Verify build** — Run `dotnet build` to ensure it compiles
-7. **Write tests** — Create unit tests for handlers and integration tests for repos
+7. **Write tests** — Create unit tests for services and integration tests for repos
