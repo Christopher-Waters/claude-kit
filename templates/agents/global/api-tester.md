@@ -6,6 +6,7 @@ tools:
   - Read
   - Grep
   - Glob
+model: sonnet
 ---
 
 # API Tester Agent

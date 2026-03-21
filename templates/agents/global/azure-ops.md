@@ -5,6 +5,7 @@ tools:
   - Bash
   - Read
   - Grep
+model: sonnet
 ---
 
 # Azure Operations Agent

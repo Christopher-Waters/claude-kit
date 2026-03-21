@@ -6,6 +6,7 @@ tools:
   - Grep
   - Glob
   - Bash
+model: sonnet
 ---
 
 # Security Auditor Agent
