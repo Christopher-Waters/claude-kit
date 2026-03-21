@@ -63,6 +63,40 @@ db.subscriptions.findOne({ OrganizationId: "org-id", Platform: 0 })
 db.users.findOne({ Email: "user@example.com" }, { Email: 1, Status: 1, Roles: 1, "Auth.EmailVerified": 1 })
 ```
 
+## Sensitive Data — STRICTLY FORBIDDEN
+
+The following fields contain sensitive PII and MUST NEVER be queried, projected, displayed, or included in output — even if the values are encrypted. Never expose encrypted values either.
+
+| Blocked Fields | Applies To |
+|---------------|-----------|
+| `TIN`, `Tin`, `TaxId`, `TaxIdentificationNumber`, `EIN` | All databases |
+| `SSN`, `SocialSecurityNumber`, `Social` | All databases |
+| `BankAccountNumber`, `AccountNumber`, `RoutingNumber` | All databases |
+| `EncryptedTin`, `EncryptedSSN`, `EncryptedTaxId` | All databases |
+
+**Rules for sensitive data:**
+- NEVER include these fields in a projection (even `{ TIN: 0 }` exclusion projections risk exposing data if the query shape changes — use explicit inclusion projections instead)
+- NEVER use `find()` or `findOne()` without a projection that explicitly lists only the safe fields to return
+- NEVER query/filter by these fields (e.g., `{ TIN: "some-value" }`)
+- NEVER display, log, or summarize values from these fields — even if encrypted/hashed
+- If a user asks to see or query a TIN or other sensitive field, explain that this is blocked by policy and suggest they use the application UI instead
+- When querying collections that contain sensitive fields (like `recipients`, `organizations`, `applications`), ALWAYS use an explicit inclusion projection listing only the non-sensitive fields needed
+
+**Example — safe query on a collection with sensitive fields:**
+```javascript
+// CORRECT: explicit inclusion projection, sensitive fields excluded
+db.recipients.findOne(
+  { Email: "user@example.com" },
+  { FirstName: 1, LastName: 1, Email: 1, Status: 1 }
+)
+
+// WRONG: no projection — returns everything including encrypted TIN
+db.recipients.findOne({ Email: "user@example.com" })
+
+// WRONG: exclusion projection — fragile, new sensitive fields won't be excluded
+db.recipients.findOne({ Email: "user@example.com" }, { TIN: 0 })
+```
+
 ## Rules
 - NEVER delete production data without explicit confirmation
 - NEVER modify connection strings or credentials

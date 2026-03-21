@@ -24,12 +24,17 @@ You (give task)
   └── reviewer → reviews code quality
 ```
 
+### Sensitive Data Policy
+
+**NEVER query, display, or expose sensitive PII fields from the database — even if the values are encrypted.** This includes TIN, SSN, EIN, TaxId, BankAccountNumber, RoutingNumber, and any `Encrypted*` variants. Even encrypted/hashed values must not appear in output, logs, or summaries. When querying collections that may contain sensitive fields, always use explicit inclusion projections listing only the non-sensitive fields needed. If a user requests access to sensitive data, direct them to use the application UI.
+
 ### Automated Hooks
 
 These run automatically — no action needed:
 
 | When | What Happens |
 |------|-------------|
+| **Before any Bash command** | Sensitive data blocker prevents database queries that reference TIN, SSN, or other PII fields |
 | **Before any file write** | Secret blocker scans for hardcoded credentials and blocks them |
 | **Before any file edit** | Protected files guard warns/blocks edits to production configs |
 | **After any file edit** | Auto-formatter runs (dotnet format for .cs, eslint --fix for .ts) |

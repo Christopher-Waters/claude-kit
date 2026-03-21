@@ -14,6 +14,15 @@
             "command": "bash .claude/hooks/protected-files.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/sensitive-data-blocker.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
