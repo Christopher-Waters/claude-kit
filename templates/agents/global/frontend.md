@@ -22,12 +22,12 @@ Before starting work, discover the project structure:
 | Library | Version | Usage |
 |---------|---------|-------|
 | React | 19 | UI framework |
-| Next.js | 15 | SSR/routing (if applicable) |
-| Vite | 6 | Build tool (if applicable) |
+| Vite | 6 | Build tool |
 | MUI | 6 | Component library |
 | Redux Toolkit | 2 | Global state management |
 | React Hook Form | 7 | Form handling and validation |
 | TanStack Query | 5 | Server state / API caching |
+| Axios | Latest | HTTP client for API calls |
 | TypeScript | 5 | Type safety |
 | Vitest | Latest | Unit testing |
 | Playwright | Latest | E2E testing |
@@ -98,16 +98,15 @@ Read the relevant HTML mockup file and match:
 ### Page Component
 
 ```tsx
-'use client';
-
 import { useState } from 'react';
 import { Box, Typography, Button } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { itemsApi } from '@/api/itemsApi';
 
 export default function ItemsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['items'],
-    queryFn: itemsApi.getAll,
+    queryFn: () => itemsApi.getAll(),
   });
 
   if (isLoading) return <LoadingSkeleton />;
@@ -145,6 +144,39 @@ export const itemSlice = createSlice({
     },
   },
 });
+```
+
+### API Service with Axios
+
+```tsx
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// Add auth token interceptor
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+export default api;
+```
+
+```tsx
+// api/itemsApi.ts
+import api from './api';
+
+export const itemsApi = {
+  getAll: () => api.get<ItemDto[]>('/api/items').then(res => res.data),
+  getById: (id: string) => api.get<ItemDto>(`/api/items/${id}`).then(res => res.data),
+  create: (dto: CreateItemDto) => api.post<string>('/api/items', dto).then(res => res.data),
+  update: (id: string, dto: UpdateItemDto) => api.put(`/api/items/${id}`, dto),
+  delete: (id: string) => api.delete(`/api/items/${id}`),
+};
 ```
 
 ### Form with React Hook Form
