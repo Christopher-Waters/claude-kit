@@ -2,7 +2,7 @@
 
 > Personal AI Infrastructure for [Claude Code](https://claude.ai/code) — an internal package that gives every Care Solutions team member a standardized, AI-powered development experience.
 
-**Private package.** Restricted to Care Solutions Azure DevOps organization members.
+**Private package.** Published to the Care Solutions Azure DevOps Artifacts npm feed. Only organization members can install it.
 
 ---
 
@@ -26,59 +26,94 @@ Every session Claude learns from your feedback and gets better at helping you sp
 
 ---
 
-## Installation
+## First-Time Setup (One Time Per Machine)
 
 ### Prerequisites
 
 - [Claude Code CLI](https://claude.ai/code) installed
 - [Node.js](https://nodejs.org/) 18 or later
-- Git access to this repo
+- Access to the Care Solutions Azure DevOps organization
 
-### Quick Start
+### Step 1: Authenticate with the npm feed
 
-```bash
-# 1. Clone this repo
-git clone https://dev.azure.com/caresolutionsinc/Care%20Solutions%20AI/_git/Care%20Solutions%20AI
-cd "Care Solutions AI"
-
-# 2. Install dependencies
-npm install
-
-# 3. Run the interactive installer on your project
-node bin/cli.js init /path/to/your/project
-```
-
-### Install Options
+You need to connect npm to our private Azure DevOps Artifacts feed. Run this once:
 
 ```bash
-# Interactive mode (recommended) — choose what you need
-node bin/cli.js init /path/to/project
+# Add our private registry for @caresolutions packages
+echo "@caresolutions:registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/" >> ~/.npmrc
 
-# Install everything without prompts
-node bin/cli.js init /path/to/project --all
-
-# Install only global agents (works across all projects)
-node bin/cli.js init --global-only
-
-# Show help
-node bin/cli.js --help
+# Authenticate (follow the prompts — use your Azure DevOps credentials)
+npm login --registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/
 ```
 
-### What the Installer Asks
+> **Windows users:** If `npm login` doesn't work, install the Azure DevOps auth helper:
+> ```bash
+> npm install -g vsts-npm-auth
+> vsts-npm-auth -config .npmrc
+> ```
 
-The interactive installer walks you through:
+### Step 2: Verify it works
 
+```bash
+npx @caresolutions/ai-infrastructure --help
+```
+
+You should see the help output. If you get a 401 or 403 error, re-run `npm login` from Step 1.
+
+---
+
+## Installation
+
+### Interactive Install (Recommended)
+
+```bash
+npx @caresolutions/ai-infrastructure init
+```
+
+The installer walks you through:
 1. **Target directory** — where to install
-2. **Component selection** — checkboxes to pick agents, hooks, commands, MCP servers, etc.
+2. **Components** — checkboxes to pick agents, hooks, commands, MCP servers
 3. **Database type** — MongoDB, SQL Server, Azure SQL, PostgreSQL, or None
-4. **MCP servers** — pick which integrations you need:
-   - Playwright (browser testing)
-   - Microsoft Teams (notifications)
-   - Stripe (payment management)
-   - Azure CLI (infrastructure)
-5. **Existing files** — overwrite, skip, or merge for each file that already exists
+4. **MCP servers** — Playwright, Teams, Stripe, Azure CLI (pick what you need)
+5. **Existing files** — asks to overwrite, skip, or merge each one
 
-### What Gets Installed
+### Install to a Specific Project
+
+```bash
+npx @caresolutions/ai-infrastructure init /path/to/your/project
+```
+
+### Install Everything (No Prompts)
+
+```bash
+# Still asks which database type (no sensible default)
+npx @caresolutions/ai-infrastructure init --all
+
+# Fully automated — zero prompts
+npx @caresolutions/ai-infrastructure init --all --db=mongo
+npx @caresolutions/ai-infrastructure init --all --db=mssql
+npx @caresolutions/ai-infrastructure init --all --db=azuresql
+npx @caresolutions/ai-infrastructure init --all --db=postgres
+```
+
+### Install Only Global Agents
+
+Global agents work across all your projects. Install them once:
+
+```bash
+npx @caresolutions/ai-infrastructure init --global-only
+```
+
+### Re-Running the Installer
+
+Safe to run multiple times. The installer:
+- **Skips** files that are identical (no unnecessary changes)
+- **Asks** before overwriting files that have changed
+- **Merges** MCP server configs (adds missing servers without removing existing ones)
+
+---
+
+## What Gets Installed
 
 ```
 your-project/
@@ -115,86 +150,142 @@ your-project/
 
 ## Usage
 
-### The Development Workflow
+### Start Working
 
-**Implementing a work item:**
+```bash
+cd /path/to/your/project
+claude
+```
+
+Verify MCP servers are connected:
+```
+/mcp
+```
+
+### Implement a Work Item
 
 ```
-1. Open your project:     cd /path/to/project && claude
-2. Verify MCP:            /mcp
-3. Start work:            /implement AB#1234
+/implement AB#1234
 ```
 
 Claude automatically:
-- Reads the work item from Azure DevOps
-- Explores the codebase and plans the approach
-- Delegates to backend/frontend agents to implement
-- Runs tests, linting, and build validation
-- Generates a UAT checklist from acceptance criteria
-- **Pauses for you to manually test**
-- Creates the PR after you confirm
+1. Reads the work item from Azure DevOps
+2. Explores the codebase and plans the approach
+3. Delegates to backend/frontend agents to implement
+4. Runs tests, linting, and build validation
+5. Generates a UAT checklist from acceptance criteria
+6. **Pauses for you to manually test**
+7. Creates the PR after you confirm
 
-**Reviewing a pull request:**
+### Review a Pull Request
 
 ```
 /review 142
 ```
 
 Claude automatically:
-- Reads the full PR diff
-- Reads the linked work item and checks all acceptance criteria
-- Reviews for Clean Architecture, security, missing tests, code quality
-- Posts inline comments on all findings
-- Posts a PR-level summary
-- Asks: "Approve, Request Changes, or skip the vote?"
+1. Reads the full PR diff
+2. Reads the linked work item and checks all acceptance criteria
+3. Reviews for Clean Architecture, security, missing tests, code quality
+4. Posts inline comments on all findings
+5. Posts a PR-level summary
+6. Asks: "Approve, Request Changes, or skip the vote?"
 
-### Hooks in Action
+### For Senior Devs / Tech Leads
 
-These run automatically — no action needed:
+Use `/review` on any PR for automated code review:
+```
+/review 142
+```
 
-| When | What Happens | Why |
-|------|-------------|-----|
-| Before any file write | Secret blocker scans for credentials | Prevents leaking API keys, connection strings, passwords |
-| Before any file edit | Protected files guard checks the path | Prevents accidental edits to production configs |
-| After any file edit | Auto-formatter runs | Keeps code style consistent (dotnet format / eslint) |
-| After any file edit | Test suggestion appears | Reminds you which tests to run |
-| When Claude stops | UAT reminder | Don't forget to test before marking done |
-| When Claude stops | Self-improvement prompt | Claude saves what it learned for next time |
+The review checks:
+- Clean Architecture boundaries (Domain has no infrastructure dependencies)
+- Tenant/organizationId enforcement on all database queries
+- Missing unit or integration tests for new code
+- `any` types in TypeScript (should be properly typed)
+- Security issues (OWASP Top 10, hardcoded secrets)
+- Acceptance criteria coverage from the linked work item
 
 ---
 
-## Environment Setup
+## Hooks
 
-Each team member sets their own environment variables. **Never commit these.**
+These run automatically — no action needed:
+
+| When | Hook | What It Does |
+|------|------|-------------|
+| **Before** any file write | `secret-blocker.sh` | Scans for hardcoded credentials (MongoDB URIs, AWS keys, Stripe keys, passwords). **Blocks the write.** |
+| **Before** any file edit | `protected-files.sh` | Blocks edits to production/staging configs. Warns on critical files (CLAUDE.md, pipelines, Program.cs). |
+| **After** any file edit | `auto-format.sh` | Runs `dotnet format` on .cs files, `eslint --fix` on .ts/.tsx files |
+| **After** any file edit | `test-on-change.sh` | Suggests the relevant test command for the modified file |
+| **When Claude stops** | `uat-reminder.sh` | Reminds to run UAT if a feature was implemented |
+| **When Claude stops** | `self-improve.sh` | Prompts Claude to save learnings to memory for next time |
+
+---
+
+## Environment Variables
+
+Each team member sets their own. **Never commit these.**
+
+Add to `~/.zshrc` (Mac) or System Environment Variables (Windows):
 
 ```bash
-# Add to ~/.zshrc (Mac) or System Environment Variables (Windows)
-
 # MongoDB (if your project uses MongoDB)
 export MONGODB_CONNECTION_STRING="mongodb+srv://user:password@cluster.mongodb.net/"
 
-# SQL Server (if your project uses SQL Server)
+# SQL Server (if your project uses SQL Server or Azure SQL)
 export MSSQL_CONNECTION_STRING="Server=localhost;Database=MyDb;User Id=sa;Password=...;"
 
-# Microsoft Teams (for team notifications)
+# PostgreSQL (if your project uses PostgreSQL)
+export POSTGRES_CONNECTION_STRING="postgresql://user:password@localhost:5432/mydb"
+
+# Microsoft Teams (for team notifications and messages)
 export TEAMS_TENANT_ID="your-azure-ad-tenant-id"
 export TEAMS_CLIENT_ID="your-app-registration-client-id"
 export TEAMS_CLIENT_SECRET="your-client-secret"
 
-# Stripe (if your project uses Stripe)
+# Stripe (if your project uses Stripe payments)
 export STRIPE_SECRET_KEY="sk_test_..."
 
 # Azure CLI (no env var needed — just log in)
 az login
 ```
 
-### Setting Up Teams MCP Server
+### Setting Up the Teams MCP Server
 
 1. Go to [Azure Portal > App Registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps)
-2. New Registration → name it "Claude Code Teams Bot"
-3. API Permissions → add Microsoft Graph: `ChannelMessage.Send`, `Chat.ReadWrite`, `Team.ReadBasic.All`
-4. Create a client secret
-5. Set the three TEAMS env vars above
+2. Click **New Registration** → name it "Claude Code Teams Bot"
+3. **API Permissions** → Add Microsoft Graph:
+   - `ChannelMessage.Send`
+   - `ChannelMessage.Read.All`
+   - `Chat.ReadWrite`
+   - `Team.ReadBasic.All`
+4. **Certificates & Secrets** → Create a new client secret
+5. Copy the Tenant ID, Client ID, and Client Secret
+6. Set the three `TEAMS_*` environment variables above
+
+---
+
+## Memory System
+
+Claude maintains persistent memory across sessions in `~/.claude/projects/.../memory/`. The self-improvement hook prompts Claude to save learnings after each session.
+
+| Memory Type | Purpose | Example |
+|-------------|---------|---------|
+| **user** | Who you are, preferences, expertise | "Senior .NET dev, prefers terse responses" |
+| **feedback** | What to do / avoid (self-improving) | "Always push to both main and develop" |
+| **project** | Decisions, priorities, blockers | "Using Stripe instead of Dwolla because..." |
+| **reference** | URLs, credentials, external resources | "Staging URL: https://..." |
+
+### Setting Up Your Memory
+
+After installing, start a Claude Code session and say:
+```
+Set up my memory profile. I'm [your name], a [your role] at Care Solutions.
+I work on [your projects]. I prefer [your preferences].
+```
+
+Claude creates the initial memory files. Each subsequent session adds to them automatically.
 
 ---
 
@@ -207,22 +298,20 @@ Create `.claude/agents/your-agent.md` in your project:
 ```markdown
 ---
 name: your-agent
-description: What this agent does — shown in agent selection
+description: What this agent does
 tools:
   - Bash
   - Read
   - Write
 ---
 
-# Your Agent Name
-
-Instructions for what this agent does and how it behaves...
+Instructions for the agent...
 ```
 
 ### Adding Custom Hooks
 
-1. Create `.claude/hooks/your-hook.sh` — make it executable
-2. Add it to `.claude/settings.json` under the appropriate event (PreToolUse, PostToolUse, or Stop)
+1. Create `.claude/hooks/your-hook.sh` and make it executable
+2. Add it to `.claude/settings.json` under PreToolUse, PostToolUse, or Stop
 
 ### Adding Custom Slash Commands
 
@@ -233,10 +322,9 @@ Do something with $ARGUMENTS.
 
 1. Step one
 2. Step two
-3. Step three
 ```
 
-Then use it: `/your-command some-argument`
+Use it: `/your-command some-argument`
 
 ### Removing Components
 
@@ -244,35 +332,87 @@ Delete any agent, hook, command, or MCP server you don't need. Everything works 
 
 ---
 
+## Updating
+
+When the infrastructure package is updated:
+
+```bash
+# Updates will install automatically via npx (always fetches latest)
+npx @caresolutions/ai-infrastructure init /path/to/project
+```
+
+The installer detects existing files and asks whether to overwrite or skip each one.
+
+### Publishing Updates (Maintainers Only)
+
+```bash
+cd care-solutions-ai
+
+# Make your changes, then bump the version
+npm version patch    # 1.0.0 → 1.0.1
+# or
+npm version minor    # 1.0.0 → 1.1.0
+
+# Publish to the private feed
+npm run publish:feed
+
+# Push to repo
+git push && git push --tags
+```
+
+---
+
 ## Security
 
 - **No secrets in the repo** — `.mcp.json` only contains `${ENV_VAR}` references
 - **Secret blocker hook** — automatically blocks writes containing hardcoded credentials
-- **Protected files hook** — prevents edits to production configs
+- **Protected files hook** — prevents edits to production/staging configs
 - **`.claude/settings.local.json`** is gitignored — personal permissions stay private
-- **Private repo** — only Care Solutions Azure DevOps org members have access
+- **Private npm feed** — only Care Solutions Azure DevOps org members can install
 
 ---
 
-## Updating
+## Troubleshooting
 
-When the infrastructure is updated:
+### `npm ERR! 401 Unauthorized` when running npx
 
+Re-authenticate with the npm feed:
 ```bash
-cd "Care Solutions AI"
-git pull
-node bin/cli.js init /path/to/project
+npm login --registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/
 ```
 
-The installer detects existing files and asks whether to overwrite, skip, or merge each one.
+### `npm ERR! 404 Not Found`
+
+Make sure the registry is configured:
+```bash
+echo "@caresolutions:registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/" >> ~/.npmrc
+```
+
+### Hooks not running
+
+Verify the settings file is loaded:
+```
+claude
+/config
+```
+Check that `.claude/settings.json` shows your hooks.
+
+### MCP server not connecting
+
+Check that the environment variable is set:
+```bash
+echo $MONGODB_CONNECTION_STRING   # Should show your connection string
+echo $STRIPE_SECRET_KEY           # Should show sk_test_...
+az account show                   # Should show your Azure subscription
+```
 
 ---
 
 ## Support
 
-- **Issues:** Contact the engineering team via Teams
-- **Documentation:** This README + CLAUDE.md workflow section in each project
-- **Source:** https://dev.azure.com/caresolutionsinc/Care%20Solutions%20AI
+- **Questions:** Ask in the #engineering Teams channel
+- **Issues:** Create a work item in the [Care Solutions AI](https://dev.azure.com/caresolutionsinc/Care%20Solutions%20AI) project
+- **Source:** https://dev.azure.com/caresolutionsinc/Care%20Solutions%20AI/_git/Care%20Solutions%20AI
 
 ## License
 
