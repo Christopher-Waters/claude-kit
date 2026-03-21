@@ -14,15 +14,15 @@ Every session Claude learns from your feedback and gets better at helping you sp
 
 ### What's Included
 
-| Component | Count | Description |
-|-----------|-------|-------------|
-| **Project Agents** | 3 | deployer (CI/CD), db-admin (MongoDB), devops-tracker (work items) |
-| **Global Agents** | 3 | azure-ops (infrastructure), security-auditor (scanning), api-tester (endpoint testing) |
-| **Hooks** | 6 | Secret blocker, protected files, auto-format, test suggestions, UAT reminder, self-improve |
-| **MCP Servers** | 6 | Azure DevOps, Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
-| **Slash Commands** | 2 | `/implement` (work item → code → tests → PR), `/review` (automated PR review) |
-| **Workflow Template** | 1 | Appended to CLAUDE.md — documents the full development process |
-| **Memory System** | Template | Self-improving context that gets smarter every session |
+| Component | Count | Where Installed | Description |
+|-----------|-------|----------------|-------------|
+| **Global Agents** | 3 | `~/.claude/agents/` (your machine, all projects) | azure-ops, security-auditor, api-tester |
+| **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
+| **Hooks** | 6 | `.claude/hooks/` (in the project) | Secret blocker, protected files, auto-format, test suggestions, UAT reminder, self-improve |
+| **Slash Commands** | 2 | `.claude/commands/` (in the project) | `/implement` (work item → PR), `/review` (automated code review) |
+| **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
+| **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
+| **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
 
 ---
 
@@ -35,8 +35,6 @@ Every session Claude learns from your feedback and gets better at helping you sp
 - Access to the Care Solutions Azure DevOps organization
 
 ### Step 1: Authenticate with the npm feed
-
-You need to connect npm to our private Azure DevOps Artifacts feed. Run this once:
 
 ```bash
 # Add our private registry for @caresolutions packages
@@ -64,86 +62,155 @@ You should see the help output. If you get a 401 or 403 error, re-run `npm login
 
 ## Installation
 
-### Interactive Install (Recommended)
+### How It Works
+
+**Every install mode does two things:**
+1. **Global agents** → installed to `~/.claude/agents/` (works across ALL your projects)
+2. **Project files** → installed to the target project directory (agents, hooks, commands, MCP config, settings)
+
+### Option 1: Interactive Install (Recommended)
+
+Best for first-time setup or when you want to pick exactly what you need.
 
 ```bash
 npx @caresolutions/ai-infrastructure init
 ```
 
-The installer walks you through:
-1. **Target directory** — where to install
-2. **Components** — checkboxes to pick agents, hooks, commands, MCP servers
+You'll be asked:
+1. **Target directory** — where is your project?
+2. **Components** — checkboxes to pick which parts to install:
+   - ☑ Project Agents (deployer, db-admin, devops-tracker)
+   - ☑ Hooks (secret blocker, auto-format, etc.)
+   - ☑ Slash Commands (/implement, /review)
+   - ☑ MCP Servers
+   - ☑ Settings
+   - ☑ CLAUDE.md Workflow
+   - ☑ .gitignore Updates
 3. **Database type** — MongoDB, SQL Server, Azure SQL, PostgreSQL, or None
-4. **MCP servers** — Playwright, Teams, Stripe, Azure CLI (pick what you need)
-5. **Existing files** — asks to overwrite, skip, or merge each one
+4. **MCP servers** — pick which ones:
+   - ☑ Playwright (browser testing)
+   - ☑ Microsoft Teams (notifications)
+   - ☐ Stripe (payments) — off by default
+   - ☑ Azure CLI (infrastructure)
+5. **Existing files** — for each file that already exists, choose overwrite or skip
 
-### Install to a Specific Project
+### Option 2: Install to a Specific Project
+
+Same as Option 1, but you specify the project path upfront:
 
 ```bash
 npx @caresolutions/ai-infrastructure init /path/to/your/project
 ```
 
-### Install Everything (No Prompts)
+### Option 3: Install Everything (Minimal Prompts)
+
+Installs all components. Only asks which database type (there's no sensible default).
 
 ```bash
-# Still asks which database type (no sensible default)
 npx @caresolutions/ai-infrastructure init --all
+```
 
-# Fully automated — zero prompts
+This installs:
+- ✅ Global agents (azure-ops, security-auditor, api-tester)
+- ✅ Project agents (deployer, db-admin, devops-tracker)
+- ✅ All 6 hooks
+- ✅ Both slash commands (/implement, /review)
+- ✅ MCP servers: Playwright, Teams, Azure CLI (+ your DB choice)
+- ✅ Settings, CLAUDE.md workflow, .gitignore
+- ❌ Stripe (not included in --all, add via interactive mode)
+- ⏭️ Skips files that are already identical
+- 🔄 Overwrites files that have changed
+
+### Option 4: Fully Automated (Zero Prompts)
+
+Specify the database type as a flag — no prompts at all:
+
+```bash
 npx @caresolutions/ai-infrastructure init --all --db=mongo
 npx @caresolutions/ai-infrastructure init --all --db=mssql
 npx @caresolutions/ai-infrastructure init --all --db=azuresql
 npx @caresolutions/ai-infrastructure init --all --db=postgres
 ```
 
-### Install Only Global Agents
+You can also target a specific directory:
+```bash
+npx @caresolutions/ai-infrastructure init /path/to/project --all --db=mongo
+```
 
-Global agents work across all your projects. Install them once:
+### Option 5: Global Agents Only
+
+Just installs the 3 global agents to `~/.claude/agents/`. No project files, no prompts.
 
 ```bash
 npx @caresolutions/ai-infrastructure init --global-only
 ```
 
+Use this when you just want the global agents on a new machine and will install project files separately per project.
+
 ### Re-Running the Installer
 
-Safe to run multiple times. The installer:
+**Safe to run as many times as you want.** The installer:
 - **Skips** files that are identical (no unnecessary changes)
-- **Asks** before overwriting files that have changed
+- **Asks** before overwriting files that have changed (in interactive mode)
+- **Overwrites** changed files silently (in `--all` mode)
 - **Merges** MCP server configs (adds missing servers without removing existing ones)
+
+### Installing on Additional Projects
+
+Already installed on one project? Just run the same command for the next one:
+
+```bash
+npx @caresolutions/ai-infrastructure init /path/to/another/project
+```
+
+The installer automatically **skips global agents** that are already installed (they're identical) and only installs the project-specific files. You don't need `--global-only` or any special flag — it just works.
+
+```
+📦 Global Agents → ~/.claude/agents/
+  = azure-ops.md (identical, skipped)       ← already installed, skipped
+  = security-auditor.md (identical, skipped)
+  = api-tester.md (identical, skipped)
+
+📦 Project Agents → .claude/agents/         ← fresh install for this project
+  ✓ deployer.md
+  ✓ db-admin.md
+  ✓ devops-tracker.md
+  ...
+```
 
 ---
 
 ## What Gets Installed
 
 ```
-your-project/
+~/.claude/agents/                  ← Global (all projects)
+├── azure-ops.md                   # Azure infrastructure management
+├── security-auditor.md            # Security scanning (read-only)
+└── api-tester.md                  # API endpoint testing
+
+your-project/                      ← Project-specific
 ├── .claude/
-│   ├── agents/                     # AI sub-agents
-│   │   ├── deployer.md             # Commit → push → deploy → monitor
-│   │   ├── db-admin.md             # Database queries and data management
-│   │   └── devops-tracker.md       # Azure DevOps work item management
+│   ├── agents/
+│   │   ├── deployer.md            # Commit → push → deploy → monitor
+│   │   ├── db-admin.md            # Database queries and data management
+│   │   └── devops-tracker.md      # Azure DevOps work item management
 │   │
-│   ├── hooks/                      # Automated behaviors
-│   │   ├── secret-blocker.sh       # BLOCKS hardcoded secrets before write
-│   │   ├── protected-files.sh      # BLOCKS/warns on critical file edits
-│   │   ├── auto-format.sh          # Auto-runs formatters after edits
-│   │   ├── test-on-change.sh       # Suggests related tests after edits
-│   │   ├── uat-reminder.sh         # Reminds to run UAT after features
-│   │   └── self-improve.sh         # Saves learnings after each session
+│   ├── hooks/
+│   │   ├── secret-blocker.sh      # BLOCKS hardcoded secrets before write
+│   │   ├── protected-files.sh     # BLOCKS/warns on critical file edits
+│   │   ├── auto-format.sh         # Auto-runs formatters after edits
+│   │   ├── test-on-change.sh      # Suggests related tests after edits
+│   │   ├── uat-reminder.sh        # Reminds to run UAT after features
+│   │   └── self-improve.sh        # Saves learnings after each session
 │   │
-│   ├── commands/                   # Slash commands
-│   │   ├── implement.md            # /implement AB#1234
+│   ├── commands/
+│   │   ├── implement.md           # /implement AB#1234
 │   │   └── review.md              # /review 142
 │   │
 │   └── settings.json              # Hook and MCP registration
 │
 ├── .mcp.json                      # MCP server configuration
 └── CLAUDE.md                      # Gets workflow section appended
-
-~/.claude/agents/                  # Global agents (installed once, all projects)
-├── azure-ops.md                   # Azure infrastructure management
-├── security-auditor.md            # Security scanning (read-only)
-└── api-tester.md                  # API endpoint testing
 ```
 
 ---
@@ -337,7 +404,7 @@ Delete any agent, hook, command, or MCP server you don't need. Everything works 
 When the infrastructure package is updated:
 
 ```bash
-# Updates will install automatically via npx (always fetches latest)
+# npx always fetches the latest version
 npx @caresolutions/ai-infrastructure init /path/to/project
 ```
 
@@ -349,9 +416,7 @@ The installer detects existing files and asks whether to overwrite or skip each 
 cd care-solutions-ai
 
 # Make your changes, then bump the version
-npm version patch    # 1.0.0 → 1.0.1
-# or
-npm version minor    # 1.0.0 → 1.1.0
+npm version patch    # 1.0.1 → 1.0.2
 
 # Publish to the private feed
 npm run publish:feed
