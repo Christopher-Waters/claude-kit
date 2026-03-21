@@ -63,10 +63,11 @@ public class CreateProgramHandler : IRequestHandler<CreateProgramCommand, string
 ```
 
 ### Infrastructure Layer
-- **Contains:** MongoDB Repositories, External Service Clients, Email, File Storage
+- **Contains:** Repositories, External Service Clients, Email, File Storage
 - **References:** Domain and Application (for implementing interfaces)
-- **Pattern:** Repository pattern with MongoDB.Driver
+- **Pattern:** Repository pattern with MongoDB.Driver or Entity Framework Core (SQL Server)
 
+**MongoDB Repository:**
 ```csharp
 public class ProgramRepository : IProgramRepository
 {
@@ -80,6 +81,25 @@ public class ProgramRepository : IProgramRepository
     public async Task CreateAsync(Program program, CancellationToken ct)
     {
         await _collection.InsertOneAsync(program, cancellationToken: ct);
+    }
+}
+```
+
+**EF Core / SQL Server Repository:**
+```csharp
+public class ProgramRepository : IProgramRepository
+{
+    private readonly AppDbContext _context;
+
+    public ProgramRepository(AppDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task CreateAsync(Program program, CancellationToken ct)
+    {
+        _context.Programs.Add(program);
+        await _context.SaveChangesAsync(ct);
     }
 }
 ```
@@ -118,8 +138,9 @@ public class ProgramsController : ControllerBase
 | **No business logic in controllers** | Controllers call MediatR only |
 | **No direct MongoDB in Application** | Use repository interfaces |
 
-## MongoDB Conventions
+## Database Conventions
 
+### MongoDB Projects (Glasswing, Monarch)
 - **Collection names:** lowercase plural (e.g., `programs`, `applications`, `users`)
 - **Document IDs:** String (MongoDB ObjectId stored as string)
 - **Timestamps:** `CreatedAt` and `UpdatedAt` as `DateTime` (UTC)
@@ -127,13 +148,22 @@ public class ProgramsController : ControllerBase
 - **Audit fields:** `CreatedBy`, `UpdatedBy` as user ID strings
 - **Indexes:** Define in repository constructor or via a migration/seed class
 
+### SQL Server Projects
+- **Table names:** PascalCase plural (e.g., `Programs`, `Applications`, `Users`)
+- **Primary keys:** `Id` as int/bigint (identity) or Guid
+- **Timestamps:** `CreatedAt` and `UpdatedAt` as `datetime2` (UTC)
+- **Soft delete:** `IsDeleted` bit + `DeletedAt` nullable datetime2
+- **Migrations:** Use EF Core migrations (`dotnet ef migrations add`, `dotnet ef database update`)
+- **Stored procedures:** Only when performance requires it; prefer LINQ queries
+
 ## Key Libraries
 
 | Library | Usage |
 |---------|-------|
 | MediatR | CQRS command/query dispatching |
 | FluentValidation | Request validation in Application layer |
-| MongoDB.Driver | Database access in Infrastructure |
+| MongoDB.Driver | Database access in Infrastructure (MongoDB projects) |
+| EF Core | Database access in Infrastructure (SQL Server projects) |
 | AutoMapper | DTO to Entity mapping |
 | ASP.NET Identity | Authentication |
 | Serilog | Structured logging |

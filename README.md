@@ -16,7 +16,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 
 | Component | Count | Where Installed | Description |
 |-----------|-------|----------------|-------------|
-| **Global Agents** | 12 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
+| **Global Agents** | 13 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
 | **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
 | **Slash Commands** | 2 | `.claude/commands/` (in the project) | `/implement` (work item → PR), `/review` (automated code review) |
@@ -111,7 +111,7 @@ npx @caresolutions/ai-infrastructure init --all
 ```
 
 This installs:
-- ✅ Global agents (backend, frontend, manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester)
+- ✅ Global agents (backend, frontend, legacy, manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester)
 - ✅ Project agents (deployer, db-admin, devops-tracker)
 - ✅ All 9 hooks
 - ✅ Both slash commands (/implement, /review)
@@ -139,7 +139,7 @@ npx @caresolutions/ai-infrastructure init /path/to/project --all --db=mongo
 
 ### Option 5: Global Agents Only
 
-Just installs the 12 global agents to `~/.claude/agents/`. No project files, no prompts.
+Just installs the 13 global agents to `~/.claude/agents/`. No project files, no prompts.
 
 ```bash
 npx @caresolutions/ai-infrastructure init --global-only
@@ -186,6 +186,7 @@ The installer automatically **skips global agents** that are already installed (
 ~/.claude/agents/                  ← Global (all projects)
 ├── backend.md                     # .NET/C# backend developer (Clean Architecture)
 ├── frontend.md                    # React/TypeScript frontend developer
+├── legacy.md                      # Lucee/CFML legacy app developer (RBWO + others)
 ├── manager.md                     # Workflow orchestrator (delegates to other agents)
 ├── mockup.md                      # HTML mockup designer
 ├── reviewer.md                    # Code reviewer (read-only)

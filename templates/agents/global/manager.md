@@ -25,6 +25,7 @@ You have the following specialized agents available:
 |-------|------|-------------|
 | `backend` | .NET/C# backend developer | Writing backend code (Domain, Application, Infrastructure, API layers) |
 | `frontend` | React/TypeScript frontend developer | Writing frontend code (pages, components, forms, state) |
+| `legacy` | Lucee/CFML developer | Writing and maintaining legacy CFML apps (RBWO and others) |
 | `mockup` | HTML mockup designer | Creating/updating screen mockups before implementation |
 | `reviewer` | Code reviewer | After code is written, before merge |
 | `test-runner` | Test executor | Running xUnit, Vitest, Playwright tests |

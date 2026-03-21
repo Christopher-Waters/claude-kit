@@ -13,7 +13,7 @@ You (give task)
   ├── Explore → finds relevant files
   ├── Plan → designs the approach
   ├── mockup → creates HTML screen mockups before implementation
-  ├── backend / frontend → implements code
+  ├── backend / frontend / legacy → implements code
   ├── deployer → commits, pushes, triggers CD pipeline
   ├── db-admin → queries/fixes MongoDB data
   ├── devops-tracker → creates/updates Azure DevOps work items
