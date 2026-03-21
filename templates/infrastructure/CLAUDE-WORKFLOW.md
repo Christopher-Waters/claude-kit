@@ -36,7 +36,7 @@ These run automatically — no action needed:
 |------|-------------|
 | **Before any Bash command** | Sensitive data blocker prevents database queries that reference TIN, SSN, or other PII fields |
 | **Before any MCP database tool** | Sensitive data MCP blocker prevents MCP database queries that reference PII fields |
-| **After any Bash/MCP database command** | Sensitive data output blocker scans results for PII field names and blocks exposure |
+| **After any Bash/MCP/Read/Grep command** | Sensitive data output blocker scans results for PII field names and blocks exposure |
 | **Before any file write** | Secret blocker scans for hardcoded credentials and blocks them |
 | **Before any file edit** | Protected files guard warns/blocks edits to production configs |
 | **After any file edit** | Auto-formatter runs (dotnet format for .cs, eslint --fix for .ts) |

@@ -1,23 +1,35 @@
 #!/bin/bash
-# Sensitive Data Output Blocker Hook (PostToolUse - Bash)
-# Scans command output for sensitive PII field names that may have been
-# returned by broad database queries (e.g., find() without a projection).
+# Sensitive Data Output Blocker Hook (PostToolUse - Bash, Read, Grep, MCP DB tools)
+# Scans tool output for sensitive PII field names that may have been returned
+# by broad database queries, file reads of seed/dump data, or grep results.
 # Exit code 2 = BLOCK (prevents the output from being used).
 
 # Read the tool result from stdin
 INPUT=$(cat)
 
-# Extract the stdout from the tool result
+# Extract output from any tool type (Bash stdout, Read content, Grep results, MCP results)
 OUTPUT=$(echo "$INPUT" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
-    # Only check Bash results that look like they came from mongo
     tool = data.get('tool_name', '')
-    stdout = data.get('tool_result', {}).get('stdout', '')
-    if not stdout:
-        stdout = str(data.get('tool_result', ''))
-    print(stdout)
+    result = data.get('tool_result', '')
+
+    # Handle different result shapes
+    if isinstance(result, dict):
+        # Bash tool: check stdout
+        text = result.get('stdout', '')
+        # MCP/other tools: check content or stringify the whole result
+        if not text:
+            text = result.get('content', '')
+        if not text:
+            text = json.dumps(result)
+    elif isinstance(result, str):
+        text = result
+    else:
+        text = str(result)
+
+    print(text)
 except:
     pass
 " 2>/dev/null)
@@ -27,15 +39,25 @@ if [ -z "$OUTPUT" ]; then
 fi
 
 # Check if output contains sensitive field names as keys (indicating PII was returned)
-# These patterns match MongoDB/JSON document field names in output
-SENSITIVE_PATTERN='"(TIN|Tin|TaxId|TaxIdentificationNumber|EIN|SSN|SocialSecurityNumber|EncryptedTin|EncryptedSSN|EncryptedTaxId|BankAccountNumber|AccountNumber|RoutingNumber)"\s*:'
+# These patterns match field names in JSON documents, MongoDB output, C# properties, etc.
+SENSITIVE_PATTERNS=(
+    # JSON/MongoDB style: "TIN": or 'TIN':
+    '"(TIN|Tin|TaxId|TaxIdentificationNumber|EIN|SSN|SocialSecurityNumber|EncryptedTin|EncryptedSSN|EncryptedTaxId|BankAccountNumber|AccountNumber|RoutingNumber)"\s*:'
+    # C# property style: .TIN = or .TaxId =
+    '\.(TIN|TaxId|TaxIdentificationNumber|EIN|SSN|SocialSecurityNumber|EncryptedTin|EncryptedSSN|EncryptedTaxId|BankAccountNumber|AccountNumber|RoutingNumber)\s*='
+    # YAML/config style: TIN: (start of line or after whitespace)
+    '(^|\s)(TIN|TaxId|TaxIdentificationNumber|EIN|SSN|SocialSecurityNumber|EncryptedTin|EncryptedSSN|EncryptedTaxId|BankAccountNumber|AccountNumber|RoutingNumber):\s'
+)
 
-if echo "$OUTPUT" | grep -qE "$SENSITIVE_PATTERN"; then
-    echo "BLOCKED: Command output contains sensitive PII fields (TIN, SSN, bank account, etc.)"
-    echo "The query returned documents with sensitive fields. Use an explicit inclusion projection"
-    echo "that lists only the non-sensitive fields you need."
-    echo "If you need to work with this data, use the application UI instead."
-    exit 2
-fi
+for PATTERN in "${SENSITIVE_PATTERNS[@]}"; do
+    if echo "$OUTPUT" | grep -qE "$PATTERN"; then
+        echo "BLOCKED: Output contains sensitive PII fields (TIN, SSN, bank account, etc.)"
+        echo "The output includes documents or data with sensitive fields."
+        echo "For database queries: use an explicit inclusion projection listing only non-sensitive fields."
+        echo "For code searches: avoid reading seed data, test fixtures, or dump files containing PII."
+        echo "If you need to work with this data, use the application UI instead."
+        exit 2
+    fi
+done
 
 exit 0

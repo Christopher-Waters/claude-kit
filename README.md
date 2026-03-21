@@ -286,7 +286,7 @@ These run automatically — no action needed:
 |------|------|-------------|
 | **Before** any Bash command | `sensitive-data-blocker.sh` | Blocks `mongosh` commands that reference sensitive PII fields (TIN, SSN, bank accounts). **Blocks the command.** |
 | **Before** any MCP database tool | `sensitive-data-mcp-blocker.sh` | Blocks MongoDB/MSSQL/Postgres MCP tool calls that reference PII fields. **Blocks the call.** |
-| **After** any Bash/MCP DB command | `sensitive-data-output-blocker.sh` | Scans command output for PII field names returned by broad queries. **Blocks the output.** |
+| **After** any Bash/MCP/Read/Grep | `sensitive-data-output-blocker.sh` | Scans output for PII field names in JSON, C#, YAML formats — catches broad queries, seed data, test fixtures, log files, and git diffs. **Blocks the output.** |
 | **Before** any file write | `secret-blocker.sh` | Scans for hardcoded credentials (MongoDB URIs, AWS keys, Stripe keys, passwords). **Blocks the write.** |
 | **Before** any file edit | `protected-files.sh` | Blocks edits to production/staging configs. Warns on critical files (CLAUDE.md, pipelines, Program.cs). |
 | **After** any file edit | `auto-format.sh` | Runs `dotnet format` on .cs files, `eslint --fix` on .ts/.tsx files |
@@ -436,7 +436,7 @@ git push && git push --tags
 ## Security
 
 - **No secrets in the repo** — `.mcp.json` only contains `${ENV_VAR}` references
-- **Sensitive data blocker hooks (3 layers)** — blocks database queries referencing TIN, SSN, bank account numbers, or other PII fields before execution (Bash + MCP), and scans output for PII field names after execution. Even encrypted values are never exposed
+- **Sensitive data blocker hooks (4 layers)** — blocks database queries referencing TIN, SSN, bank account numbers, or other PII fields before execution (Bash + MCP), and scans all output (Bash, MCP, Read, Grep) for PII field names. Even encrypted values are never exposed. CLAUDE.md policy is injected at the top of every project
 - **Secret blocker hook** — automatically blocks writes containing hardcoded credentials
 - **Protected files hook** — prevents edits to production/staging configs
 - **`.claude/settings.local.json`** is gitignored — personal permissions stay private

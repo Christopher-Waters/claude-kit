@@ -65,6 +65,15 @@
             "command": "bash .claude/hooks/sensitive-data-output-blocker.sh"
           }
         ]
+      },
+      {
+        "matcher": "Read|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/sensitive-data-output-blocker.sh"
+          }
+        ]
       }
     ],
     "Stop": [

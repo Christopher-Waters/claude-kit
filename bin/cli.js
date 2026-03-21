@@ -394,11 +394,35 @@ async function main() {
       'utf8'
     );
 
+    const sensitiveDataPolicy = `## SENSITIVE DATA — MANDATORY RULE
+
+**NEVER query, display, read, grep, or expose sensitive PII fields from the database or codebase — even if the values are encrypted.** Blocked fields: TIN, SSN, EIN, TaxId, BankAccountNumber, RoutingNumber, and any \`Encrypted*\` variants. Always use explicit inclusion projections listing only non-sensitive fields. Direct users to the application UI for sensitive data access.
+`;
+
     if (!await fs.pathExists(claudeMdPath)) {
-      await fs.writeFile(claudeMdPath, `# ${basename(targetDir)}\n\n${workflowContent}`);
-      console.log(chalk.green('  ✓ Created CLAUDE.md with workflow'));
+      await fs.writeFile(claudeMdPath, `# ${basename(targetDir)}\n\n${sensitiveDataPolicy}\n${workflowContent}`);
+      console.log(chalk.green('  ✓ Created CLAUDE.md with sensitive data policy and workflow'));
     } else {
-      const existing = await fs.readFile(claudeMdPath, 'utf8');
+      let existing = await fs.readFile(claudeMdPath, 'utf8');
+
+      // Inject sensitive data policy if not present
+      if (!existing.includes('SENSITIVE DATA — MANDATORY RULE')) {
+        // Insert after the first heading line, or at the top
+        const firstHeadingEnd = existing.indexOf('\n');
+        if (firstHeadingEnd !== -1 && existing.startsWith('#')) {
+          existing = existing.slice(0, firstHeadingEnd + 1) + '\n' + sensitiveDataPolicy + existing.slice(firstHeadingEnd + 1);
+        } else {
+          existing = sensitiveDataPolicy + '\n' + existing;
+        }
+        await fs.writeFile(claudeMdPath, existing);
+        console.log(chalk.green('  ✓ Injected sensitive data policy into CLAUDE.md'));
+      } else {
+        console.log(chalk.gray('  = Sensitive data policy already exists'));
+      }
+
+      // Re-read in case we just modified it
+      existing = await fs.readFile(claudeMdPath, 'utf8');
+
       if (existing.includes('Care Solutions AI Workflow')) {
         console.log(chalk.gray('  = Workflow section already exists'));
         if (!installAll) {
