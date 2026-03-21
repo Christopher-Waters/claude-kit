@@ -7,7 +7,8 @@
     "care-solutions-ai": "./bin/cli.js"
   },
   "scripts": {
-    "test": "node bin/cli.js --help"
+    "test": "node bin/cli.js --help",
+    "publish:feed": "npm publish --registry https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/"
   },
   "keywords": [
     "claude-code",
@@ -21,7 +22,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://dev.azure.com/caresolutionsinc/Glasswing%20and%20Monarch/_git/care-solutions-ai"
+    "url": "https://dev.azure.com/caresolutionsinc/Care%20Solutions%20AI/_git/Care%20Solutions%20AI"
   },
   "engines": {
     "node": ">=18"
