@@ -23,6 +23,15 @@
             "command": "bash .claude/hooks/sensitive-data-blocker.sh"
           }
         ]
+      },
+      {
+        "matcher": "mcp__mongodb|mcp__mssql|mcp__postgres",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/sensitive-data-mcp-blocker.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -36,6 +45,24 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/test-on-change.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/sensitive-data-output-blocker.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mongodb|mcp__mssql|mcp__postgres",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/sensitive-data-output-blocker.sh"
           }
         ]
       }

@@ -18,7 +18,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 |-----------|-------|----------------|-------------|
 | **Global Agents** | 3 | `~/.claude/agents/` (your machine, all projects) | azure-ops, security-auditor, api-tester |
 | **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
-| **Hooks** | 7 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker, protected files, auto-format, test suggestions, UAT reminder, self-improve |
+| **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
 | **Slash Commands** | 2 | `.claude/commands/` (in the project) | `/implement` (work item → PR), `/review` (automated code review) |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
@@ -196,7 +196,9 @@ your-project/                      ← Project-specific
 │   │   └── devops-tracker.md      # Azure DevOps work item management
 │   │
 │   ├── hooks/
-│   │   ├── sensitive-data-blocker.sh # BLOCKS DB queries for TIN/SSN/PII
+│   │   ├── sensitive-data-blocker.sh       # BLOCKS mongosh queries for TIN/SSN/PII
+│   │   ├── sensitive-data-mcp-blocker.sh   # BLOCKS MCP DB queries for TIN/SSN/PII
+│   │   ├── sensitive-data-output-blocker.sh # BLOCKS output containing PII fields
 │   │   ├── secret-blocker.sh      # BLOCKS hardcoded secrets before write
 │   │   ├── protected-files.sh     # BLOCKS/warns on critical file edits
 │   │   ├── auto-format.sh         # Auto-runs formatters after edits
@@ -282,7 +284,9 @@ These run automatically — no action needed:
 
 | When | Hook | What It Does |
 |------|------|-------------|
-| **Before** any Bash command | `sensitive-data-blocker.sh` | Blocks database queries that reference sensitive PII fields (TIN, SSN, bank accounts). **Blocks the command.** |
+| **Before** any Bash command | `sensitive-data-blocker.sh` | Blocks `mongosh` commands that reference sensitive PII fields (TIN, SSN, bank accounts). **Blocks the command.** |
+| **Before** any MCP database tool | `sensitive-data-mcp-blocker.sh` | Blocks MongoDB/MSSQL/Postgres MCP tool calls that reference PII fields. **Blocks the call.** |
+| **After** any Bash/MCP DB command | `sensitive-data-output-blocker.sh` | Scans command output for PII field names returned by broad queries. **Blocks the output.** |
 | **Before** any file write | `secret-blocker.sh` | Scans for hardcoded credentials (MongoDB URIs, AWS keys, Stripe keys, passwords). **Blocks the write.** |
 | **Before** any file edit | `protected-files.sh` | Blocks edits to production/staging configs. Warns on critical files (CLAUDE.md, pipelines, Program.cs). |
 | **After** any file edit | `auto-format.sh` | Runs `dotnet format` on .cs files, `eslint --fix` on .ts/.tsx files |
@@ -432,7 +436,7 @@ git push && git push --tags
 ## Security
 
 - **No secrets in the repo** — `.mcp.json` only contains `${ENV_VAR}` references
-- **Sensitive data blocker hook** — blocks database queries that reference TIN, SSN, bank account numbers, or other PII fields (even encrypted values are never exposed)
+- **Sensitive data blocker hooks (3 layers)** — blocks database queries referencing TIN, SSN, bank account numbers, or other PII fields before execution (Bash + MCP), and scans output for PII field names after execution. Even encrypted values are never exposed
 - **Secret blocker hook** — automatically blocks writes containing hardcoded credentials
 - **Protected files hook** — prevents edits to production/staging configs
 - **`.claude/settings.local.json`** is gitignored — personal permissions stay private

@@ -39,7 +39,7 @@ You manage MongoDB data for Glasswing and Monarch platforms. Use `mongosh` for a
 |-----------|-----------|-------|
 | `users` | `Email`, `EmailVerified`, `IsActive` | Different schema from Glasswing |
 | `organizations` | `Name`, `Status` | |
-| `recipients` | `FirstName`, `LastName`, `Email`, `Status`, `BankAccounts` | |
+| `recipients` | `FirstName`, `LastName`, `Email`, `Status` | Contains sensitive fields — always use inclusion projections |
 | `payments` | `Amount`, `Status`, `Method`, `RecipientId` | |
 
 ## Common Tasks
