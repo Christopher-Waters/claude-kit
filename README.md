@@ -19,7 +19,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 | **Global Agents** | 13 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
 | **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
-| **Slash Commands** | 2 | `.claude/commands/` (in the project) | `/implement` (work item → PR), `/review` (automated code review) |
+| **Slash Commands** | 8 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/cherry-pick`, `/promote`, `/rollback` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
 | **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
@@ -81,7 +81,7 @@ You'll be asked:
 2. **Components** — checkboxes to pick which parts to install:
    - ☑ Project Agents (deployer, db-admin, devops-tracker)
    - ☑ Hooks (secret blocker, auto-format, etc.)
-   - ☑ Slash Commands (/implement, /review)
+   - ☑ Slash Commands (/implement, /review, /deploy, /create-release, /deploy-release, /cherry-pick, /promote, /rollback)
    - ☑ MCP Servers
    - ☑ Settings
    - ☑ CLAUDE.md Workflow
@@ -114,7 +114,7 @@ This installs:
 - ✅ Global agents (backend, frontend, legacy, manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester)
 - ✅ Project agents (deployer, db-admin, devops-tracker)
 - ✅ All 9 hooks
-- ✅ Both slash commands (/implement, /review)
+- ✅ All 8 slash commands (/implement, /review, /deploy, /create-release, /deploy-release, /cherry-pick, /promote, /rollback)
 - ✅ MCP servers: Playwright, Teams, Azure CLI (+ your DB choice)
 - ✅ Settings, CLAUDE.md workflow, .gitignore
 - ❌ Stripe (not included in --all, add via interactive mode)
@@ -218,7 +218,13 @@ your-project/                      ← Project-specific
 │   │
 │   ├── commands/
 │   │   ├── implement.md           # /implement AB#1234
-│   │   └── review.md              # /review 142
+│   │   ├── review.md              # /review 142
+│   │   ├── deploy.md              # /deploy "commit message"
+│   │   ├── create-release.md      # /create-release 23
+│   │   ├── deploy-release.md      # /deploy-release 23 staging
+│   │   ├── cherry-pick.md         # /cherry-pick AB#1234 production
+│   │   ├── promote.md             # /promote staging production
+│   │   └── rollback.md            # /rollback AB#1234 production
 │   │
 │   └── settings.json              # Hook and MCP registration
 │
@@ -271,20 +277,301 @@ Claude automatically:
 5. Posts a PR-level summary
 6. Asks: "Approve, Request Changes, or skip the vote?"
 
-### For Senior Devs / Tech Leads
+### Deploy Changes
 
-Use `/review` on any PR for automated code review:
+```
+/deploy "Add payment export feature"
+```
+
+Claude automatically:
+1. Runs pre-flight checks (dotnet build, tsc)
+2. Stages and commits with the provided message
+3. Pushes the current branch
+4. Triggers the CD pipeline if on an environment branch
+
+### Create a Release
+
+```
+/create-release 23
+```
+
+Claude automatically:
+1. Asks which work items to include
+2. Creates a `Release #23` iteration in Azure DevOps
+3. Assigns and tags all work items with `release-23`
+
+### Deploy a Release
+
+```
+/deploy-release 23 staging
+```
+
+Claude automatically:
+1. Finds all work items in Release #23
+2. Cherry-picks their commits into `release/23-to-staging`
+3. Creates a PR targeting the staging branch
+4. Links all work items to the PR
+
+### Cherry-Pick Work Items
+
+```
+/cherry-pick AB#1234 AB#1235 production
+```
+
+Cherry-picks specific work items to an environment without a formal release.
+
+### Promote an Environment
+
+```
+/promote staging production
+```
+
+Creates a PR to promote all code from staging to production. Shows a summary of all included commits before confirming.
+
+### Rollback a Deployment
+
+```
+/rollback AB#1234 production
+/rollback last staging
+```
+
+Reverts specific commits or the last deployment on an environment. Creates a revert branch and PR.
+
+---
+
+## Branching Strategy
+
+### Target State (All Projects)
+
+Every project should converge to this standard. Each long-lived branch maps to an Azure subscription and environment:
+
+| Branch | Azure Subscription | Environment | Deploys When |
+|--------|-------------------|-------------|-------------|
+| `develop` | Dev | Development | PR merged into `develop` |
+| `staging` | Staging | Staging | PR merged into `staging` |
+| `main` | Production | Production | PR merged into `main` (with approval gate) |
+
+> **Note:** Some projects are not yet in sync — they may use `master` instead of `main`, or lack a `staging` branch. All commands work dynamically with whatever branch you're on. No branch names are hardcoded.
+
+### Branch Naming
+
+When you run `/implement`, a branch is automatically created based on the Azure DevOps work item type:
+
+| Work Item Type | Branch Prefix | Example |
+|----------------|--------------|---------|
+| Feature | `feature/` | `feature/AB#1234-add-payment-export` |
+| User Story | `story/` | `story/AB#1235-user-can-view-history` |
+| Bug | `bugfix/` | `bugfix/AB#1236-fix-login-redirect` |
+| Hot Fix | `hotfix/` | `hotfix/AB#1237-fix-crash-on-submit` |
+| (other) | `work/` | `work/AB#1238-update-dependencies` |
+
+The branch is always created off the **current branch** — no assumptions are made about which branch you're on.
+
+> **Note:** The Azure DevOps work item type is "Hot Fix" (two words), but the branch prefix and PR label use `hotfix` (one word, lowercase).
+
+### Code Promotion Flow
+
+Code flows through environments via PRs, never by direct push:
+
+```
+feature/AB#1234-... ──PR──▸ develop ──PR──▸ staging ──PR──▸ main
+   (work branch)            (Dev)          (Staging)      (Production)
+```
+
+---
+
+## Development Workflow Guide
+
+This section walks through the complete workflow from picking up a work item to deploying to production.
+
+### Step 1: Implement a Work Item
+
+Start by switching to your project's development branch and running `/implement`:
+
+```bash
+cd /path/to/your/project
+claude
+```
+
+```
+# Switch to the develop branch first
+git checkout develop
+
+# Implement the work item
+/implement AB#1234
+```
+
+Claude will:
+1. Read the work item from Azure DevOps (extracts type, title, acceptance criteria)
+2. Create a branch automatically (e.g., `story/AB#1234-user-can-view-history`)
+3. Explore the codebase and plan the approach
+4. Implement using backend and/or frontend agents
+5. Run all quality checks (build, lint, tests, review)
+6. Generate a UAT checklist and **pause for you to manually test**
+7. After you confirm "testing passed", create a PR targeting `develop`
+
+The PR merges into `develop`, which triggers the Dev environment CD pipeline.
+
+### Step 2: Deploy Changes (Quick Commits)
+
+For smaller changes that don't need the full `/implement` workflow:
+
+```
+/deploy "Fix typo in dashboard header"
+```
+
+This commits, pushes, and triggers the pipeline if you're on an environment branch. If you're on a feature branch, it just pushes — the pipeline triggers on PR merge.
+
+### Step 3: Group Work Items into a Release
+
+Once multiple work items are merged to `develop` and tested in Dev, group them into a release:
+
+```
+/create-release 23
+```
+
+Claude will:
+1. Ask which work items to include — you can provide:
+   - Specific IDs: `AB#1234, AB#1235, AB#1236`
+   - A query: `all Ready for Testing user stories`
+   - A state filter: `all items tagged sprint-5`
+2. Show you the list and ask for confirmation
+3. Create a `Release #23` iteration in Azure DevOps
+4. Assign all work items to the iteration and tag them with `release-23`
+5. Tell you how to deploy: `/deploy-release 23 staging` or `/deploy-release 23 production`
+
+### Step 4: Deploy a Release to Staging
+
+```
+/deploy-release 23 staging
+```
+
+Claude will:
+1. Find all work items tagged `release-23`
+2. Find their associated commits on the `develop` branch
+3. Create a release branch: `release/23-to-staging`
+4. Cherry-pick all commits for each work item
+5. Create a PR from `release/23-to-staging` → `staging`
+6. Link all work items to the PR
+
+After the PR is reviewed and merged, the Staging CD pipeline triggers automatically.
+
+### Step 5: Test on Staging
+
+QA and stakeholders test on the Staging environment. If issues are found, fix them with `/implement` and add the fixes to the release.
+
+### Step 6: Deploy a Release to Production
+
+When staging testing passes:
+
+```
+/deploy-release 23 production
+```
+
+Same process — cherry-picks the release's commits to a PR targeting the production branch. After merge, the Production CD pipeline triggers (with approval gate).
+
+### Selective Deployment
+
+If staging has 5 user stories but only 3 are ready for production:
+
+**Option A: Create a smaller release**
+```
+/create-release 24
+```
+Include only the 3 ready stories, then `/deploy-release 24 production`.
+
+**Option B: Cherry-pick specific items**
+```
+/cherry-pick AB#1234 AB#1235 AB#1236 production
+```
+This cherry-picks just those 3 work items without creating a formal release.
+
+### Promoting Without a Release
+
+To promote **all** code from one environment to the next (no cherry-picking):
+
+```
+/promote staging production
+```
+
+This creates a PR from `staging` → production branch containing everything. Use this when all staging code is ready for production.
+
+You can also auto-detect the next environment:
+```
+/promote
+```
+If you're on the `staging` branch, it auto-detects `staging → production`.
+
+### Hot Fix Workflow
+
+For critical production issues:
+
+1. Switch to the production branch:
+   ```
+   git checkout main
+   ```
+2. Run `/implement` with the Hot Fix work item:
+   ```
+   /implement AB#9999
+   ```
+3. Claude creates a `hotfix/AB#9999-fix-crash-on-submit` branch
+4. Automated checks still run (build, lint, tests, review)
+5. **Manual UAT is skipped** — you get an abbreviated confirmation instead
+6. PR targets the production branch directly with a `hotfix` label
+
+### Rollback a Deployment
+
+If a deployment causes issues:
+
+**Revert specific work items:**
+```
+/rollback AB#1234 production
+```
+
+**Revert the most recent deployment:**
+```
+/rollback last staging
+```
+
+Claude will:
+1. Find the commits to revert
+2. Create a revert branch (e.g., `revert/2026-03-21-on-production`)
+3. Run `git revert` on each commit
+4. Run pre-flight checks on the reverted code
+5. Create a PR targeting the environment branch
+
+Merge the PR to deploy the rollback.
+
+### Code Review
+
+For any open PR:
+
 ```
 /review 142
 ```
 
-The review checks:
+Claude reviews for:
 - Clean Architecture boundaries (Domain has no infrastructure dependencies)
 - Tenant/organizationId enforcement on all database queries
 - Missing unit or integration tests for new code
 - `any` types in TypeScript (should be properly typed)
 - Security issues (OWASP Top 10, hardcoded secrets)
 - Acceptance criteria coverage from the linked work item
+
+---
+
+## Slash Commands Reference
+
+| Command | Usage | What It Does |
+|---------|-------|-------------|
+| `/implement` | `/implement AB#1234` | Read work item → create branch → implement → quality checks → UAT → PR |
+| `/review` | `/review 142` | Full code review on a PR with inline comments |
+| `/deploy` | `/deploy "message"` | Commit, push, trigger pipeline if on environment branch |
+| `/create-release` | `/create-release 23` | Group work items into Release #23 iteration with tags |
+| `/deploy-release` | `/deploy-release 23 staging` | Cherry-pick release work items to environment via PR |
+| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 production` | Cherry-pick specific work items to environment via PR |
+| `/promote` | `/promote staging production` | PR to promote all code between environments |
+| `/rollback` | `/rollback AB#1234 production` | Revert specific commits on an environment via PR |
 
 ---
 
