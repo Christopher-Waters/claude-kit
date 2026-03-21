@@ -1,6 +1,6 @@
 {
   "name": "@caresolutions/ai-infrastructure",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Care Solutions Personal AI Infrastructure for Claude Code — agents, hooks, MCP servers, and workflow automation",
   "type": "module",
   "bin": {
