@@ -16,7 +16,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 
 | Component | Count | Where Installed | Description |
 |-----------|-------|----------------|-------------|
-| **Global Agents** | 3 | `~/.claude/agents/` (your machine, all projects) | azure-ops, security-auditor, api-tester |
+| **Global Agents** | 12 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
 | **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
 | **Slash Commands** | 2 | `.claude/commands/` (in the project) | `/implement` (work item → PR), `/review` (automated code review) |
@@ -111,9 +111,9 @@ npx @caresolutions/ai-infrastructure init --all
 ```
 
 This installs:
-- ✅ Global agents (azure-ops, security-auditor, api-tester)
+- ✅ Global agents (backend, frontend, manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester)
 - ✅ Project agents (deployer, db-admin, devops-tracker)
-- ✅ All 6 hooks
+- ✅ All 9 hooks
 - ✅ Both slash commands (/implement, /review)
 - ✅ MCP servers: Playwright, Teams, Azure CLI (+ your DB choice)
 - ✅ Settings, CLAUDE.md workflow, .gitignore
@@ -139,7 +139,7 @@ npx @caresolutions/ai-infrastructure init /path/to/project --all --db=mongo
 
 ### Option 5: Global Agents Only
 
-Just installs the 3 global agents to `~/.claude/agents/`. No project files, no prompts.
+Just installs the 12 global agents to `~/.claude/agents/`. No project files, no prompts.
 
 ```bash
 npx @caresolutions/ai-infrastructure init --global-only
@@ -184,6 +184,15 @@ The installer automatically **skips global agents** that are already installed (
 
 ```
 ~/.claude/agents/                  ← Global (all projects)
+├── backend.md                     # .NET/C# backend developer (Clean Architecture)
+├── frontend.md                    # React/TypeScript frontend developer
+├── manager.md                     # Workflow orchestrator (delegates to other agents)
+├── mockup.md                      # HTML mockup designer
+├── reviewer.md                    # Code reviewer (read-only)
+├── test-runner.md                 # Test executor — xUnit, Vitest, Playwright (read-only)
+├── build-validator.md             # Build checker (read-only)
+├── lint-checker.md                # ESLint + dotnet format checker
+├── uat-generator.md               # UAT checklist generator (read-only)
 ├── azure-ops.md                   # Azure infrastructure management
 ├── security-auditor.md            # Security scanning (read-only)
 └── api-tester.md                  # API endpoint testing

@@ -9,8 +9,10 @@ When given a task, Claude Code can delegate through specialized agents:
 
 ```
 You (give task)
+  ├── manager → orchestrates workflow, delegates to agents below
   ├── Explore → finds relevant files
   ├── Plan → designs the approach
+  ├── mockup → creates HTML screen mockups before implementation
   ├── backend / frontend → implements code
   ├── deployer → commits, pushes, triggers CD pipeline
   ├── db-admin → queries/fixes MongoDB data
@@ -18,6 +20,7 @@ You (give task)
   ├── test-runner → runs xUnit, Vitest, Playwright tests
   ├── build-validator → confirms builds pass
   ├── lint-checker → runs ESLint and dotnet format
+  ├── uat-generator → generates UAT checklists from requirements
   ├── security-auditor → scans for secrets, vulnerabilities
   ├── api-tester → tests API endpoints with curl
   ├── azure-ops → manages Azure infrastructure
