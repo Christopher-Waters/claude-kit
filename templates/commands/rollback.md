@@ -91,3 +91,16 @@ Merge the PR to trigger the CD pipeline and deploy the rollback.
 ```
 
 For production rollbacks, flag urgency to the user.
+
+## Step 7: Notify Team (if Teams MCP is configured)
+
+Send a notification to the project's Teams channel via the Microsoft Teams MCP server:
+
+```
+⚠️ Rollback PR created for {environment}
+PR: {pr-url}
+Reverting: AB#1234, AB#1235
+Awaiting review and merge.
+```
+
+For production rollbacks, mark the message as urgent. If the Teams MCP server is not configured, skip this step silently.

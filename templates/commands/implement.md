@@ -31,38 +31,7 @@ Does this look correct? Do you have any additional context or requirements?
 
 **Wait for the user to respond.** Do NOT proceed until the user confirms or provides additional context. If they add context, incorporate it into the plan.
 
-## Step 3: Create Feature Branch
-
-Capture the current branch as the PR target — do NOT hardcode any branch name:
-
-```bash
-BASE_BRANCH=$(git symbolic-ref --short HEAD)
-```
-
-Determine the branch prefix from the work item type:
-
-| Work Item Type | Branch Prefix |
-|---|---|
-| Feature | `feature/` |
-| User Story | `story/` |
-| Bug | `bugfix/` |
-| Hot Fix | `hotfix/` |
-| (anything else) | `work/` |
-
-Construct the branch name as `{prefix}AB#{id}-{sanitized-title}`:
-- Sanitize the title: lowercase, replace non-alphanumeric characters (except hyphens) with hyphens, collapse consecutive hyphens, truncate to 50 characters, trim leading/trailing hyphens
-- Example: Feature AB#1234 "Add Payment History Export" → `feature/AB#1234-add-payment-history-export`
-
-Create and switch to the branch:
-```bash
-git checkout -b <branch-name>
-```
-
-If the branch already exists, switch to it with `git checkout <branch-name>` instead of failing.
-
-Remember the `BASE_BRANCH` — you will need it for the PR step.
-
-## Step 4: Explore & Plan
+## Step 3: Explore & Plan
 
 1. **Explore** the codebase to map relevant files
 2. **Plan** the implementation approach
@@ -97,6 +66,39 @@ Approve this plan? (yes / no / suggest changes)
 ```
 
 **Wait for the user to approve the plan.** Do NOT start implementation until the user approves. If they suggest changes, revise the plan and present it again.
+
+## Step 4: Create Feature Branch
+
+Only create the branch after the plan is approved.
+
+Capture the current branch as the PR target — do NOT hardcode any branch name:
+
+```bash
+BASE_BRANCH=$(git symbolic-ref --short HEAD)
+```
+
+Determine the branch prefix from the work item type:
+
+| Work Item Type | Branch Prefix |
+|---|---|
+| Feature | `feature/` |
+| User Story | `story/` |
+| Bug | `bugfix/` |
+| Hot Fix | `hotfix/` |
+| (anything else) | `work/` |
+
+Construct the branch name as `{prefix}AB#{id}-{sanitized-title}`:
+- Sanitize the title: lowercase, replace non-alphanumeric characters (except hyphens) with hyphens, collapse consecutive hyphens, truncate to 50 characters, trim leading/trailing hyphens
+- Example: Feature AB#1234 "Add Payment History Export" → `feature/AB#1234-add-payment-history-export`
+
+Create and switch to the branch:
+```bash
+git checkout -b <branch-name>
+```
+
+If the branch already exists, switch to it with `git checkout <branch-name>` instead of failing.
+
+Remember the `BASE_BRANCH` — you will need it for the PR step.
 
 ## Step 5: Implement
 
@@ -146,7 +148,7 @@ Wait for the user's response before proceeding. Do NOT create a PR until confirm
 1. Push the branch: `git push -u origin HEAD`
 2. Create a PR via Azure DevOps MCP:
    - **sourceRefName**: `refs/heads/{branch-name}`
-   - **targetRefName**: `refs/heads/{BASE_BRANCH}` (the branch captured in Step 3)
+   - **targetRefName**: `refs/heads/{BASE_BRANCH}` (the branch captured in Step 4)
    - **title**: `AB#{id}: {work item title}`
    - **labels**: `["hotfix"]` if the work item type is Hot Fix
 3. Link the PR to the work item via `wit_link_work_item_to_pull_request`

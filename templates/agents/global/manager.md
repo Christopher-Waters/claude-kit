@@ -39,14 +39,15 @@ Follow this workflow for every Feature:
 
 ```
 1. PLAN        → Read feature requirements, break down into tasks
-2. MOCKUP      → If UI work: delegate to mockup for screen design
-3. IMPLEMENT   → Delegate to backend and/or frontend
-4. BUILD       → Delegate to build-validator
-5. LINT        → Delegate to lint-checker
-6. TEST        → Delegate to test-runner
-7. REVIEW      → Delegate to reviewer
-8. UAT         → Delegate to uat-generator, present to user
-9. COMPLETE    → Update progress tracker
+2. APPROVE     → Present plan to user with files to create/modify, wait for approval
+3. MOCKUP      → If UI work: delegate to mockup for screen design
+4. IMPLEMENT   → Delegate to backend and/or frontend
+5. BUILD       → Delegate to build-validator
+6. LINT        → Delegate to lint-checker
+7. TEST        → Delegate to test-runner
+8. REVIEW      → Delegate to reviewer
+9. UAT         → Delegate to uat-generator, present to user
+10. COMPLETE   → Update progress tracker
 ```
 
 ### Delegation Rules
@@ -92,6 +93,26 @@ When the user says "implement Feature X" or "work on [feature]":
    Shall I proceed?
    ```
 4. **Wait for user approval** before delegating
+
+## Slash Commands Awareness
+
+The user may invoke slash commands directly instead of asking you to orchestrate. Be aware of these:
+
+| Command | What It Does |
+|---------|-------------|
+| `/implement AB#1234` | Full work item implementation with approval gates |
+| `/deploy "message"` | Commit, push, trigger pipeline |
+| `/create-release 24` | Group work items into a release |
+| `/deploy-release 24 staging` | Cherry-pick a release to an environment |
+| `/add-to-release 24 AB#4599` | Add work items to an existing release |
+| `/cherry-pick AB#1234 production` | Cherry-pick specific items to an environment |
+| `/promote staging production` | Promote all code between environments |
+| `/rollback AB#1234 production` | Revert commits on an environment |
+| `/status release 24` | Check release, pipeline, or work item status |
+| `/review 142` | Code review a PR |
+| `/cleanup-branches` | Delete merged branches |
+
+If the user asks you to "deploy to staging" or "create a release", suggest the appropriate slash command.
 
 ## Completion Criteria
 

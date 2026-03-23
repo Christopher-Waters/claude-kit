@@ -537,6 +537,146 @@ Approve, Request Changes, or skip the vote?
 
 ---
 
+## /add-to-release — Add Work Items to an Existing Release
+
+### Example: Forgot a bug fix in Release #24
+
+You already created Release #24 but realized AB#4599 (a bug fix) should be included.
+
+```
+/add-to-release 24 AB#4599
+```
+
+**Claude shows:**
+```
+## Release #24 — Adding Work Items
+
+### Currently in Release #24:
+| ID | Type | Title | State |
+|----|------|-------|-------|
+| AB#4521 | User Story | Admin can export payment history | Ready for Testing |
+| AB#4522 | User Story | Bulk payment approval workflow | Ready for Testing |
+| AB#4530 | User Story | Dashboard monthly payment trends | Ready for Testing |
+
+### Adding:
+| ID | Type | Title | State |
+|----|------|-------|-------|
+| AB#4599 | Bug | Fix export column alignment | Ready for Testing |
+
+Add 1 work item to Release #24? (yes/no)
+```
+
+**You respond:**
+```
+yes
+```
+
+**Claude confirms:**
+```
+1 work item added to Release #24.
+
+Release #24 now contains 4 work items.
+```
+
+---
+
+## /status — Check Status of Anything
+
+### Example: Check what's in a release
+
+```
+/status release 24
+```
+
+```
+## Release #24 Status
+
+| ID | Type | Title | State |
+|----|------|-------|-------|
+| AB#4521 | User Story | Add payment export | Closed |
+| AB#4522 | User Story | Bulk approval workflow | Ready for Testing |
+| AB#4530 | User Story | Dashboard trends | Ready for Testing |
+| AB#4589 | Bug | Login plus sign fix | Closed |
+
+Deployed to:
+- Dev: All 4 items
+- Staging: All 4 items
+- Production: 2 of 4 items
+```
+
+### Example: Check pipeline status
+
+```
+/status pipeline
+```
+
+```
+## Recent Pipeline Runs
+
+| Pipeline | Branch | Status | Time |
+|----------|--------|--------|------|
+| Compass API | main | Succeeded | 2026-03-22 14:26 |
+| Compass Client | main | Succeeded | 2026-03-22 14:27 |
+| Compass API | develop | Failed | 2026-03-22 10:15 |
+```
+
+### Example: Check a work item
+
+```
+/status AB#4521
+```
+
+Shows the work item details, linked PRs, child tasks, and which environments it's been deployed to.
+
+### Example: Quick overview
+
+```
+/status
+```
+
+Shows active releases, recent pipeline runs, and open PRs at a glance.
+
+---
+
+## /cleanup-branches — Delete Merged Branches
+
+### Example: Clean up after a sprint
+
+```
+/cleanup-branches
+```
+
+**Claude finds merged branches:**
+```
+## Branch Cleanup
+
+### Branches to delete (7):
+| Branch | Last Commit | Merged Into |
+|--------|-------------|-------------|
+| story/AB#4521-admin-export | 2026-03-18 | develop |
+| story/AB#4522-bulk-approval | 2026-03-19 | develop |
+| bugfix/AB#4589-login-plus-sign | 2026-03-19 | develop |
+| release/24-to-staging | 2026-03-21 | staging |
+| cherry-pick/2026-03-22-to-production | 2026-03-22 | main |
+| T3796 | 2026-03-10 | main |
+| U3297 | 2026-03-05 | main |
+
+### Protected (will NOT be deleted):
+- main, develop, staging
+
+Delete 7 merged branches? (yes/no)
+```
+
+### Example: Preview without deleting
+
+```
+/cleanup-branches --dry-run
+```
+
+Shows the same list but does not delete anything.
+
+---
+
 ## Full Workflow — End to End
 
 Here's a complete real-world scenario tying all commands together:
@@ -611,10 +751,19 @@ git checkout develop
 /implement AB#4610    → Root cause fix for bulk approval
 ```
 
-After fix is verified on develop and staging, cherry-pick to production:
+After fix is verified on develop and staging, add it to the release and cherry-pick to production:
 
 ```
+/add-to-release 25 AB#4610
 /cherry-pick AB#4610 production
+```
+
+### Wednesday: Check status and clean up
+
+```
+/status release 25     → See what's deployed where
+/status pipeline       → Check recent build results
+/cleanup-branches      → Delete all the merged feature branches from the sprint
 ```
 
 ---
@@ -626,6 +775,7 @@ After fix is verified on develop and staging, cherry-pick to production:
 | Build a work item from scratch | `/implement AB#1234` |
 | Quick commit and push | `/deploy "message"` |
 | Group work items for deployment | `/create-release 24` |
+| Add a forgotten item to a release | `/add-to-release 24 AB#4599` |
 | Deploy a release to staging | `/deploy-release 24 staging` |
 | Deploy a release to production | `/deploy-release 24 production` |
 | Send just 2 bug fixes to production | `/cherry-pick AB#1234 AB#1235 production` |
@@ -633,3 +783,9 @@ After fix is verified on develop and staging, cherry-pick to production:
 | Revert a bad deploy | `/rollback AB#1234 production` |
 | Revert the last deploy | `/rollback last staging` |
 | Review a PR | `/review 142` |
+| Check what's in a release | `/status release 24` |
+| Check pipeline runs | `/status pipeline` |
+| Check a work item | `/status AB#4521` |
+| See overall project status | `/status` |
+| Clean up old branches | `/cleanup-branches` |
+| Preview branch cleanup | `/cleanup-branches --dry-run` |

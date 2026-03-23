@@ -203,11 +203,55 @@ All deployment and release operations are available as slash commands:
 | `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 |
 | `/deploy-release` | `/deploy-release 23 staging` | Cherry-pick release to environment |
+| `/add-to-release` | `/add-to-release 24 AB#4599` | Add work items to existing release |
 | `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 production` | Cherry-pick specific work items |
 | `/promote` | `/promote staging production` | Promote all code between environments |
 | `/rollback` | `/rollback AB#1234 production` | Revert commits on an environment |
+| `/status` | `/status release 24` | Check release, pipeline, or work item status |
+| `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
 
 The CD pipeline is only triggered manually when pushing directly to an environment branch. For feature/work branches, the pipeline triggers on PR merge.
+
+### Pipeline Configuration
+
+Each project must define its environment chain and pipeline IDs so the slash commands (`/deploy`, `/promote`, `/deploy-release`) know which pipelines to trigger and what the promotion order is.
+
+Add this section to your project's `CLAUDE.md`:
+
+```markdown
+## Pipeline Configuration
+
+| Branch | Environment | Pipeline(s) |
+|--------|------------|-------------|
+| develop | Dev | My API (ID), My Client (ID) |
+| staging | Staging | My API (ID), My Client (ID) |
+| main | Production | My API (ID), My Client (ID) |
+```
+
+**Rules for slash commands:**
+- `/deploy` triggers the pipeline(s) listed for the current branch. If the current branch is not in this table, no pipeline is triggered.
+- `/promote` uses this table to determine the next environment (e.g., `develop` → `staging` → `main`).
+- `/deploy-release` and `/cherry-pick` create PRs targeting environment branches listed here.
+- The **order of rows** defines the promotion flow (top to bottom).
+
+**Examples from actual projects:**
+
+CSIPay (4 environments):
+```markdown
+| Branch | Environment | Pipeline(s) |
+|--------|------------|-------------|
+| Dev | Dev | CSIPay API (12), CSIPay Client (13) |
+| QA | QA | CSIPay API (12), CSIPay Client (13) |
+| Staging | Staging | CSIPay API (12), CSIPay Client (13) |
+| master | Production | CSIPay API (12), CSIPay Client (13) |
+```
+
+Glasswing and Monarch (1 environment currently):
+```markdown
+| Branch | Environment | Pipeline(s) |
+|--------|------------|-------------|
+| develop | Dev | CD - Development (28) |
+```
 
 ### Environment Setup
 

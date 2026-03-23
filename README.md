@@ -19,7 +19,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 | **Global Agents** | 13 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
 | **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
-| **Slash Commands** | 8 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/cherry-pick`, `/promote`, `/rollback` |
+| **Slash Commands** | 11 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
 | **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
@@ -81,7 +81,7 @@ You'll be asked:
 2. **Components** — checkboxes to pick which parts to install:
    - ☑ Project Agents (deployer, db-admin, devops-tracker)
    - ☑ Hooks (secret blocker, auto-format, etc.)
-   - ☑ Slash Commands (/implement, /review, /deploy, /create-release, /deploy-release, /cherry-pick, /promote, /rollback)
+   - ☑ Slash Commands (11 commands — /implement, /review, /deploy, /create-release, /deploy-release, /add-to-release, /cherry-pick, /promote, /rollback, /status, /cleanup-branches)
    - ☑ MCP Servers
    - ☑ Settings
    - ☑ CLAUDE.md Workflow
@@ -114,7 +114,7 @@ This installs:
 - ✅ Global agents (backend, frontend, legacy, manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester)
 - ✅ Project agents (deployer, db-admin, devops-tracker)
 - ✅ All 9 hooks
-- ✅ All 8 slash commands (/implement, /review, /deploy, /create-release, /deploy-release, /cherry-pick, /promote, /rollback)
+- ✅ All 11 slash commands
 - ✅ MCP servers: Playwright, Teams, Azure CLI (+ your DB choice)
 - ✅ Settings, CLAUDE.md workflow, .gitignore
 - ❌ Stripe (not included in --all, add via interactive mode)
@@ -224,7 +224,10 @@ your-project/                      ← Project-specific
 │   │   ├── deploy-release.md      # /deploy-release 23 staging
 │   │   ├── cherry-pick.md         # /cherry-pick AB#1234 production
 │   │   ├── promote.md             # /promote staging production
-│   │   └── rollback.md            # /rollback AB#1234 production
+│   │   ├── rollback.md            # /rollback AB#1234 production
+│   │   ├── add-to-release.md      # /add-to-release 24 AB#4599
+│   │   ├── status.md              # /status release 24
+│   │   └── cleanup-branches.md    # /cleanup-branches
 │   │
 │   └── settings.json              # Hook and MCP registration
 │
@@ -338,6 +341,35 @@ Creates a PR to promote all code from staging to production. Shows a summary of 
 ```
 
 Reverts specific commits or the last deployment on an environment. Creates a revert branch and PR.
+
+### Add Work Items to a Release
+
+```
+/add-to-release 24 AB#4599 AB#4600
+```
+
+Adds work items to an existing release — assigns them to the iteration and tags them.
+
+### Check Status
+
+```
+/status release 24
+/status pipeline
+/status AB#4521
+/status staging
+/status
+```
+
+Shows the status of a release, pipeline, work item, environment, or a high-level overview of everything.
+
+### Clean Up Merged Branches
+
+```
+/cleanup-branches
+/cleanup-branches --dry-run
+```
+
+Finds and deletes branches that have been fully merged. Protects environment branches. Use `--dry-run` to preview without deleting.
 
 ---
 
@@ -573,9 +605,12 @@ Claude reviews for:
 | `/deploy` | `/deploy "message"` | Commit, push, trigger pipeline if on environment branch |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 iteration with tags |
 | `/deploy-release` | `/deploy-release 23 staging` | Cherry-pick release work items to environment via PR |
+| `/add-to-release` | `/add-to-release 24 AB#4599` | Add work items to an existing release |
 | `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 production` | Cherry-pick specific work items to environment via PR |
 | `/promote` | `/promote staging production` | PR to promote all code between environments |
 | `/rollback` | `/rollback AB#1234 production` | Revert specific commits on an environment via PR |
+| `/status` | `/status release 24` | Check status of a release, pipeline, work item, or environment |
+| `/cleanup-branches` | `/cleanup-branches` | Delete merged feature/work branches |
 
 ---
 

@@ -114,3 +114,16 @@ Next steps:
 ```
 
 Do NOT trigger the CD pipeline — it triggers automatically on PR merge.
+
+## Step 7: Notify Team (if Teams MCP is configured)
+
+Send a notification to the project's Teams channel via the Microsoft Teams MCP server:
+
+```
+🚀 Release #{N} PR created for {environment}
+PR: {pr-url}
+Work items: AB#1234, AB#1235, AB#1236
+Awaiting review and merge.
+```
+
+If the Teams MCP server is not configured, skip this step silently.

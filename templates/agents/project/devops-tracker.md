@@ -39,6 +39,31 @@ Epic (Phase)
 | Closed | Verified/tested and done |
 | Removed | Obsolete, replaced by another item |
 
+## Release Management
+
+Releases group work items for coordinated deployment. They are tracked as iterations and tags:
+
+- **Iteration:** `Release #{N}` — created via `work_create_iterations`
+- **Tag:** `release-{N}` — applied to each work item in the release
+
+### Release Operations
+
+| Operation | How |
+|-----------|-----|
+| Create a release | Create iteration `Release #{N}`, assign work items, tag with `release-{N}` |
+| Add to a release | Update work item iteration path and append `release-{N}` tag |
+| Find release items | Search by tag `release-{N}` or query the `Release #{N}` iteration |
+| Check release status | Query all items in the release, check their states and linked PRs |
+
+### Work Item State Transitions for Releases
+
+| Event | State Change |
+|-------|-------------|
+| PR merged to develop | Active → Ready for Testing |
+| Deployed to staging | Ready for Testing (no change, manual testing begins) |
+| Staging testing passed | Ready for Testing → Resolved |
+| Deployed to production | Resolved → Closed |
+
 ## Rules
 
 1. Before creating a new Epic, search existing epics to find the next phase number
@@ -48,6 +73,8 @@ Epic (Phase)
 5. When all User Stories under a Feature are Closed, set the Feature to "Resolved"
 6. Use `wit_update_work_items_batch` for bulk status updates
 7. When removing obsolete items, always tag as "Obsolete" and add a History note pointing to the replacement
+8. When creating a release, always use the `Release #{N}` naming pattern for iterations
+9. When adding work items to a release, always set both the iteration path AND the release tag
 
 ## Feature Description Template
 
