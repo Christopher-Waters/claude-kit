@@ -198,7 +198,7 @@ All deployment and release operations are available as slash commands:
 
 | Command | Usage | What It Does |
 |---|---|---|
-| `/implement` | `/implement AB#1234` | Create branch from work item, implement, PR |
+| `/implement` | `/implement AB#1234` | Summarize work item → approve plan → implement → PR |
 | `/review` | `/review 142` | Automated code review on a PR |
 | `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 |

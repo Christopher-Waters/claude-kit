@@ -256,12 +256,14 @@ Verify MCP servers are connected:
 
 Claude automatically:
 1. Reads the work item from Azure DevOps
-2. Explores the codebase and plans the approach
-3. Delegates to backend/frontend agents to implement
-4. Runs tests, linting, and build validation
-5. Generates a UAT checklist from acceptance criteria
-6. **Pauses for you to manually test**
-7. Creates the PR after you confirm
+2. **Summarizes and asks you to confirm** — shows title, description, acceptance criteria. Waits for you to agree or add context
+3. Creates a feature branch based on work item type
+4. Explores the codebase and **presents an implementation plan** — lists files to create, modify, and delete. Waits for your approval before writing any code
+5. Implements using backend/frontend agents (only after plan approval)
+6. Runs tests, linting, and build validation
+7. Generates a UAT checklist from acceptance criteria
+8. **Pauses for you to manually test**
+9. Creates the PR after you confirm
 
 ### Review a Pull Request
 
@@ -403,12 +405,14 @@ git checkout develop
 
 Claude will:
 1. Read the work item from Azure DevOps (extracts type, title, acceptance criteria)
-2. Create a branch automatically (e.g., `story/AB#1234-user-can-view-history`)
-3. Explore the codebase and plan the approach
-4. Implement using backend and/or frontend agents
-5. Run all quality checks (build, lint, tests, review)
-6. Generate a UAT checklist and **pause for you to manually test**
-7. After you confirm "testing passed", create a PR targeting `develop`
+2. **Summarize the work item** and ask you to confirm understanding. You can add context or corrections here
+3. Create a branch automatically (e.g., `story/AB#1234-user-can-view-history`)
+4. Explore the codebase and **present an implementation plan** showing which files will be created, modified, or deleted
+5. **Wait for your approval** before writing any code
+6. Implement using backend and/or frontend agents
+7. Run all quality checks (build, lint, tests, review)
+8. Generate a UAT checklist and **pause for you to manually test**
+9. After you confirm "testing passed", create a PR targeting `develop`
 
 The PR merges into `develop`, which triggers the Dev environment CD pipeline.
 
@@ -564,7 +568,7 @@ Claude reviews for:
 
 | Command | Usage | What It Does |
 |---------|-------|-------------|
-| `/implement` | `/implement AB#1234` | Read work item → create branch → implement → quality checks → UAT → PR |
+| `/implement` | `/implement AB#1234` | Read work item → summarize → approve plan → implement → quality checks → UAT → PR |
 | `/review` | `/review 142` | Full code review on a PR with inline comments |
 | `/deploy` | `/deploy "message"` | Commit, push, trigger pipeline if on environment branch |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 iteration with tags |

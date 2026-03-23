@@ -9,7 +9,29 @@ Read the work item from Azure DevOps via MCP. Extract:
 
 Handle `$ARGUMENTS` as either `1234` or `AB#1234` — strip the `AB#` prefix when calling the MCP API.
 
-## Step 2: Create Feature Branch
+## Step 2: Summarize and Confirm
+
+Present a summary of the work item to the user:
+
+```
+## AB#{id}: {title}
+
+**Type:** {work item type}
+**State:** {state}
+**Assigned To:** {assigned to}
+
+### Description
+{description summary}
+
+### Acceptance Criteria
+{acceptance criteria — numbered list}
+
+Does this look correct? Do you have any additional context or requirements?
+```
+
+**Wait for the user to respond.** Do NOT proceed until the user confirms or provides additional context. If they add context, incorporate it into the plan.
+
+## Step 3: Create Feature Branch
 
 Capture the current branch as the PR target — do NOT hardcode any branch name:
 
@@ -40,23 +62,54 @@ If the branch already exists, switch to it with `git checkout <branch-name>` ins
 
 Remember the `BASE_BRANCH` — you will need it for the PR step.
 
-## Step 3: Explore & Plan
+## Step 4: Explore & Plan
 
 1. **Explore** the codebase to map relevant files
 2. **Plan** the implementation approach
 
-## Step 4: Implement
+Present the plan to the user:
 
-1. **Implement** using backend and/or frontend agents
+```
+## Implementation Plan for AB#{id}
+
+### Approach
+{brief description of how you will implement this}
+
+### Files to Create
+- `path/to/new/file.cs` — {purpose}
+- `path/to/new/file.tsx` — {purpose}
+
+### Files to Modify
+- `path/to/existing/file.cs` — {what changes and why}
+- `path/to/existing/file.tsx` — {what changes and why}
+
+### Files to Delete (if any)
+- `path/to/old/file.cs` — {why it's being removed}
+
+### Agents
+- **backend**: {what it will do}
+- **frontend**: {what it will do}
+
+### Risks / Considerations
+- {any potential issues or trade-offs}
+
+Approve this plan? (yes / no / suggest changes)
+```
+
+**Wait for the user to approve the plan.** Do NOT start implementation until the user approves. If they suggest changes, revise the plan and present it again.
+
+## Step 5: Implement
+
+1. **Implement** using backend and/or frontend agents according to the approved plan
 2. **Generate mockup** if there are UI changes
 
-## Step 5: Quality Checks
+## Step 6: Quality Checks
 
 1. **Review** code for quality, security, and Clean Architecture compliance
 2. **Run tests** — unit, integration, and build validation
 3. **Run lint** — ESLint and dotnet format
 
-## Step 6: UAT Gate
+## Step 7: UAT Gate
 
 ### If Hot Fix:
 Skip manual UAT. Present an abbreviated confirmation:
@@ -88,12 +141,12 @@ Did manual testing pass?
 
 Wait for the user's response before proceeding. Do NOT create a PR until confirmed.
 
-## Step 7: Push, Create PR, and Update Work Item
+## Step 8: Push, Create PR, and Update Work Item
 
 1. Push the branch: `git push -u origin HEAD`
 2. Create a PR via Azure DevOps MCP:
    - **sourceRefName**: `refs/heads/{branch-name}`
-   - **targetRefName**: `refs/heads/{BASE_BRANCH}` (the branch captured in Step 2)
+   - **targetRefName**: `refs/heads/{BASE_BRANCH}` (the branch captured in Step 3)
    - **title**: `AB#{id}: {work item title}`
    - **labels**: `["hotfix"]` if the work item type is Hot Fix
 3. Link the PR to the work item via `wit_link_work_item_to_pull_request`
