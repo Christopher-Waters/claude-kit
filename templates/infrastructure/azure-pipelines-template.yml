@@ -1,0 +1,199 @@
+# Care Solutions Standard Pipeline Template
+#
+# Multi-stage YAML pipeline that builds once and deploys to the correct
+# environment based on the source branch.
+#
+# Usage:
+# 1. Copy this file to your project root as azure-pipelines.yml
+# 2. Replace all {{PLACEHOLDER}} values with your project-specific values
+# 3. Remove stages you don't need (e.g., QA if your project doesn't have it)
+# 4. Create a new pipeline in Azure DevOps pointing to this file
+#
+# Branch-to-environment mapping:
+#   develop  → Dev
+#   staging  → Staging
+#   main     → Production
+
+trigger:
+  branches:
+    include:
+      - develop
+      - staging
+      - main
+  paths:
+    include:
+      - "{{PROJECT_PATH}}/**"    # e.g., Api/**, Client/**, src/**
+
+pool:
+  vmImage: "windows-latest"      # Use "ubuntu-latest" for Linux-based builds
+
+variables:
+  buildConfiguration: "Release"
+  projectName: "{{PROJECT_NAME}}"                          # e.g., CompassAPI, CSIPayAPI
+  solutionFile: "{{SOLUTION_FILE}}"                        # e.g., CompassPOC.sln, CSIPay.sln
+  WebsitePhysicalPath: "{{PHYSICAL_PATH}}"                 # e.g., F:\Compass\Api
+
+  # Dev environment
+  devWebsiteName: "{{DEV_WEBSITE_NAME}}"                   # e.g., dev.api.compass.caresolutions.com
+  devAppPoolName: "{{DEV_APP_POOL}}"                       # e.g., dev.api.compass.com
+
+  # Staging environment
+  stagingWebsiteName: "{{STAGING_WEBSITE_NAME}}"           # e.g., staging.api.compass.caresolutions.com
+  stagingAppPoolName: "{{STAGING_APP_POOL}}"               # e.g., staging.api.compass.com
+
+  # Production environment
+  prodWebsiteName: "{{PROD_WEBSITE_NAME}}"                 # e.g., api.compass.caresolutions.com
+  prodAppPoolName: "{{PROD_APP_POOL}}"                     # e.g., api.compass.com
+
+stages:
+  # ── Build ──────────────────────────────────────────────
+  - stage: Build
+    displayName: "Build"
+    jobs:
+      - job: BuildJob
+        displayName: "Build and Publish"
+        steps:
+          - script: |
+              dotnet build $(solutionFile) --configuration $(buildConfiguration)
+              dotnet publish $(solutionFile) --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)
+            displayName: "dotnet build and publish"
+
+          - task: ArchiveFiles@2
+            displayName: "Zip Published Files"
+            inputs:
+              rootFolderOrFile: "$(Build.ArtifactStagingDirectory)"
+              includeRootFolder: false
+              archiveType: "zip"
+              archiveFile: "$(Build.ArtifactStagingDirectory)/$(projectName).zip"
+
+          - publish: $(Build.ArtifactStagingDirectory)/$(projectName).zip
+            artifact: drop
+
+  # ── Dev ────────────────────────────────────────────────
+  - stage: Dev
+    displayName: "Deploy to Dev"
+    dependsOn: "Build"
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    jobs:
+      - deployment: DeployDev
+        displayName: "Deploy to Dev"
+        environment:
+          name: "{{DEV_ENVIRONMENT_NAME}}"                 # e.g., Dev
+          resourceType: VirtualMachine
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    artifact: "drop"
+                    path: "$(Build.ArtifactStagingDirectory)"
+
+                - task: IISWebAppManagementOnMachineGroup@0
+                  displayName: "Configure IIS"
+                  inputs:
+                    IISDeploymentType: "IISWebsite"
+                    ActionIISWebsite: "CreateOrUpdateWebsite"
+                    WebsiteName: "$(devWebsiteName)"
+                    WebsitePhysicalPath: "$(WebsitePhysicalPath)"
+                    WebsitePhysicalPathAuth: "WebsiteUserPassThrough"
+                    AddBinding: false
+                    CreateOrUpdateAppPoolForWebsite: true
+                    AppPoolNameForWebsite: "$(devAppPoolName)"
+                    DotNetVersionForWebsite: "No Managed Code"
+                    PipeLineModeForWebsite: "Integrated"
+                    AppPoolIdentityForWebsite: "ApplicationPoolIdentity"
+
+                - task: IISWebAppDeploymentOnMachineGroup@0
+                  displayName: "Deploy to IIS"
+                  inputs:
+                    WebsiteName: "$(devWebsiteName)"
+                    Package: "$(Build.ArtifactStagingDirectory)/$(projectName).zip"
+                    TakeAppOfflineFlag: true
+                    XmlVariableSubstitution: true
+
+  # ── Staging ────────────────────────────────────────────
+  - stage: Staging
+    displayName: "Deploy to Staging"
+    dependsOn: "Build"
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/staging'))
+    jobs:
+      - deployment: DeployStaging
+        displayName: "Deploy to Staging"
+        environment:
+          name: "{{STAGING_ENVIRONMENT_NAME}}"             # e.g., Staging
+          resourceType: VirtualMachine
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    artifact: "drop"
+                    path: "$(Build.ArtifactStagingDirectory)"
+
+                - task: IISWebAppManagementOnMachineGroup@0
+                  displayName: "Configure IIS"
+                  inputs:
+                    IISDeploymentType: "IISWebsite"
+                    ActionIISWebsite: "CreateOrUpdateWebsite"
+                    WebsiteName: "$(stagingWebsiteName)"
+                    WebsitePhysicalPath: "$(WebsitePhysicalPath)"
+                    WebsitePhysicalPathAuth: "WebsiteUserPassThrough"
+                    AddBinding: false
+                    CreateOrUpdateAppPoolForWebsite: true
+                    AppPoolNameForWebsite: "$(stagingAppPoolName)"
+                    DotNetVersionForWebsite: "No Managed Code"
+                    PipeLineModeForWebsite: "Integrated"
+                    AppPoolIdentityForWebsite: "ApplicationPoolIdentity"
+
+                - task: IISWebAppDeploymentOnMachineGroup@0
+                  displayName: "Deploy to IIS"
+                  inputs:
+                    WebsiteName: "$(stagingWebsiteName)"
+                    Package: "$(Build.ArtifactStagingDirectory)/$(projectName).zip"
+                    TakeAppOfflineFlag: true
+                    XmlVariableSubstitution: true
+
+  # ── Production ─────────────────────────────────────────
+  - stage: Production
+    displayName: "Deploy to Production"
+    dependsOn: "Build"
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployProd
+        displayName: "Deploy to Production"
+        environment:
+          name: "{{PROD_ENVIRONMENT_NAME}}"                # e.g., Production
+          resourceType: VirtualMachine
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    artifact: "drop"
+                    path: "$(Build.ArtifactStagingDirectory)"
+
+                - task: IISWebAppManagementOnMachineGroup@0
+                  displayName: "Configure IIS"
+                  inputs:
+                    IISDeploymentType: "IISWebsite"
+                    ActionIISWebsite: "CreateOrUpdateWebsite"
+                    WebsiteName: "$(prodWebsiteName)"
+                    WebsitePhysicalPath: "$(WebsitePhysicalPath)"
+                    WebsitePhysicalPathAuth: "WebsiteUserPassThrough"
+                    AddBinding: false
+                    CreateOrUpdateAppPoolForWebsite: true
+                    AppPoolNameForWebsite: "$(prodAppPoolName)"
+                    DotNetVersionForWebsite: "No Managed Code"
+                    PipeLineModeForWebsite: "Integrated"
+                    AppPoolIdentityForWebsite: "ApplicationPoolIdentity"
+
+                - task: IISWebAppDeploymentOnMachineGroup@0
+                  displayName: "Deploy to IIS"
+                  inputs:
+                    WebsiteName: "$(prodWebsiteName)"
+                    Package: "$(Build.ArtifactStagingDirectory)/$(projectName).zip"
+                    TakeAppOfflineFlag: true
+                    XmlVariableSubstitution: true

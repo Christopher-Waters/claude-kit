@@ -45,7 +45,25 @@ Cherry-pick commits for each work item in chronological order:
 git cherry-pick <commit-hash>
 ```
 
-If conflicts arise, STOP and report them — list which work item caused the conflict. Do not resolve automatically.
+If conflicts arise, STOP and report them. Do not resolve automatically. Present recovery options:
+
+```
+CONFLICT while cherry-picking AB#1235 (commit def5678)
+
+Conflicting files:
+- src/API/Controllers/PaymentController.cs
+
+Options:
+1. Skip this work item and continue with the rest
+2. Abort the entire cherry-pick and clean up
+3. I will resolve the conflict manually — wait for me
+
+Which option? (1 / 2 / 3)
+```
+
+- **Option 1:** Run `git cherry-pick --skip` and continue with remaining work items. Note the skipped item in the summary.
+- **Option 2:** Run `git cherry-pick --abort`, delete the cherry-pick branch, and switch back to the original branch.
+- **Option 3:** Wait for the user to resolve conflicts and run `git cherry-pick --continue`, then proceed.
 
 Track progress:
 ```

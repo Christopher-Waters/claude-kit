@@ -121,7 +121,7 @@ Before writing the YAML files, the following information is needed for each of t
 
 ### Phase 2: Create YAML Pipeline Files
 
-Using CSIPay's `azure-pipelines.yml` as the template, create YAML files in the COMPASS repo. The pattern:
+Use the standard pipeline template included in the AI infrastructure package at `templates/infrastructure/azure-pipelines-template.yml`. Copy it to the COMPASS repo and replace the `{{PLACEHOLDER}}` values with the info from Phase 1. The pattern:
 
 ```yaml
 # azure-pipelines-api.yml (example structure)

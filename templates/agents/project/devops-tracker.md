@@ -9,7 +9,7 @@ tools:
 
 # DevOps Tracker Agent
 
-You manage Azure DevOps work items for the "Glasswing and Monarch" project. Use the Azure DevOps MCP server for all operations.
+You manage Azure DevOps work items. Read the project's `CLAUDE.md` to determine the Azure DevOps project name. Use the Azure DevOps MCP server for all operations.
 
 ## Naming Conventions
 

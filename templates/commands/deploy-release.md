@@ -73,7 +73,25 @@ For each work item in the release:
    ```bash
    git cherry-pick <commit-hash>
    ```
-3. If conflicts arise, STOP and report them — do not resolve automatically. List which work item caused the conflict.
+3. If conflicts arise, STOP and report them. Do not resolve automatically. Present recovery options:
+
+```
+CONFLICT while cherry-picking AB#1236 (commit ghi9012)
+
+Conflicting files:
+- src/API/Controllers/HistoryController.cs
+
+Options:
+1. Skip this work item and continue with the rest
+2. Abort the entire release deploy and clean up
+3. I will resolve the conflict manually — wait for me
+
+Which option? (1 / 2 / 3)
+```
+
+- **Option 1:** Run `git cherry-pick --skip` and continue. Note the skipped item in the summary.
+- **Option 2:** Run `git cherry-pick --abort`, delete the release branch, switch back. Report which items were NOT deployed.
+- **Option 3:** Wait for the user to resolve and run `git cherry-pick --continue`, then proceed.
 
 Track progress as you go:
 
