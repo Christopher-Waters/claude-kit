@@ -1,0 +1,35 @@
+# Publish @caresolutions/ai-infrastructure to Azure Artifacts npm feed
+#
+# Triggers on version tags (v1.0.0, v1.1.0, etc.)
+# Authenticates using the built-in Azure Artifacts credential provider
+
+trigger:
+  tags:
+    include:
+      - 'v*'
+  branches:
+    exclude:
+      - '*'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - task: NodeTool@0
+    displayName: 'Install Node.js'
+    inputs:
+      versionSpec: '20.x'
+
+  - task: npmAuthenticate@0
+    displayName: 'Authenticate with Azure Artifacts'
+    inputs:
+      workingFile: '.npmrc'
+
+  - script: |
+      echo "Publishing version $(Build.SourceBranchName)..."
+      npm publish --registry https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/
+    displayName: 'Publish to Azure Artifacts'
+
+  - script: |
+      echo "Published @caresolutions/ai-infrastructure@$(node -p "require('./package.json').version")"
+    displayName: 'Confirm version'
