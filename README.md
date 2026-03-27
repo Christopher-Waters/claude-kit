@@ -36,19 +36,32 @@ Every session Claude learns from your feedback and gets better at helping you sp
 
 ### Step 1: Authenticate with the npm feed
 
-```bash
-# Add our private registry for @caresolutions packages
-echo "@caresolutions:registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/" >> ~/.npmrc
+1. **Generate a Personal Access Token (PAT)** in Azure DevOps:
+   - Go to https://dev.azure.com/caresolutionsinc/_usersSettings/tokens
+   - Click **New Token**
+   - Set scope to **Packaging → Read & Write**
+   - Copy the token
 
-# Authenticate (follow the prompts — use your Azure DevOps credentials)
-npm login --registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/
-```
+2. **Base64-encode your PAT:**
 
-> **Windows users:** If `npm login` doesn't work, install the Azure DevOps auth helper:
-> ```bash
-> npm install -g vsts-npm-auth
-> vsts-npm-auth -config .npmrc
-> ```
+   ```bash
+   # Mac/Linux
+   echo -n 'YOUR_PAT' | base64
+
+   # Windows (PowerShell)
+   [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("YOUR_PAT"))
+   ```
+
+3. **Add the following to `~/.npmrc`** (replace `BASE64_ENCODED_PAT` with the output from step 2, and `YOUR_EMAIL` with your email):
+
+   ```
+   @caresolutions:registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/
+   //pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/:username=caresolutionsinc
+   //pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/:_password=BASE64_ENCODED_PAT
+   //pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/:email=YOUR_EMAIL
+   ```
+
+> **Note:** PATs expire. When your token expires, generate a new one, base64-encode it, and update the `_password` line in `~/.npmrc`.
 
 ### Step 2: Verify it works
 
@@ -809,17 +822,15 @@ git push && git push --tags
 
 ### `npm ERR! 401 Unauthorized` when running npx
 
-Re-authenticate with the npm feed:
+Your PAT may have expired. Generate a new one, base64-encode it, and update `~/.npmrc`:
 ```bash
-npm login --registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/
+echo -n 'YOUR_NEW_PAT' | base64
 ```
+Then replace the `_password=...` line in `~/.npmrc` with the new value.
 
 ### `npm ERR! 404 Not Found`
 
-Make sure the registry is configured:
-```bash
-echo "@caresolutions:registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/" >> ~/.npmrc
-```
+Make sure the registry and PAT auth are configured in `~/.npmrc` — see [Step 1](#step-1-authenticate-with-the-npm-feed).
 
 ### Hooks not running
 
