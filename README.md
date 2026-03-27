@@ -19,7 +19,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 | **Global Agents** | 13 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
 | **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
-| **Slash Commands** | 11 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches` |
+| **Slash Commands** | 13 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches`, `/quote`, `/explain` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
 | **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
@@ -81,7 +81,7 @@ You'll be asked:
 2. **Components** — checkboxes to pick which parts to install:
    - ☑ Project Agents (deployer, db-admin, devops-tracker)
    - ☑ Hooks (secret blocker, auto-format, etc.)
-   - ☑ Slash Commands (11 commands — /implement, /review, /deploy, /create-release, /deploy-release, /add-to-release, /cherry-pick, /promote, /rollback, /status, /cleanup-branches)
+   - ☑ Slash Commands (13 commands — /implement, /review, /deploy, /create-release, /deploy-release, /add-to-release, /cherry-pick, /promote, /rollback, /status, /cleanup-branches, /quote, /explain)
    - ☑ MCP Servers
    - ☑ Settings
    - ☑ CLAUDE.md Workflow
@@ -114,7 +114,7 @@ This installs:
 - ✅ Global agents (backend, frontend, legacy, manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester)
 - ✅ Project agents (deployer, db-admin, devops-tracker)
 - ✅ All 9 hooks
-- ✅ All 11 slash commands
+- ✅ All 13 slash commands
 - ✅ MCP servers: Playwright, Teams, Azure CLI (+ your DB choice)
 - ✅ Settings, CLAUDE.md workflow, .gitignore
 - ❌ Stripe (not included in --all, add via interactive mode)
@@ -227,7 +227,9 @@ your-project/                      ← Project-specific
 │   │   ├── rollback.md            # /rollback AB#1234 production
 │   │   ├── add-to-release.md      # /add-to-release 24 AB#4599
 │   │   ├── status.md              # /status release 24
-│   │   └── cleanup-branches.md    # /cleanup-branches
+│   │   ├── cleanup-branches.md    # /cleanup-branches
+│   │   ├── quote.md               # /quote AB#1234
+│   │   └── explain.md             # /explain AB#1234
 │   │
 │   └── settings.json              # Hook and MCP registration
 │
@@ -361,6 +363,27 @@ Adds work items to an existing release — assigns them to the iteration and tag
 ```
 
 Shows the status of a release, pipeline, work item, environment, or a high-level overview of everything.
+
+### Quote a Work Item
+
+```
+/quote AB#1234
+```
+
+Displays a work item as a formatted blockquote — title, type, state, assignee, description, acceptance criteria, and child items. Useful for pasting into PR descriptions, Teams messages, or discussions.
+
+### Explain a Work Item
+
+```
+/explain AB#1234
+```
+
+Reads a work item and explains it in plain language:
+1. **Summary** — what the work item is about in 1–2 sentences
+2. **What needs to happen** — acceptance criteria translated into concrete actions
+3. **Why it matters** — business/user value
+4. **Current status** — state, assignee, parent, child progress, linked PRs
+5. **Scope & risks** — flags ambiguity, missing criteria, or large scope
 
 ### Clean Up Merged Branches
 
@@ -610,6 +633,8 @@ Claude reviews for:
 | `/promote` | `/promote staging production` | PR to promote all code between environments |
 | `/rollback` | `/rollback AB#1234 production` | Revert specific commits on an environment via PR |
 | `/status` | `/status release 24` | Check status of a release, pipeline, work item, or environment |
+| `/quote` | `/quote AB#1234` | Display a work item as a formatted blockquote |
+| `/explain` | `/explain AB#1234` | Summarize and explain a work item in plain language |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged feature/work branches |
 
 ---
