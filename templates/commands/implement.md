@@ -9,6 +9,14 @@ Read the work item from Azure DevOps via MCP. Extract:
 
 Handle `$ARGUMENTS` as either `1234` or `AB#1234` — strip the `AB#` prefix when calling the MCP API.
 
+### Embedded Images
+
+The description and acceptance criteria fields may contain embedded images (screenshots, mockups, diagrams). These are typically `<img>` tags with `src` URLs pointing to Azure DevOps attachments. **Download and view every embedded image** using WebFetch — they often contain critical visual requirements (UI layouts, expected behavior, error states) that are not described in the text.
+
+### Comments
+
+Read the work item comments via `wit_list_work_item_comments`. Comments often contain clarifications, scope changes, or additional requirements added after the work item was created. Incorporate any relevant information from comments into your understanding of the work item.
+
 ## Step 2: Summarize and Confirm
 
 Present a summary of the work item to the user:
@@ -105,13 +113,20 @@ Remember the `BASE_BRANCH` — you will need it for the PR step.
 1. **Implement** using backend and/or frontend agents according to the approved plan
 2. **Generate mockup** if there are UI changes
 
-## Step 6: Quality Checks
+## Step 6: Build Validation
+
+Run a build check **before** any other quality checks. Use the `build-validator` agent to verify that all projects compile successfully.
+
+- If the build fails, **fix the errors immediately** and re-run until the build passes
+- Do NOT proceed to review, tests, or lint until the build is clean
+
+## Step 7: Quality Checks
 
 1. **Review** code for quality, security, and Clean Architecture compliance
 2. **Run tests** — unit, integration, and build validation
 3. **Run lint** — ESLint and dotnet format
 
-## Step 7: UAT Gate
+## Step 8: UAT Gate
 
 ### If Hot Fix:
 Skip manual UAT. Present an abbreviated confirmation:
@@ -143,7 +158,7 @@ Did manual testing pass?
 
 Wait for the user's response before proceeding. Do NOT create a PR until confirmed.
 
-## Step 8: Push, Create PR, and Update Work Item
+## Step 9: Push, Create PR, and Update Work Item
 
 1. Push the branch: `git push -u origin HEAD`
 2. Create a PR via Azure DevOps MCP:
