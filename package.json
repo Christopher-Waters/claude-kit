@@ -1,6 +1,6 @@
 {
   "name": "@caresolutions/ai-infrastructure",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Care Solutions Personal AI Infrastructure for Claude Code — agents, hooks, MCP servers, and workflow automation",
   "type": "module",
   "bin": {
@@ -22,7 +22,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://dev.azure.com/caresolutionsinc/Care%20Solutions%20AI/_git/Care%20Solutions%20AI"
+    "url": "https://dev.azure.com/caresolutionsinc/Care%20Solutions%20Compass/_git/Care%20Solutions%20Compass"
   },
   "engines": {
     "node": ">=18"
