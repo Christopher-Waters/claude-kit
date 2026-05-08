@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp"
+      ]
+    },
+    "teams": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic/mcp-teams-server"
+      ],
+      "env": {
+        "TEAMS_TENANT_ID": "${TEAMS_TENANT_ID}",
+        "TEAMS_CLIENT_ID": "${TEAMS_CLIENT_ID}",
+        "TEAMS_CLIENT_SECRET": "${TEAMS_CLIENT_SECRET}"
+      }
+    },
+    "azure": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure/mcp@latest",
+        "server",
+        "start"
+      ]
+    }
+  }
+}
