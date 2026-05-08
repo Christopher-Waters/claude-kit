@@ -1,6 +1,6 @@
 {
   "name": "@chris1807/claude-kit",
-  "version": "2.1.3",
+  "version": "2.1.4",
   "description": "Claude Code starter kit — agents, hooks, MCP servers, slash commands, and workflow automation",
   "type": "module",
   "bin": {
