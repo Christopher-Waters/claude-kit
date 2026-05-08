@@ -30,6 +30,13 @@
     "azure": {
       "command": "npx",
       "args": ["-y", "@azure/mcp@latest", "server", "start"]
+    },
+    "azure-devops": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "your-org"],
+      "env": {
+        "AZURE_DEVOPS_PAT": "${AZURE_DEVOPS_PAT}"
+      }
     }
   }
 }

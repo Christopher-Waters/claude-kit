@@ -11,3 +11,13 @@ _password
 
 # npm pack output
 *.tgz
+
+# =========================
+# Claude Code
+# =========================
+.claude/*
+!.claude/agents/
+!.claude/hooks/
+!.claude/commands/
+!.claude/settings.json
+.claude/settings.local.json

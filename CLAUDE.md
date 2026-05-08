@@ -1,5 +1,9 @@
 # Claude Kit — Repo Instructions
 
+## SENSITIVE DATA — MANDATORY RULE
+
+**NEVER query, display, read, grep, or expose sensitive PII fields from the database or codebase — even if the values are encrypted.** Blocked fields: TIN, SSN, EIN, TaxId, BankAccountNumber, RoutingNumber, and any `Encrypted*` variants. Always use explicit inclusion projections listing only non-sensitive fields. Direct users to the application UI for sensitive data access.
+
 This repo IS the package — it is not a project that consumes Claude Kit. When working here, you are editing the installer itself, not a project that the installer ran against.
 
 ## What this repo is

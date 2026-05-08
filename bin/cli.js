@@ -20,6 +20,7 @@ const showHelp = args.includes('--help') || args.includes('-h');
 const globalOnly = args.includes('--global-only');
 const installAll = args.includes('--all');
 const dbFlag = args.find(a => a.startsWith('--db='))?.split('=')[1] || null;
+const adoOrgFlag = args.find(a => a.startsWith('--ado-org='))?.split('=')[1] || null;
 const targetArg = args.find(a => !a.startsWith('--') && a !== 'init');
 
 if (showHelp) {
@@ -37,6 +38,7 @@ Options:
   --all --db=mssql   Install all with SQL Server
   --all --db=azuresql  Install all with Azure SQL
   --all --db=postgres  Install all with PostgreSQL
+  --ado-org=<name>   Include Azure DevOps MCP for the named organization
   --global-only      Only install global agents to ~/.claude/agents/
   --help, -h         Show this help
 `);
@@ -159,7 +161,7 @@ async function main() {
         { name: 'Project Agents (deployer, db-admin, devops-tracker)', value: 'agents', checked: true },
         { name: 'Hooks (secret blocker, auto-format, test suggestions)', value: 'hooks', checked: true },
         { name: 'Slash Commands (11 commands — implement, review, deploy, releases, cherry-pick, promote, rollback, status, cleanup)', value: 'commands', checked: true },
-        { name: 'MCP Servers (Playwright, DB, Teams, Stripe, Azure)', value: 'mcp', checked: true },
+        { name: 'MCP Servers (Playwright, DB, Teams, Stripe, Azure, Azure DevOps)', value: 'mcp', checked: true },
         { name: 'Settings (hook registration)', value: 'settings', checked: true },
         { name: 'CLAUDE.md Workflow Section', value: 'workflow', checked: true },
         { name: '.gitignore Updates', value: 'gitignore', checked: true },
@@ -222,6 +224,7 @@ async function main() {
 
   // ── MCP Servers (interactive selection) ───────────────────────────────
   let dbType = 'none';
+  let selectedServers = [];
   if (components.includes('mcp')) {
     console.log(chalk.yellow.bold('\n🔌 MCP Servers → .mcp.json\n'));
 
@@ -244,7 +247,9 @@ async function main() {
         }]);
         db = dbAnswer;
       }
-      mcpChoices = { servers: ['playwright', 'teams', 'azure'], db, stripe: false };
+      const allServers = ['playwright', 'teams', 'azure'];
+      if (adoOrgFlag) allServers.push('azuredevops');
+      mcpChoices = { servers: allServers, db, stripe: false, adoOrg: adoOrgFlag };
     } else {
       // Database selection
       const { db } = await inquirer.prompt([{
@@ -271,10 +276,22 @@ async function main() {
           { name: 'Microsoft Teams (notifications, messages)', value: 'teams', checked: true },
           { name: 'Stripe (payment management)', value: 'stripe', checked: false },
           { name: 'Azure CLI (App Service, Key Vault, DNS)', value: 'azure', checked: true },
+          { name: 'Azure DevOps (work items, repos, pipelines, wiki)', value: 'azuredevops', checked: false },
         ],
       }]);
 
-      mcpChoices = { servers, db, stripe: servers.includes('stripe') };
+      let adoOrg = null;
+      if (servers.includes('azuredevops')) {
+        const { org } = await inquirer.prompt([{
+          type: 'input',
+          name: 'org',
+          message: 'Azure DevOps organization name (e.g. contoso for dev.azure.com/contoso):',
+          validate: (v) => v.trim().length > 0 || 'Organization name is required',
+        }]);
+        adoOrg = org.trim();
+      }
+
+      mcpChoices = { servers, db, stripe: servers.includes('stripe'), adoOrg };
     }
 
     // Build MCP config
@@ -334,7 +351,16 @@ async function main() {
       };
     }
 
+    if (mcpChoices.servers.includes('azuredevops') && mcpChoices.adoOrg) {
+      mcpConfig.mcpServers['azure-devops'] = {
+        command: 'npx',
+        args: ['-y', '@azure-devops/mcp', mcpChoices.adoOrg],
+        env: { AZURE_DEVOPS_PAT: '${AZURE_DEVOPS_PAT}' },
+      };
+    }
+
     dbType = mcpChoices.db;
+    selectedServers = mcpChoices.servers;
 
     const mcpPath = join(targetDir, '.mcp.json');
     if (await fs.pathExists(mcpPath)) {
@@ -501,12 +527,29 @@ async function main() {
   console.log(`  Database:        ${chalk.bold(dbType)}`);
   console.log('');
 
-  // Show required env vars
+  // Show required env vars + a copy-paste command to persist them in the user's shell rc
+  const shell = process.env.SHELL || '';
+  const rcFile = shell.includes('zsh') ? '~/.zshrc'
+    : shell.includes('bash') ? '~/.bashrc'
+    : shell.includes('fish') ? '~/.config/fish/config.fish'
+    : '~/.zshrc';
+  const exports = [];
+  if (dbType === 'mongo') exports.push('export MONGODB_CONNECTION_STRING="mongodb+srv://..."');
+  if (dbType === 'mssql' || dbType === 'azuresql') exports.push('export MSSQL_CONNECTION_STRING="Server=...;Database=..."');
+  if (dbType === 'postgres') exports.push('export POSTGRES_CONNECTION_STRING="postgresql://..."');
+  exports.push('export TEAMS_TENANT_ID="..."', 'export TEAMS_CLIENT_ID="..."', 'export TEAMS_CLIENT_SECRET="..."');
+  if (selectedServers.includes('azuredevops')) exports.push('export AZURE_DEVOPS_PAT="..."  # mint at https://dev.azure.com/_usersSettings/tokens');
+
   console.log(chalk.yellow('  Environment variables to set:'));
-  if (dbType === 'mongo') console.log(chalk.gray('    export MONGODB_CONNECTION_STRING="mongodb+srv://..."'));
-  if (dbType === 'mssql' || dbType === 'azuresql') console.log(chalk.gray('    export MSSQL_CONNECTION_STRING="Server=...;Database=..."'));
-  if (dbType === 'postgres') console.log(chalk.gray('    export POSTGRES_CONNECTION_STRING="postgresql://..."'));
-  console.log(chalk.gray('    export TEAMS_TENANT_ID="..." TEAMS_CLIENT_ID="..." TEAMS_CLIENT_SECRET="..."'));
+  for (const line of exports) console.log(chalk.gray(`    ${line}`));
+  console.log('');
+  console.log(chalk.yellow(`  To persist (replace the "..." placeholders first, then paste into your terminal):`));
+  console.log(chalk.gray(`    cat <<'EOF' >> ${rcFile}`));
+  for (const line of exports) console.log(chalk.gray(`    ${line}`));
+  console.log(chalk.gray(`    EOF`));
+  console.log(chalk.gray(`    source ${rcFile}`));
+  console.log('');
+  console.log(chalk.yellow('  Also run:'));
   console.log(chalk.gray('    az login'));
   console.log('');
   console.log(`  Then: ${chalk.blue(`cd ${targetDir} && claude`)}`);
