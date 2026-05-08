@@ -781,7 +781,7 @@ git push && git push --tags
 - **Secret blocker hook** — automatically blocks writes containing hardcoded credentials
 - **Protected files hook** — prevents edits to production/staging configs
 - **`.claude/settings.local.json`** is gitignored — personal permissions stay private
-- **Public npm package** — published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) so the published artifact is verifiably built from this GitHub repo
+- **Public npm package** — published from a GitHub Actions workflow gated on a tag-version match check
 
 ---
 

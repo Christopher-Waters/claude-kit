@@ -52,7 +52,7 @@ npm publish --dry-run --access public
 
 ## Publishing
 
-Do **not** run `npm publish` from a dev machine. The GitHub Action at `.github/workflows/publish.yml` is the only publishing path, so every published version is traceable to a tagged commit and carries npm provenance.
+Do **not** run `npm publish` from a dev machine. The GitHub Action at `.github/workflows/publish.yml` is the only publishing path, so every published version is traceable to a tagged commit.
 
 ```bash
 npm version patch     # bumps package.json + creates a v* git tag
