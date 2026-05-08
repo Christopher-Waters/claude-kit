@@ -47,6 +47,10 @@ claude-kit init . --all --db=mongo      # full install into /tmp/kit-test
 
 To unlink: `npm unlink -g @chris1807/claude-kit`.
 
+### Non-interactive contexts
+
+The installer detects non-TTY stdin (CI runs, piped invocations, agent shells) at startup and exits with a clear error rather than hanging on a prompt. To run cleanly in those contexts, use either `--global-only` or `--all --db=<...>` (optionally with `--ado-org=<name>`). Plain `init` and `--all` without `--db=` both require a TTY.
+
 Inspect what `npm publish` would ship without actually publishing:
 
 ```bash

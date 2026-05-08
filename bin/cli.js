@@ -41,8 +41,26 @@ Options:
   --ado-org=<name>   Include Azure DevOps MCP for the named organization
   --global-only      Only install global agents to ~/.claude/agents/
   --help, -h         Show this help
+
+Non-interactive (CI / piped / non-TTY contexts):
+  Use --global-only OR --all --db=<...> to skip every prompt.
+  Without these flags, the installer needs a TTY and will exit early
+  rather than hang waiting on stdin.
 `);
   process.exit(0);
+}
+
+// ============================================================================
+// Non-interactive guard — fail fast instead of hanging on prompts
+// ============================================================================
+const isTTY = Boolean(process.stdin.isTTY);
+const fullyAutomated = globalOnly || (installAll && dbFlag);
+if (!isTTY && !fullyAutomated) {
+  console.error(chalk.red('\n  ✗ Non-interactive context detected (stdin is not a TTY).'));
+  console.error(chalk.yellow('  This installer needs to prompt, but cannot. Use one of:\n'));
+  console.error(chalk.gray('    npx @chris1807/claude-kit init --global-only'));
+  console.error(chalk.gray('    npx @chris1807/claude-kit init --all --db=<mongo|mssql|azuresql|postgres|none> [--ado-org=<name>]\n'));
+  process.exit(1);
 }
 
 // ============================================================================
