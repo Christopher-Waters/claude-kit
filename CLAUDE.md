@@ -4,10 +4,10 @@ This repo IS the package — it is not a project that consumes Claude Kit. When 
 
 ## What this repo is
 
-`@chriswaters/claude-kit` is an npm CLI that installs Claude Code infrastructure (agents, hooks, MCP servers, slash commands, workflow) into a target project:
+`@chris1807/claude-kit` is an npm CLI that installs Claude Code infrastructure (agents, hooks, MCP servers, slash commands, workflow) into a target project:
 
 ```bash
-npx @chriswaters/claude-kit init [target-dir]
+npx @chris1807/claude-kit init [target-dir]
 ```
 
 The CLI lives in `bin/cli.js`. The content it copies into target projects lives in `templates/`.
@@ -27,7 +27,7 @@ The CLI lives in `bin/cli.js`. The content it copies into target projects lives 
 
 **Edits to `bin/cli.js` or `package.json`** change installer behavior. Bump the version and publish to ship them.
 
-**Edits to anything under `templates/`** change what gets installed into target projects. Existing installs do NOT auto-update; users re-run `npx @chriswaters/claude-kit init` (or `--all`) to pick up template changes. Bump the version anyway so users can see new content is available.
+**Edits to anything under `templates/`** change what gets installed into target projects. Existing installs do NOT auto-update; users re-run `npx @chris1807/claude-kit init` (or `--all`) to pick up template changes. Bump the version anyway so users can see new content is available.
 
 ## Local testing
 
@@ -41,7 +41,7 @@ claude-kit init --global-only           # writes ~/.claude/agents/* (idempotent 
 claude-kit init . --all --db=mongo      # full install into /tmp/kit-test
 ```
 
-To unlink: `npm unlink -g @chriswaters/claude-kit`.
+To unlink: `npm unlink -g @chris1807/claude-kit`.
 
 Inspect what `npm publish` would ship without actually publishing:
 

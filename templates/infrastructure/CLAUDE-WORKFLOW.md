@@ -1,7 +1,7 @@
 
 ## Claude Kit Workflow
 
-This project uses [Claude Kit](https://github.com/Christopher-Waters/claude-kit) — a standardized set of agents, hooks, MCP servers, and workflows installed via `npx @chriswaters/claude-kit init`.
+This project uses [Claude Kit](https://github.com/Christopher-Waters/claude-kit) — a standardized set of agents, hooks, MCP servers, and workflows installed via `npx @chris1807/claude-kit init`.
 
 ### Agent Pipeline
 

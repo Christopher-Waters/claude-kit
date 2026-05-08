@@ -27,9 +27,9 @@ if (showHelp) {
 ${chalk.blue('Claude Kit')}
 
 Usage:
-  npx @chriswaters/claude-kit init [target-dir]   Interactive install
-  npx @chriswaters/claude-kit init --all          Install everything
-  npx @chriswaters/claude-kit init --global-only  Global agents only
+  npx @chris1807/claude-kit init [target-dir]   Interactive install
+  npx @chris1807/claude-kit init --all          Install everything
+  npx @chris1807/claude-kit init --global-only  Global agents only
 
 Options:
   --all              Install all components (skips identical files, still asks DB type)

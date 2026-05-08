@@ -2,7 +2,7 @@
 
 > A starter kit for [Claude Code](https://claude.ai/code) — agents, hooks, MCP servers, slash commands, and workflow automation, installed into any project with a single `npx` command.
 
-[![npm](https://img.shields.io/npm/v/@chriswaters/claude-kit)](https://www.npmjs.com/package/@chriswaters/claude-kit)
+[![npm](https://img.shields.io/npm/v/@chris1807/claude-kit)](https://www.npmjs.com/package/@chris1807/claude-kit)
 
 ---
 
@@ -34,10 +34,10 @@ Every session Claude learns from your feedback and gets better at helping you sp
 ### Verify it works
 
 ```bash
-npx @chriswaters/claude-kit --help
+npx @chris1807/claude-kit --help
 ```
 
-You should see the help output. The package is published publicly on [npmjs.com](https://www.npmjs.com/package/@chriswaters/claude-kit) — no authentication or `.npmrc` setup required.
+You should see the help output. The package is published publicly on [npmjs.com](https://www.npmjs.com/package/@chris1807/claude-kit) — no authentication or `.npmrc` setup required.
 
 ---
 
@@ -54,7 +54,7 @@ You should see the help output. The package is published publicly on [npmjs.com]
 Best for first-time setup or when you want to pick exactly what you need.
 
 ```bash
-npx @chriswaters/claude-kit init
+npx @chris1807/claude-kit init
 ```
 
 You'll be asked:
@@ -80,7 +80,7 @@ You'll be asked:
 Same as Option 1, but you specify the project path upfront:
 
 ```bash
-npx @chriswaters/claude-kit init /path/to/your/project
+npx @chris1807/claude-kit init /path/to/your/project
 ```
 
 ### Option 3: Install Everything (Minimal Prompts)
@@ -88,7 +88,7 @@ npx @chriswaters/claude-kit init /path/to/your/project
 Installs all components. Only asks which database type (there's no sensible default).
 
 ```bash
-npx @chriswaters/claude-kit init --all
+npx @chris1807/claude-kit init --all
 ```
 
 This installs:
@@ -107,15 +107,15 @@ This installs:
 Specify the database type as a flag — no prompts at all:
 
 ```bash
-npx @chriswaters/claude-kit init --all --db=mongo
-npx @chriswaters/claude-kit init --all --db=mssql
-npx @chriswaters/claude-kit init --all --db=azuresql
-npx @chriswaters/claude-kit init --all --db=postgres
+npx @chris1807/claude-kit init --all --db=mongo
+npx @chris1807/claude-kit init --all --db=mssql
+npx @chris1807/claude-kit init --all --db=azuresql
+npx @chris1807/claude-kit init --all --db=postgres
 ```
 
 You can also target a specific directory:
 ```bash
-npx @chriswaters/claude-kit init /path/to/project --all --db=mongo
+npx @chris1807/claude-kit init /path/to/project --all --db=mongo
 ```
 
 ### Option 5: Global Agents Only
@@ -123,7 +123,7 @@ npx @chriswaters/claude-kit init /path/to/project --all --db=mongo
 Just installs the 13 global agents to `~/.claude/agents/`. No project files, no prompts.
 
 ```bash
-npx @chriswaters/claude-kit init --global-only
+npx @chris1807/claude-kit init --global-only
 ```
 
 Use this when you just want the global agents on a new machine and will install project files separately per project.
@@ -141,7 +141,7 @@ Use this when you just want the global agents on a new machine and will install 
 Already installed on one project? Just run the same command for the next one:
 
 ```bash
-npx @chriswaters/claude-kit init /path/to/another/project
+npx @chris1807/claude-kit init /path/to/another/project
 ```
 
 The installer automatically **skips global agents** that are already installed (they're identical) and only installs the project-specific files. You don't need `--global-only` or any special flag — it just works.
@@ -753,7 +753,7 @@ When the infrastructure package is updated:
 
 ```bash
 # npx always fetches the latest version
-npx @chriswaters/claude-kit init /path/to/project
+npx @chris1807/claude-kit init /path/to/project
 ```
 
 The installer detects existing files and asks whether to overwrite or skip each one.
@@ -789,7 +789,7 @@ git push && git push --tags
 
 ### `npm ERR! 404 Not Found`
 
-If `npx @chriswaters/claude-kit` reports 404, your local npm registry may be set to a private feed that overrides the public one. Check with `npm config get registry` — it should be `https://registry.npmjs.org/`.
+If `npx @chris1807/claude-kit` reports 404, your local npm registry may be set to a private feed that overrides the public one. Check with `npm config get registry` — it should be `https://registry.npmjs.org/`.
 
 ### Hooks not running
 
