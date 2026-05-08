@@ -63,6 +63,12 @@ Present the plan to the user:
 ### Files to Delete (if any)
 - `path/to/old/file.cs` — {why it's being removed}
 
+### Unit Tests
+- `path/to/new.tests.cs` — covers {scenario 1}, {scenario 2}, {edge case}
+- `path/to/existing.tests.cs` — adds cases for {new behavior}
+
+List every test file you will add or modify and the scenarios each covers (happy path, error paths, edge cases, regression guards). If a change in this plan has no test coverage, justify why here.
+
 ### Agents
 - **backend**: {what it will do}
 - **frontend**: {what it will do}
@@ -111,7 +117,8 @@ Remember the `BASE_BRANCH` — you will need it for the PR step.
 ## Step 5: Implement
 
 1. **Implement** using backend and/or frontend agents according to the approved plan
-2. **Generate mockup** if there are UI changes
+2. **Write the unit tests** listed in the plan's "Unit Tests" section alongside the implementation — not after
+3. **Generate mockup** if there are UI changes
 
 ## Step 6: Build Validation
 
@@ -123,7 +130,7 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 ## Step 7: Quality Checks
 
 1. **Review** code for quality, security, and Clean Architecture compliance
-2. **Run tests** — unit, integration, and build validation
+2. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this change. A failure in an unrelated test means this change broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
 3. **Run lint** — ESLint and dotnet format
 
 ## Step 8: UAT Gate

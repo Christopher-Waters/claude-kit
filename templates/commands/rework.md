@@ -79,6 +79,12 @@ Present the plan to the user:
 ### Files to Delete (if any)
 - `path/to/old/file.cs` — {why it's being removed}
 
+### Unit Tests
+- `path/to/new.tests.cs` — covers {scenario the rework adds or fixes}
+- `path/to/existing.tests.cs` — updates assertions for {changed behavior}
+
+List every test file you will add or modify and the scenarios each covers. Rework feedback often reveals missing test coverage on the original implementation — add regression tests that would have caught the original issue. If a rework change in this plan has no test coverage, justify why here.
+
 ### Agents
 - **backend**: {what it will do}
 - **frontend**: {what it will do}
@@ -104,7 +110,8 @@ If the PR was completed/merged and the branch was deleted, create a new branch f
 ## Step 6: Implement
 
 1. **Implement** the rework using backend and/or frontend agents according to the approved plan
-2. **Generate mockup** if there are UI changes
+2. **Write the unit tests** listed in the plan's "Unit Tests" section alongside the implementation — not after. Include any regression test that would have caught the original issue
+3. **Generate mockup** if there are UI changes
 
 ## Step 7: Build Validation
 
@@ -116,7 +123,7 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 ## Step 8: Quality Checks
 
 1. **Review** code for quality, security, and Clean Architecture compliance
-2. **Run tests** — unit, integration, and build validation
+2. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this rework. A failure in an unrelated test means this rework broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
 3. **Run lint** — ESLint and dotnet format
 
 ## Step 9: UAT Gate
