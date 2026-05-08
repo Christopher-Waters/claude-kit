@@ -320,7 +320,7 @@ All commits cherry-picked successfully.
 ```
 Release #24 PR created for staging.
 
-PR: https://dev.azure.com/caresolutionsinc/.../_git/.../pullrequest/287
+PR: https://github.com/<owner>/<repo>/pull/287
 Branch: release/24-to-staging → staging
 
 Work items included:
@@ -378,7 +378,7 @@ yes
 ```
 Cherry-pick PR created for production.
 
-PR: https://dev.azure.com/caresolutionsinc/.../_git/.../pullrequest/289
+PR: https://github.com/<owner>/<repo>/pull/289
 Branch: cherry-pick/2026-03-22-to-production → main
 
 Work items:
@@ -477,7 +477,7 @@ Claude reverts, runs pre-flight checks, creates the PR:
 ```
 Rollback PR created for production.
 
-PR: https://dev.azure.com/caresolutionsinc/.../_git/.../pullrequest/291
+PR: https://github.com/<owner>/<repo>/pull/291
 Branch: revert/2026-03-22-on-production → main
 
 Reverted:

@@ -1,4 +1,4 @@
-# Care Solutions Standard Pipeline Template
+# Standard Azure DevOps Pipeline Template (example)
 #
 # Multi-stage YAML pipeline that builds once and deploys to the correct
 # environment based on the source branch.

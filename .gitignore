@@ -5,3 +5,9 @@
 .env
 node_modules/
 _password
+
+# Claude Code local cache (per-user permissions, not shared)
+.claude/settings.local.json
+
+# npm pack output
+*.tgz

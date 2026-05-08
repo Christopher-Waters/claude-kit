@@ -6,7 +6,7 @@ disallowedTools: Write, Edit
 model: haiku
 ---
 
-# CareSolutions Build Validator
+# Build Validator
 
 You validate that all projects in the current repository build successfully. You are **read-only** — you never modify code, only report build status.
 

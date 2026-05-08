@@ -24,12 +24,12 @@ const targetArg = args.find(a => !a.startsWith('--') && a !== 'init');
 
 if (showHelp) {
   console.log(`
-${chalk.blue('Care Solutions AI Infrastructure')}
+${chalk.blue('Claude Kit')}
 
 Usage:
-  npx @caresolutions/ai-infrastructure init [target-dir]   Interactive install
-  npx @caresolutions/ai-infrastructure init --all          Install everything
-  npx @caresolutions/ai-infrastructure init --global-only  Global agents only
+  npx @chriswaters/claude-kit init [target-dir]   Interactive install
+  npx @chriswaters/claude-kit init --all          Install everything
+  npx @chriswaters/claude-kit init --global-only  Global agents only
 
 Options:
   --all              Install all components (skips identical files, still asks DB type)
@@ -48,7 +48,7 @@ Options:
 // ============================================================================
 console.log('');
 console.log(chalk.blue('╔══════════════════════════════════════════════════╗'));
-console.log(chalk.blue('║') + chalk.bold.white('  Care Solutions AI Infrastructure Installer     ') + chalk.blue('║'));
+console.log(chalk.blue('║') + chalk.bold.white('  Claude Kit Installer                           ') + chalk.blue('║'));
 console.log(chalk.blue('╚══════════════════════════════════════════════════╝'));
 console.log('');
 
@@ -423,7 +423,7 @@ async function main() {
       // Re-read in case we just modified it
       existing = await fs.readFile(claudeMdPath, 'utf8');
 
-      if (existing.includes('Care Solutions AI Workflow')) {
+      if (existing.includes('Claude Kit Workflow') || existing.includes('Care Solutions AI Workflow')) {
         console.log(chalk.gray('  = Workflow section already exists'));
         if (!installAll) {
           const { replace } = await inquirer.prompt([{
@@ -433,7 +433,7 @@ async function main() {
             default: false,
           }]);
           if (replace) {
-            const cleaned = existing.replace(/\n## Care Solutions AI Workflow[\s\S]*$/, '').trimEnd();
+            const cleaned = existing.replace(/\n## (?:Claude Kit Workflow|Care Solutions AI Workflow)[\s\S]*$/, '').trimEnd();
             await fs.writeFile(claudeMdPath, `${cleaned}\n\n${workflowContent}`);
             console.log(chalk.green('  ✓ Workflow section replaced'));
           }

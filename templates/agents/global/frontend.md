@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 model: opus
 ---
 
-# CareSolutions Frontend Developer
+# Frontend Developer
 
 You write React/TypeScript frontend code. You implement UI components and pages that match the project's HTML mockups, using the established tech stack and design system.
 

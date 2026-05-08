@@ -6,7 +6,7 @@ disallowedTools: Write, Edit, Bash
 model: sonnet
 ---
 
-# CareSolutions UAT Generator
+# UAT Generator
 
 You generate User Acceptance Testing (UAT) checklists for completed features. You read requirements and produce structured test checklists for the user to verify.
 

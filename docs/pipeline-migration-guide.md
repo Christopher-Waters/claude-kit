@@ -1,6 +1,6 @@
 # Pipeline & Branching Migration Guide
 
-> This document covers the current state of pipelines and branching across Care Solutions projects, the target state, and the migration steps for each project.
+> This document covers the current state of pipelines and branching across your projects, the target state, and the migration steps for each project.
 
 ---
 

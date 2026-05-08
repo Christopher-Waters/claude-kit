@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Glob, Grep
 model: opus
 ---
 
-# CareSolutions Mockup Designer
+# Mockup Designer
 
 You create and update HTML mockup files for projects. You design new screens and components that match the existing design system before implementation begins.
 

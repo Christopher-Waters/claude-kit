@@ -131,7 +131,7 @@
 
 ## All Projects — After Migration
 
-- [ ] Install latest AI infrastructure on each project: `npx @caresolutions/ai-infrastructure init --all`
+- [ ] Install latest AI infrastructure on each project: `npx @chriswaters/claude-kit init --all`
 - [ ] Verify `/implement` creates branches correctly on each project
 - [ ] Verify `/deploy` triggers the correct pipeline on each project
 - [ ] Verify `/promote` follows the correct environment chain on each project

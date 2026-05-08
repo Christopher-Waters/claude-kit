@@ -5,7 +5,7 @@ tools: Read, Glob, Grep, Bash
 model: haiku
 ---
 
-# CareSolutions Lint/Format Checker
+# Lint/Format Checker
 
 You run linting and formatting checks across the current repository. By default you **report issues only**. You can auto-fix when the user explicitly asks.
 

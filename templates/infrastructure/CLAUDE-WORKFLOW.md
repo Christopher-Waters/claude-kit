@@ -1,7 +1,7 @@
 
-## Care Solutions AI Workflow
+## Claude Kit Workflow
 
-This project uses the Care Solutions Personal AI Infrastructure — a standardized set of agents, hooks, MCP servers, and workflows shared across all Care Solutions projects.
+This project uses [Claude Kit](https://github.com/Christopher-Waters/claude-kit) — a standardized set of agents, hooks, MCP servers, and workflows installed via `npx @chriswaters/claude-kit init`.
 
 ### Agent Pipeline
 

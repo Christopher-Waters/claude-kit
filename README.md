@@ -1,14 +1,14 @@
-# Care Solutions AI Infrastructure
+# Claude Kit
 
-> Personal AI Infrastructure for [Claude Code](https://claude.ai/code) — an internal package that gives every Care Solutions team member a standardized, AI-powered development experience.
+> A starter kit for [Claude Code](https://claude.ai/code) — agents, hooks, MCP servers, slash commands, and workflow automation, installed into any project with a single `npx` command.
 
-**Private package.** Published to the Care Solutions Azure DevOps Artifacts npm feed. Only organization members can install it.
+[![npm](https://img.shields.io/npm/v/@chriswaters/claude-kit)](https://www.npmjs.com/package/@chriswaters/claude-kit)
 
 ---
 
 ## About
 
-This package installs a complete AI development infrastructure into any project. It includes specialized agents that handle specific tasks (deployment, database ops, code review), security hooks that prevent mistakes automatically, MCP server connections to your tools (Azure DevOps, MongoDB, Teams, Stripe), and slash commands that automate your entire workflow from work item to pull request.
+This package installs a complete AI development infrastructure into any project. It includes specialized agents that handle specific tasks (deployment, database ops, code review), security hooks that prevent mistakes automatically, MCP server connections to your tools (databases, Teams, Stripe, Azure CLI), and slash commands that automate your entire workflow from work item to pull request.
 
 Every session Claude learns from your feedback and gets better at helping you specifically. The infrastructure is modular — install only what your project needs.
 
@@ -26,50 +26,18 @@ Every session Claude learns from your feedback and gets better at helping you sp
 
 ---
 
-## First-Time Setup (One Time Per Machine)
-
-### Prerequisites
+## Prerequisites
 
 - [Claude Code CLI](https://claude.ai/code) installed
 - [Node.js](https://nodejs.org/) 18 or later
-- Access to the Care Solutions Azure DevOps organization
 
-### Step 1: Authenticate with the npm feed
-
-1. **Generate a Personal Access Token (PAT)** in Azure DevOps:
-   - Go to https://dev.azure.com/caresolutionsinc/_usersSettings/tokens
-   - Click **New Token**
-   - Set scope to **Packaging → Read & Write**
-   - Copy the token
-
-2. **Base64-encode your PAT:**
-
-   ```bash
-   # Mac/Linux
-   echo -n 'YOUR_PAT' | base64
-
-   # Windows (PowerShell)
-   [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("YOUR_PAT"))
-   ```
-
-3. **Add the following to `~/.npmrc`** (replace `BASE64_ENCODED_PAT` with the output from step 2, and `YOUR_EMAIL` with your email):
-
-   ```
-   @caresolutions:registry=https://pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/
-   //pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/:username=caresolutionsinc
-   //pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/:_password=BASE64_ENCODED_PAT
-   //pkgs.dev.azure.com/caresolutionsinc/_packaging/caresolutionsinc/npm/registry/:email=YOUR_EMAIL
-   ```
-
-> **Note:** PATs expire. When your token expires, generate a new one, base64-encode it, and update the `_password` line in `~/.npmrc`.
-
-### Step 2: Verify it works
+### Verify it works
 
 ```bash
-npx @caresolutions/ai-infrastructure --help
+npx @chriswaters/claude-kit --help
 ```
 
-You should see the help output. If you get a 401 or 403 error, re-run `npm login` from Step 1.
+You should see the help output. The package is published publicly on [npmjs.com](https://www.npmjs.com/package/@chriswaters/claude-kit) — no authentication or `.npmrc` setup required.
 
 ---
 
@@ -86,7 +54,7 @@ You should see the help output. If you get a 401 or 403 error, re-run `npm login
 Best for first-time setup or when you want to pick exactly what you need.
 
 ```bash
-npx @caresolutions/ai-infrastructure init
+npx @chriswaters/claude-kit init
 ```
 
 You'll be asked:
@@ -112,7 +80,7 @@ You'll be asked:
 Same as Option 1, but you specify the project path upfront:
 
 ```bash
-npx @caresolutions/ai-infrastructure init /path/to/your/project
+npx @chriswaters/claude-kit init /path/to/your/project
 ```
 
 ### Option 3: Install Everything (Minimal Prompts)
@@ -120,7 +88,7 @@ npx @caresolutions/ai-infrastructure init /path/to/your/project
 Installs all components. Only asks which database type (there's no sensible default).
 
 ```bash
-npx @caresolutions/ai-infrastructure init --all
+npx @chriswaters/claude-kit init --all
 ```
 
 This installs:
@@ -139,15 +107,15 @@ This installs:
 Specify the database type as a flag — no prompts at all:
 
 ```bash
-npx @caresolutions/ai-infrastructure init --all --db=mongo
-npx @caresolutions/ai-infrastructure init --all --db=mssql
-npx @caresolutions/ai-infrastructure init --all --db=azuresql
-npx @caresolutions/ai-infrastructure init --all --db=postgres
+npx @chriswaters/claude-kit init --all --db=mongo
+npx @chriswaters/claude-kit init --all --db=mssql
+npx @chriswaters/claude-kit init --all --db=azuresql
+npx @chriswaters/claude-kit init --all --db=postgres
 ```
 
 You can also target a specific directory:
 ```bash
-npx @caresolutions/ai-infrastructure init /path/to/project --all --db=mongo
+npx @chriswaters/claude-kit init /path/to/project --all --db=mongo
 ```
 
 ### Option 5: Global Agents Only
@@ -155,7 +123,7 @@ npx @caresolutions/ai-infrastructure init /path/to/project --all --db=mongo
 Just installs the 13 global agents to `~/.claude/agents/`. No project files, no prompts.
 
 ```bash
-npx @caresolutions/ai-infrastructure init --global-only
+npx @chriswaters/claude-kit init --global-only
 ```
 
 Use this when you just want the global agents on a new machine and will install project files separately per project.
@@ -173,7 +141,7 @@ Use this when you just want the global agents on a new machine and will install 
 Already installed on one project? Just run the same command for the next one:
 
 ```bash
-npx @caresolutions/ai-infrastructure init /path/to/another/project
+npx @chriswaters/claude-kit init /path/to/another/project
 ```
 
 The installer automatically **skips global agents** that are already installed (they're identical) and only installs the project-specific files. You don't need `--global-only` or any special flag — it just works.
@@ -728,7 +696,7 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 
 After installing, start a Claude Code session and say:
 ```
-Set up my memory profile. I'm [your name], a [your role] at Care Solutions.
+Set up my memory profile. I'm [your name], a [your role] at [your company].
 I work on [your projects]. I prefer [your preferences].
 ```
 
@@ -785,7 +753,7 @@ When the infrastructure package is updated:
 
 ```bash
 # npx always fetches the latest version
-npx @caresolutions/ai-infrastructure init /path/to/project
+npx @chriswaters/claude-kit init /path/to/project
 ```
 
 The installer detects existing files and asks whether to overwrite or skip each one.
@@ -793,17 +761,16 @@ The installer detects existing files and asks whether to overwrite or skip each 
 ### Publishing Updates (Maintainers Only)
 
 ```bash
-cd care-solutions-ai
+cd claude-kit
 
 # Make your changes, then bump the version
-npm version patch    # 1.0.1 → 1.0.2
+npm version patch    # 2.0.0 → 2.0.1
 
-# Publish to the private feed
-npm run publish:feed
-
-# Push to repo
+# Push the tag — GitHub Actions publishes to npm automatically
 git push && git push --tags
 ```
+
+> The `.github/workflows/publish.yml` workflow runs on any pushed `v*` tag and publishes to npm using the `NPM_TOKEN` repo secret. You should not run `npm publish` from a dev machine.
 
 ---
 
@@ -814,23 +781,15 @@ git push && git push --tags
 - **Secret blocker hook** — automatically blocks writes containing hardcoded credentials
 - **Protected files hook** — prevents edits to production/staging configs
 - **`.claude/settings.local.json`** is gitignored — personal permissions stay private
-- **Private npm feed** — only Care Solutions Azure DevOps org members can install
+- **Public npm package** — published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) so the published artifact is verifiably built from this GitHub repo
 
 ---
 
 ## Troubleshooting
 
-### `npm ERR! 401 Unauthorized` when running npx
-
-Your PAT may have expired. Generate a new one, base64-encode it, and update `~/.npmrc`:
-```bash
-echo -n 'YOUR_NEW_PAT' | base64
-```
-Then replace the `_password=...` line in `~/.npmrc` with the new value.
-
 ### `npm ERR! 404 Not Found`
 
-Make sure the registry and PAT auth are configured in `~/.npmrc` — see [Step 1](#step-1-authenticate-with-the-npm-feed).
+If `npx @chriswaters/claude-kit` reports 404, your local npm registry may be set to a private feed that overrides the public one. Check with `npm config get registry` — it should be `https://registry.npmjs.org/`.
 
 ### Hooks not running
 
@@ -854,10 +813,9 @@ az account show                   # Should show your Azure subscription
 
 ## Support
 
-- **Questions:** Ask in the #engineering Teams channel
-- **Issues:** Create a work item in the [Care Solutions AI](https://dev.azure.com/caresolutionsinc/Care%20Solutions%20AI) project
-- **Source:** https://dev.azure.com/caresolutionsinc/Care%20Solutions%20AI/_git/Care%20Solutions%20AI
+- **Issues:** [github.com/Christopher-Waters/claude-kit/issues](https://github.com/Christopher-Waters/claude-kit/issues)
+- **Source:** [github.com/Christopher-Waters/claude-kit](https://github.com/Christopher-Waters/claude-kit)
 
 ## License
 
-MIT — Care Solutions internal use.
+MIT

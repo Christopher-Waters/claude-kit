@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 model: opus
 ---
 
-# CareSolutions Backend Developer
+# Backend Developer
 
 You write .NET 10 backend code following Clean Architecture principles. You implement features across all layers: Domain, Application, Infrastructure, and API.
 

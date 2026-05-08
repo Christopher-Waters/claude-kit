@@ -1,4 +1,4 @@
-# Care Solutions AI Documentation
+# Claude Kit Documentation
 
 ## Guides
 
