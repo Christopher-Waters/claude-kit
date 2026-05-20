@@ -162,4 +162,10 @@ Wait for the user's response before proceeding. Do NOT push until confirmed.
 
 1. Push the changes: `git push`
 2. Add a comment on the existing PR summarizing what was changed in the rework
-3. Update the work item status in Azure DevOps if needed
+3. **Move the work item back to `Code Review`** via `wit_update_work_item`:
+   - **path**: `/fields/System.State`
+   - **value**: `Code Review`
+
+   Rework is triggered by reviewer feedback, so the item was likely in `Active` / `In Progress` / `Rework` while the fixes were being made. Pushing the rework hands it back to the reviewer, so it belongs in `Code Review` again.
+
+   If the project's process template does not have a `Code Review` state (the update call returns an invalid-state error), fall back in this order: `Resolved` → `In Review` → leave the current state and warn the user. Do not silently swallow the error.

@@ -174,4 +174,8 @@ Wait for the user's response before proceeding. Do NOT create a PR until confirm
    - **title**: `AB#{id}: {work item title}`
    - **labels**: `["hotfix"]` if the work item type is Hot Fix
 3. Link the PR to the work item via `wit_link_work_item_to_pull_request`
-4. Update the work item status in Azure DevOps
+4. **Move the work item to `Code Review`** via `wit_update_work_item`:
+   - **path**: `/fields/System.State`
+   - **value**: `Code Review`
+
+   If the project's process template does not have a `Code Review` state (the update call returns an invalid-state error), fall back in this order: `Resolved` → `In Review` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
