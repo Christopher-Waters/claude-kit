@@ -178,7 +178,7 @@ async function main() {
       choices: [
         { name: 'Project Agents (deployer, db-admin, devops-tracker)', value: 'agents', checked: true },
         { name: 'Hooks (secret blocker, auto-format, test suggestions)', value: 'hooks', checked: true },
-        { name: 'Slash Commands (11 commands — implement, review, deploy, releases, cherry-pick, promote, rollback, status, cleanup)', value: 'commands', checked: true },
+        { name: 'Slash Commands (implement, review, deploy, releases, cherry-pick, promote, rollback, status, cleanup, create-work-item, …)', value: 'commands', checked: true },
         { name: 'MCP Servers (Playwright, DB, Teams, Stripe, Azure, Azure DevOps)', value: 'mcp', checked: true },
         { name: 'Settings (hook registration)', value: 'settings', checked: true },
         { name: 'CLAUDE.md Workflow Section', value: 'workflow', checked: true },
