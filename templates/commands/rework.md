@@ -97,7 +97,69 @@ Approve this plan? (yes / no / suggest changes)
 
 **Wait for the user to approve the plan.** Do NOT start implementation until the user approves. If they suggest changes, revise the plan and present it again.
 
-## Step 5: Switch to Existing Branch
+## Step 5: Create Rework Task as a Child
+
+Every rework round gets its own Task work item, parented under the original User Story / Bug. This keeps the rework effort visible on the board and gives the team a clean record of how many rounds an item went through.
+
+### Suggest hours
+
+Estimate the rework effort from the approved plan. Use this rubric — calibrate against scope, not abstract complexity:
+
+| Hours | Looks like |
+|-------|-----------|
+| **0.5** | Trivial — copy tweak, single config value, one-line fix. No new tests. |
+| **1**   | One file, well-understood change. Maybe one new/updated test. |
+| **2**   | 2–3 files, one layer, follows existing patterns. Some new tests. |
+| **4**   | Multiple files across layers, or new logic in one area. Real test coverage. |
+| **8**   | Most of a day — meaningful new logic, several files, edge cases. |
+| **16**  | Two days — significant rework, multiple unknowns to resolve. |
+| **24+** | Three days or more — flag that this rework probably should have been a fresh story. |
+
+Adjust upward for: ambiguous feedback, missing UX, data migrations, regression risk in unrelated areas. Adjust downward for: pure config changes or mechanical fixes.
+
+### Prompt the user
+
+```
+## Rework Task
+
+**Title:**       Rework AB#{id} — round {N}
+**Parent:**      AB#{id} ({title})
+**Description:** {1–2 sentence summary of the rework feedback addressed}
+
+**Suggested hours:** {n}
+  Based on: {one line — files touched / scope / unknowns}
+
+Enter the estimated hours for this task (press enter to accept {n}):
+```
+
+`{N}` is the rework round — count how many existing child Tasks already exist on the parent with a title matching `Rework AB#{id}` and add 1.
+
+**Wait for the user's response.** Accept the suggestion (enter), accept a different number, or `cancel` to skip task creation. Do not proceed to branch switch until this is resolved.
+
+### Create the task
+
+If the user provided hours (suggested or overridden):
+
+1. Call `mcp__azure-devops__wit_create_work_item`:
+   - **workItemType**: `Task`
+   - **title**: `Rework AB#{id} — round {N}`
+   - **fields**: JSON Patch document setting:
+     - `System.Description` — short summary of the rework feedback + link to the most recent PR
+     - `Microsoft.VSTS.Scheduling.OriginalEstimate` — the agreed hours
+     - `Microsoft.VSTS.Scheduling.RemainingWork` — the agreed hours
+     - `System.AreaPath` — same as the parent
+     - `System.IterationPath` — same as the parent
+
+2. Link the new Task as a child of the parent work item via `wit_work_items_link`:
+   - **type**: `Child` (the parent → child link from the parent's perspective; equivalent to `Parent` from the task's perspective)
+   - **source**: parent work item ID
+   - **target**: new task ID
+
+3. Confirm to the user: `Created task AB#{taskId} (parent: AB#{id}, est: {hours}h)`.
+
+If the user cancels, skip task creation and proceed — note "No rework task created" in the final summary.
+
+## Step 6: Switch to Existing Branch
 
 The work item already has a branch from the previous PR. Switch to it:
 
@@ -107,26 +169,26 @@ The work item already has a branch from the previous PR. Switch to it:
 
 If the PR was completed/merged and the branch was deleted, create a new branch from the PR's target branch following the same naming convention as `/implement` Step 4.
 
-## Step 6: Implement
+## Step 7: Implement
 
 1. **Implement** the rework using backend and/or frontend agents according to the approved plan
 2. **Write the unit tests** listed in the plan's "Unit Tests" section alongside the implementation — not after. Include any regression test that would have caught the original issue
 3. **Generate mockup** if there are UI changes
 
-## Step 7: Build Validation
+## Step 8: Build Validation
 
 Run a build check **before** any other quality checks. Use the `build-validator` agent to verify that all projects compile successfully.
 
 - If the build fails, **fix the errors immediately** and re-run until the build passes
 - Do NOT proceed to review, tests, or lint until the build is clean
 
-## Step 8: Quality Checks
+## Step 9: Quality Checks
 
 1. **Review** code for quality, security, and Clean Architecture compliance
 2. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this rework. A failure in an unrelated test means this rework broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
 3. **Run lint** — ESLint and dotnet format
 
-## Step 9: UAT Gate
+## Step 10: UAT Gate
 
 ### If Hot Fix:
 Skip manual UAT. Present an abbreviated confirmation:
@@ -158,14 +220,75 @@ Did manual testing pass?
 
 Wait for the user's response before proceeding. Do NOT push until confirmed.
 
-## Step 10: Push and Update
+## Step 11: Push and Update
 
 1. Push the changes: `git push`
 2. Add a comment on the existing PR summarizing what was changed in the rework
-3. **Move the work item back to `Code Review`** via `wit_update_work_item`:
+3. **Close related Tasks and log hours** — see "Closing Related Tasks" below. This includes the rework Task created in Step 5 as well as any other child Tasks that became `Completed` as a result of this rework round.
+4. **Move the work item back to `Code Review`** via `wit_update_work_item`:
    - **path**: `/fields/System.State`
    - **value**: `Code Review`
 
    Rework is triggered by reviewer feedback, so the item was likely in `Active` / `In Progress` / `Rework` while the fixes were being made. Pushing the rework hands it back to the reviewer, so it belongs in `Code Review` again.
 
    If the project's process template does not have a `Code Review` state (the update call returns an invalid-state error), fall back in this order: `Resolved` → `In Review` → leave the current state and warn the user. Do not silently swallow the error.
+
+### Closing Related Tasks
+
+After pushing, find every child Task of this work item (relations of type `System.LinkTypes.Hierarchy-Forward` where the target's `System.WorkItemType` is `Task`). Skip this step if there are no child Tasks.
+
+For each child Task, capture:
+- ID, title, state
+- `Microsoft.VSTS.Scheduling.OriginalEstimate`
+- `Microsoft.VSTS.Scheduling.CompletedWork`
+- `Microsoft.VSTS.Scheduling.RemainingWork`
+
+Present:
+
+```
+## Close Related Tasks
+
+| Task ID | Title | State | Original | Completed | Remaining |
+|---------|-------|-------|----------|-----------|-----------|
+| AB#xxxx | Rework AB#{id} — round 2 | Active | 4 | 0 | 4 |
+| AB#yyyy | ...                      | Active | 2 | 1 | 1 |
+
+Close all related tasks and log completed hours? (yes / no / select)
+```
+
+- `yes` → walk through every child Task in sequence
+- `no`  → skip closing tasks entirely
+- `select` → ask which task IDs to process; only those get prompted
+
+For each task being processed, prompt for completed hours:
+
+- **If `CompletedWork` is empty or `0`:**
+
+  ```
+  AB#xxxx ({title})
+    Original estimate: {n}h
+    Completed:         0h
+    Remaining:         {n}h
+
+  Enter completed hours (suggested: {OriginalEstimate}h, press enter to accept):
+  ```
+
+- **If `CompletedWork` is already set (non-zero):**
+
+  ```
+  AB#xxxx ({title})
+    Original estimate: {n}h
+    Completed:         {current}h   ← already logged
+    Remaining:         {m}h
+
+  Update completed hours to (press enter to keep {current}, or enter new value):
+  ```
+
+**Wait for the user's response on every task.** Accept the suggested/current value (enter), a new numeric value, or `skip` to leave that one untouched.
+
+Once the user has answered, update each task via `wit_update_work_item`:
+- `Microsoft.VSTS.Scheduling.CompletedWork` → the agreed value
+- `Microsoft.VSTS.Scheduling.RemainingWork` → `0`
+- `System.State` → `Closed` (fall back to `Done` if the project's task template uses Agile; warn if neither is valid)
+
+Confirm with a summary line per task: `Closed AB#xxxx — {hours}h logged`.

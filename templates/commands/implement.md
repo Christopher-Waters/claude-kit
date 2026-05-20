@@ -174,8 +174,69 @@ Wait for the user's response before proceeding. Do NOT create a PR until confirm
    - **title**: `AB#{id}: {work item title}`
    - **labels**: `["hotfix"]` if the work item type is Hot Fix
 3. Link the PR to the work item via `wit_link_work_item_to_pull_request`
-4. **Move the work item to `Code Review`** via `wit_update_work_item`:
+4. **Close related Tasks and log hours** — see "Closing Related Tasks" below.
+5. **Move the work item to `Code Review`** via `wit_update_work_item`:
    - **path**: `/fields/System.State`
    - **value**: `Code Review`
 
    If the project's process template does not have a `Code Review` state (the update call returns an invalid-state error), fall back in this order: `Resolved` → `In Review` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
+
+### Closing Related Tasks
+
+After the PR is created, find every child Task of this work item (relations of type `System.LinkTypes.Hierarchy-Forward` where the target's `System.WorkItemType` is `Task`). Skip this step if there are no child Tasks.
+
+For each child Task, capture:
+- ID, title, state
+- `Microsoft.VSTS.Scheduling.OriginalEstimate`
+- `Microsoft.VSTS.Scheduling.CompletedWork`
+- `Microsoft.VSTS.Scheduling.RemainingWork`
+
+Present:
+
+```
+## Close Related Tasks
+
+| Task ID | Title | State | Original | Completed | Remaining |
+|---------|-------|-------|----------|-----------|-----------|
+| AB#xxxx | ...   | Active | 4 | 0 | 4 |
+| AB#yyyy | ...   | Active | 2 | 1 | 1 |
+
+Close all related tasks and log completed hours? (yes / no / select)
+```
+
+- `yes` → walk through every child Task in sequence
+- `no`  → skip closing tasks entirely
+- `select` → ask which task IDs to process; only those get prompted
+
+For each task being processed, prompt for completed hours:
+
+- **If `CompletedWork` is empty or `0`:**
+
+  ```
+  AB#xxxx ({title})
+    Original estimate: {n}h
+    Completed:         0h
+    Remaining:         {n}h
+
+  Enter completed hours (suggested: {OriginalEstimate}h, press enter to accept):
+  ```
+
+- **If `CompletedWork` is already set (non-zero):**
+
+  ```
+  AB#xxxx ({title})
+    Original estimate: {n}h
+    Completed:         {current}h   ← already logged
+    Remaining:         {m}h
+
+  Update completed hours to (press enter to keep {current}, or enter new value):
+  ```
+
+**Wait for the user's response on every task.** Accept the suggested/current value (enter), a new numeric value, or `skip` to leave that one untouched.
+
+Once the user has answered, update each task via `wit_update_work_item`:
+- `Microsoft.VSTS.Scheduling.CompletedWork` → the agreed value
+- `Microsoft.VSTS.Scheduling.RemainingWork` → `0`
+- `System.State` → `Closed` (fall back to `Done` if the project's task template uses Agile; warn if neither is valid)
+
+Confirm with a summary line per task: `Closed AB#xxxx — {hours}h logged`.
