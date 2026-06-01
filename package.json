@@ -1,7 +1,7 @@
 {
   "name": "@chris1807/claude-kit",
   "version": "2.1.8",
-  "description": "Claude Code starter kit — agents, hooks, MCP servers, slash commands, and workflow automation",
+  "description": "Claude Code starter kit for Azure DevOps teams — agents, hooks, MCP servers, slash commands, and end-to-end work item → PR → release → deploy workflow automation",
   "type": "module",
   "bin": {
     "claude-kit": "./bin/cli.js"
@@ -17,7 +17,10 @@
     "mcp",
     "agents",
     "hooks",
-    "starter-kit"
+    "starter-kit",
+    "azure-devops",
+    "azure-pipelines",
+    "devops-workflow"
   ],
   "author": "Chris Waters <chriswaters@caresolutions.com>",
   "license": "MIT",

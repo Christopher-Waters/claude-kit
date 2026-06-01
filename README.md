@@ -1,6 +1,6 @@
 # Claude Kit
 
-> A starter kit for [Claude Code](https://claude.ai/code) — agents, hooks, MCP servers, slash commands, and workflow automation, installed into any project with a single `npx` command.
+> A [Claude Code](https://claude.ai/code) starter kit **built for Azure DevOps teams** — agents, hooks, MCP servers, and slash commands that automate the full work item → branch → PR → release → deploy lifecycle. Installed into any project with a single `npx` command.
 
 [![npm](https://img.shields.io/npm/v/@chris1807/claude-kit)](https://www.npmjs.com/package/@chris1807/claude-kit)
 
@@ -8,7 +8,16 @@
 
 ## About
 
-This package installs a complete AI development infrastructure into any project. It includes specialized agents that handle specific tasks (deployment, database ops, code review), security hooks that prevent mistakes automatically, MCP server connections to your tools (databases, Teams, Stripe, Azure CLI), and slash commands that automate your entire workflow from work item to pull request.
+Claude Kit installs a complete AI development infrastructure into any project that uses **Azure DevOps** for work tracking, source control (Azure Repos), and CI/CD (Azure Pipelines). It includes specialized agents that handle specific tasks (deployment, database ops, code review), security hooks that prevent mistakes automatically, MCP server connections to your tools (Azure DevOps, databases, Teams, Stripe, Azure CLI), and slash commands that automate the entire workflow from work item to pull request.
+
+The slash commands assume Azure DevOps as the system of record:
+
+- **Work items** — read, created, and updated via the Azure DevOps MCP server (`AB#1234` ids throughout)
+- **Branches & pull requests** — created in Azure Repos and voted on / merged through Azure DevOps
+- **Releases & deployments** — tracked as Azure DevOps iterations (`Release #N`) and tags; CD runs on Azure Pipelines
+- **Wiki, test plans, advanced security alerts** — all surfaced through the same Azure DevOps MCP server
+
+> **Not using Azure DevOps?** The Claude Code primitives (agents, hooks, memory) are still useful, but the slash commands, the `devops-tracker` agent, and the deployment workflow won't apply out of the box — you'd need to rewrite the `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/rework`, and `/resolve-feedback` commands against GitHub / GitLab / Jira / etc.
 
 Every session Claude learns from your feedback and gets better at helping you specifically. The infrastructure is modular — install only what your project needs.
 
@@ -19,8 +28,8 @@ Every session Claude learns from your feedback and gets better at helping you sp
 | **Global Agents** | 13 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
 | **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
-| **Slash Commands** | 13 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches`, `/quote`, `/explain` |
-| **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
+| **Slash Commands** | 13 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/resolve-feedback`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches`, `/quote`, `/explain` |
+| **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | **Azure DevOps** (work items, repos, pipelines, wiki), Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
 | **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
 
@@ -30,6 +39,8 @@ Every session Claude learns from your feedback and gets better at helping you sp
 
 - [Claude Code CLI](https://claude.ai/code) installed
 - [Node.js](https://nodejs.org/) 18 or later
+- An **Azure DevOps** organization with a project for work items, an Azure Repos Git repository, and (optionally) Azure Pipelines for CD
+- An Azure DevOps Personal Access Token (PAT) — used by the Azure DevOps MCP server. Scopes needed: Work Items (read/write), Code (read/write), Build (read/execute), Wiki (read/write)
 
 ### Verify it works
 
@@ -62,7 +73,7 @@ You'll be asked:
 2. **Components** — checkboxes to pick which parts to install:
    - ☑ Project Agents (deployer, db-admin, devops-tracker)
    - ☑ Hooks (secret blocker, auto-format, etc.)
-   - ☑ Slash Commands (13 commands — /implement, /review, /deploy, /create-release, /deploy-release, /add-to-release, /cherry-pick, /promote, /rollback, /status, /cleanup-branches, /quote, /explain)
+   - ☑ Slash Commands (/implement, /review, /resolve-feedback, /deploy, /create-release, /deploy-release, /add-to-release, /cherry-pick, /promote, /rollback, /status, /cleanup-branches, /quote, /explain)
    - ☑ MCP Servers
    - ☑ Settings
    - ☑ CLAUDE.md Workflow
@@ -606,6 +617,7 @@ Claude reviews for:
 |---------|-------|-------------|
 | `/implement` | `/implement AB#1234` | Read work item → summarize → approve plan → implement → quality checks → UAT → PR |
 | `/review` | `/review 142` | Full code review on a PR with inline comments |
+| `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
 | `/deploy` | `/deploy "message"` | Commit, push, trigger pipeline if on environment branch |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 iteration with tags |
 | `/deploy-release` | `/deploy-release 23 staging` | Cherry-pick release work items to environment via PR |

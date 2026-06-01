@@ -1,6 +1,8 @@
 # Slash Commands Guide — Real-World Examples
 
 > This guide walks through every slash command with realistic, step-by-step examples showing exactly what Claude says and what you type back.
+>
+> **All commands target Azure DevOps.** `AB#1234` ids are Azure DevOps work items, PR numbers are Azure Repos pull requests, releases are tracked as Azure DevOps iterations (`Release #N`), and `/deploy` triggers Azure Pipelines builds. The Azure DevOps MCP server must be connected (`/mcp` to verify) before any of these commands will work.
 
 ---
 

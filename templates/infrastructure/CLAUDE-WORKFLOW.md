@@ -3,6 +3,8 @@
 
 This project uses [Claude Kit](https://github.com/Christopher-Waters/claude-kit) — a standardized set of agents, hooks, MCP servers, and workflows installed via `npx @chris1807/claude-kit init`.
 
+> **This workflow is built for Azure DevOps.** Work items, branches, pull requests, releases (as iterations), and CD pipelines all live in Azure DevOps. The slash commands below talk to it through the Azure DevOps MCP server — `AB#1234` ids refer to Azure DevOps work items, PR numbers refer to Azure Repos pull requests, and pipeline ids refer to Azure Pipelines build definitions. If your project lives somewhere else (GitHub, GitLab, Jira), these commands will not work as-is.
+
 ### Agent Pipeline
 
 When given a task, Claude Code can delegate through specialized agents:
@@ -51,7 +53,7 @@ These run automatically — no action needed:
 
 | Server | What It Does |
 |--------|-------------|
-| **Azure DevOps** | Work items, pipelines, repos, wiki |
+| **Azure DevOps** *(core — drives every slash command)* | Work items, repos, pull requests, pipelines, wiki, test plans, advanced security |
 | **Playwright** | Browser testing (navigate, click, fill, screenshot) |
 | **MongoDB** | Direct database queries and updates |
 | **Microsoft Teams** | Send/read team messages and notifications |
@@ -200,6 +202,7 @@ All deployment and release operations are available as slash commands:
 |---|---|---|
 | `/implement` | `/implement AB#1234` | Summarize work item → approve plan → implement → PR |
 | `/review` | `/review 142` | Automated code review on a PR |
+| `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
 | `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 |
 | `/deploy-release` | `/deploy-release 23 staging` | Cherry-pick release to environment |
