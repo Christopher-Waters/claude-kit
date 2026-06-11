@@ -211,6 +211,7 @@ All deployment and release operations are available as slash commands:
 | `/promote` | `/promote staging production` | Promote all code between environments |
 | `/rollback` | `/rollback AB#1234 production` | Revert commits on an environment |
 | `/status` | `/status release 24` | Check release, pipeline, or work item status |
+| `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
 
 The CD pipeline is only triggered manually when pushing directly to an environment branch. For feature/work branches, the pipeline triggers on PR merge.
