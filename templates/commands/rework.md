@@ -149,6 +149,7 @@ If the user provided hours (suggested or overridden):
      - `Microsoft.VSTS.Scheduling.RemainingWork` — the agreed hours
      - `System.AreaPath` — same as the parent
      - `System.IterationPath` — same as the parent
+     - `System.AssignedTo` — same as the parent (copy the parent's `System.AssignedTo` value; pass the `uniqueName` / email if the parent's value is an identity object). If the parent is unassigned, leave this field unset rather than failing.
 
 2. Link the new Task as a child of the parent work item via `wit_work_items_link`:
    - **type**: `Child` (the parent → child link from the parent's perspective; equivalent to `Parent` from the task's perspective)

@@ -182,6 +182,7 @@ For each approved task, call `mcp__azure-devops__wit_create_work_item` with:
   - `Microsoft.VSTS.Scheduling.RemainingWork` — the same hour estimate
   - `System.IterationPath` — copy from the parent (which is the root)
   - `System.AreaPath` — copy from the parent
+  - `System.AssignedTo` — copy from the parent (pass the parent's `uniqueName` / email if its `System.AssignedTo` value is an identity object). If the parent is unassigned, leave this field unset rather than failing.
 
 Then link the new task as a child of the parent with `mcp__azure-devops__wit_add_child_work_items` (or fall back to `wit_work_items_link` with link type `System.LinkTypes.Hierarchy-Forward` from parent → task).
 
