@@ -1,6 +1,6 @@
 {
   "name": "@chris1807/claude-kit",
-  "version": "2.1.12",
+  "version": "2.1.13",
   "description": "Claude Code starter kit for Azure DevOps teams — agents, hooks, MCP servers, slash commands, and end-to-end work item → PR → release → deploy workflow automation",
   "type": "module",
   "bin": {
