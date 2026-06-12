@@ -2,7 +2,7 @@
 name: frontend
 description: Writes React/TypeScript frontend code with MUI 6, Redux Toolkit, React Hook Form, and TanStack Query. Implements UI matching the HTML mockups.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: opus
+model: claude-opus-4-8
 ---
 
 # Frontend Developer

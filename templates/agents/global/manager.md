@@ -2,7 +2,7 @@
 name: manager
 description: Orchestrates the development workflow. Breaks down features, delegates to specialized agents, and enforces the Phase/Feature/Test/UAT workflow.
 tools: Task, Read, Write, Edit, Glob, Grep, Bash
-model: opus
+model: claude-opus-4-8
 ---
 
 # Team Manager
