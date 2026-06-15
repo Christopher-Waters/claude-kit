@@ -129,11 +129,37 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
 ## Step 7: Quality Checks
 
-1. **Review** code for quality, security, and Clean Architecture compliance
-2. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this change. A failure in an unrelated test means this change broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
-3. **Run lint** — ESLint and dotnet format
+1. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this change. A failure in an unrelated test means this change broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
+2. **Run lint** — ESLint and dotnet format
 
-## Step 8: UAT Gate
+## Step 8: Code Review
+
+Spawn the `reviewer` agent to review the diff for quality, security, Clean Architecture compliance, and CLAUDE.md adherence. The agent is read-only — it reports findings, you act on them.
+
+Present the findings to the user grouped by severity:
+
+```
+## Code Review Findings
+
+### Must-fix (blocking)
+- {file:line} — {issue + why it blocks}
+
+### Should-fix (recommended)
+- {file:line} — {issue + suggested change}
+
+### Nits (optional)
+- {file:line} — {minor note}
+
+Address must-fix items? (yes / select / skip)
+```
+
+- `yes` → fix every must-fix item, then re-run the reviewer agent on the updated diff
+- `select` → ask which items to address; fix only those, then re-run the reviewer agent
+- `skip` → proceed without fixes (only allowed if there are no must-fix items, or the user explicitly overrides)
+
+Loop until the reviewer reports no must-fix items, or the user explicitly accepts remaining findings. Do not proceed to UAT with unresolved must-fix items unless the user overrides.
+
+## Step 9: UAT Gate
 
 ### If Hot Fix:
 Skip manual UAT. Present an abbreviated confirmation:
@@ -165,7 +191,7 @@ Did manual testing pass?
 
 Wait for the user's response before proceeding. Do NOT create a PR until confirmed.
 
-## Step 9: Push, Create PR, and Update Work Item
+## Step 10: Push, Create PR, and Update Work Item
 
 1. Push the branch: `git push -u origin HEAD`
 2. Create a PR via Azure DevOps MCP:

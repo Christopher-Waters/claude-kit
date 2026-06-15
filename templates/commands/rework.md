@@ -202,10 +202,9 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
 ## Step 9: Quality Checks
 
-1. **Review** code for quality, security, and Clean Architecture compliance
-2. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this rework. A failure in an unrelated test means this rework broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
-3. **Run lint** — ESLint and dotnet format
-4. **Acceptance Criteria check** — re-read the work item's full Acceptance Criteria (the same list captured in Step 3). For each AC, identify the test or piece of code that proves it's met. If any AC has no covering test or visible code path, flag it before moving to the UAT gate:
+1. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this rework. A failure in an unrelated test means this rework broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
+2. **Run lint** — ESLint and dotnet format
+3. **Acceptance Criteria check** — re-read the work item's full Acceptance Criteria (the same list captured in Step 3). For each AC, identify the test or piece of code that proves it's met. If any AC has no covering test or visible code path, flag it before moving on:
 
    ```
    ⚠ AC #{n} ({short form}) has no covering test or clear code path.
@@ -214,7 +213,34 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
    Do not advance to Step 10 with any AC unverified.
 
-## Step 10: UAT Gate
+## Step 10: Code Review
+
+Spawn the `reviewer` agent to review the rework diff for quality, security, Clean Architecture compliance, and CLAUDE.md adherence. Focus the review on the files changed since the last PR — call out any regression risk introduced by the rework. The agent is read-only — it reports findings, you act on them.
+
+Present the findings to the user grouped by severity:
+
+```
+## Code Review Findings
+
+### Must-fix (blocking)
+- {file:line} — {issue + why it blocks}
+
+### Should-fix (recommended)
+- {file:line} — {issue + suggested change}
+
+### Nits (optional)
+- {file:line} — {minor note}
+
+Address must-fix items? (yes / select / skip)
+```
+
+- `yes` → fix every must-fix item, then re-run the reviewer agent on the updated diff
+- `select` → ask which items to address; fix only those, then re-run the reviewer agent
+- `skip` → proceed without fixes (only allowed if there are no must-fix items, or the user explicitly overrides)
+
+Loop until the reviewer reports no must-fix items, or the user explicitly accepts remaining findings. Do not proceed to UAT with unresolved must-fix items unless the user overrides.
+
+## Step 11: UAT Gate
 
 ### If Hot Fix:
 Skip manual UAT. Present an abbreviated confirmation:
@@ -246,7 +272,7 @@ Did manual testing pass?
 
 Wait for the user's response before proceeding. Do NOT push until confirmed.
 
-## Step 11: Push and Update
+## Step 12: Push and Update
 
 1. Push the changes: `git push`
 2. Add a comment on the existing PR summarizing what was changed in the rework
