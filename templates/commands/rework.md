@@ -33,7 +33,7 @@ Regardless of whether description/acceptance criteria changed, **always read the
 
 ## Step 3: Summarize Rework and Confirm
 
-Present a summary of the rework feedback to the user:
+Present a summary of the rework feedback to the user. **Every feedback item must be mapped to an Acceptance Criterion** — if a feedback item doesn't map to any AC, flag it explicitly as either (a) implied by an AC that's worded too loosely or (b) scope-creep that should be a separate work item.
 
 ```
 ## Rework for AB#{id}: {title}
@@ -41,19 +41,25 @@ Present a summary of the rework feedback to the user:
 **Last PR:** #{pr_id} (created {date})
 **New comments:** {count}
 
-### Rework Feedback
-{summarized feedback from new comments — numbered list}
+### Current Acceptance Criteria
+1. {AC #1 — verbatim}
+2. {AC #2 — verbatim}
+3. ...
+
+### Rework Feedback → AC mapping
+| # | Feedback (summarized) | Maps to AC | Status |
+|---|----------------------|-----------|--------|
+| 1 | {feedback item 1}    | AC #2     | not met in last PR |
+| 2 | {feedback item 2}    | AC #4     | partially met — edge case missed |
+| 3 | {feedback item 3}    | (none)    | ⚠ scope-creep — flag for separate item? |
 
 ### Requirement Changes (if any)
 {description/acceptance criteria changes since last PR, or "No changes to description or acceptance criteria since last PR"}
 
-### Current Acceptance Criteria
-{full acceptance criteria — numbered list, highlight any that the feedback suggests are not yet met}
-
-Does this capture the rework correctly? Do you have any additional context?
+Does this capture the rework correctly? Any feedback items that should be flagged as scope-creep (separate work item) instead of being addressed here?
 ```
 
-**Wait for the user to respond.** Do NOT proceed until the user confirms or provides additional context. If they add context, incorporate it into the plan.
+**Wait for the user to respond.** Do NOT proceed until the user confirms the AC mapping. If they reclassify any item as scope-creep, drop it from the plan and note it in the final summary. If they add context, incorporate it.
 
 ## Step 4: Explore & Plan
 
@@ -84,6 +90,17 @@ Present the plan to the user:
 - `path/to/existing.tests.cs` — updates assertions for {changed behavior}
 
 List every test file you will add or modify and the scenarios each covers. Rework feedback often reveals missing test coverage on the original implementation — add regression tests that would have caught the original issue. If a rework change in this plan has no test coverage, justify why here.
+
+### Acceptance Criteria Coverage
+For every AC on the work item, state how this plan ensures it is met after rework. The rework is not complete until every row is "covered." Use this table — do not skip any AC, even ones the feedback didn't mention.
+
+| AC # | Acceptance Criterion (short) | How this plan covers it |
+|------|------------------------------|--------------------------|
+| 1    | {AC #1 short form}           | Already met by prior PR — verify via {test or manual check} |
+| 2    | {AC #2 short form}           | Addressed by {file/change} + {test} |
+| 3    | {AC #3 short form}           | ⚠ Not yet covered — {what needs to be added to this plan before approving} |
+
+If any row reads "⚠ Not yet covered," fix the plan before presenting it — do not ask the user to approve an incomplete plan.
 
 ### Agents
 - **backend**: {what it will do}
@@ -188,6 +205,14 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 1. **Review** code for quality, security, and Clean Architecture compliance
 2. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this rework. A failure in an unrelated test means this rework broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
 3. **Run lint** — ESLint and dotnet format
+4. **Acceptance Criteria check** — re-read the work item's full Acceptance Criteria (the same list captured in Step 3). For each AC, identify the test or piece of code that proves it's met. If any AC has no covering test or visible code path, flag it before moving to the UAT gate:
+
+   ```
+   ⚠ AC #{n} ({short form}) has no covering test or clear code path.
+     Add coverage now, or call this out to the user before UAT.
+   ```
+
+   Do not advance to Step 10 with any AC unverified.
 
 ## Step 10: UAT Gate
 
