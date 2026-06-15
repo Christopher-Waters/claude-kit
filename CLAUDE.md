@@ -31,7 +31,23 @@ The CLI lives in `bin/cli.js`. The content it copies into target projects lives 
 
 **Edits to `bin/cli.js` or `package.json`** change installer behavior. Bump the version and publish to ship them.
 
-**Edits to anything under `templates/`** change what gets installed into target projects. Existing installs do NOT auto-update; users re-run `npx @chris1807/claude-kit init` (or `--all`) to pick up template changes. Bump the version anyway so users can see new content is available.
+**Edits to anything under `templates/`** change what gets installed into target projects. Bump the package version so the auto-update path (see below) picks it up.
+
+### Auto-update on session start
+
+Installed projects get a `SessionStart` hook (`.claude/hooks/kit-update-check.sh`) that:
+
+1. Reads `.claude/.kit-install.json` for the installed version and saved choices (db, adoOrg).
+2. Queries npm for the latest published `@chris1807/claude-kit` version (5s timeout, silent on failure).
+3. If newer, re-runs `npx @chris1807/claude-kit init --all --db=<saved> [--ado-org=<saved>]` against the project root.
+4. Throttled to once per 24h via `.claude/.kit-update-check`.
+
+This means **template changes reach users automatically** the next time they open a session, up to a day after the new version is published. They do not have to re-run the installer manually.
+
+User-customized files are protected by the merge logic in `bin/cli.js`:
+- `.claude/settings.json` — additive merge: kit hooks are added if missing, user-added hooks are never removed, top-level keys the user changed are never overwritten.
+- `.mcp.json` — merge by default in `--all`: missing servers are added, user-added servers are preserved.
+- `CLAUDE.md` workflow section — replaced only when it differs from the current template.
 
 ## Local testing
 

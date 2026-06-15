@@ -11,6 +11,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const TEMPLATES_DIR = join(__dirname, '..', 'templates');
 const GLOBAL_CLAUDE_DIR = join(process.env.HOME || process.env.USERPROFILE, '.claude');
+const PKG = await fs.readJson(join(__dirname, '..', 'package.json'));
+const KIT_VERSION = PKG.version;
 
 // ============================================================================
 // CLI Arguments
@@ -108,6 +110,47 @@ async function installFile(src, dest, label) {
   await fs.copy(src, dest);
   console.log(chalk.green(`  ✓ ${label}`));
   return true;
+}
+
+// ============================================================================
+// Helper: additive merge for settings.json
+// ============================================================================
+// Top-level keys: keep user's value if present, add kit's only if missing.
+// `hooks`: union of matcher blocks; within each block, union of hook commands
+// (compared by `command` string). Never removes user-added entries.
+function mergeSettings(existing, template) {
+  const merged = { ...existing };
+  for (const [key, value] of Object.entries(template)) {
+    if (key === 'hooks') {
+      merged.hooks = mergeHooks(existing.hooks || {}, value);
+    } else if (!(key in merged)) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+function mergeHooks(existing, template) {
+  const merged = { ...existing };
+  for (const [event, templateBlocks] of Object.entries(template)) {
+    const resultBlocks = [...(merged[event] || [])];
+    for (const tplBlock of templateBlocks) {
+      const idx = resultBlocks.findIndex(b => b.matcher === tplBlock.matcher);
+      if (idx === -1) {
+        resultBlocks.push(tplBlock);
+      } else {
+        const newHooks = [...(resultBlocks[idx].hooks || [])];
+        for (const tplHook of tplBlock.hooks || []) {
+          if (!newHooks.some(h => h.command === tplHook.command)) {
+            newHooks.push(tplHook);
+          }
+        }
+        resultBlocks[idx] = { ...resultBlocks[idx], hooks: newHooks };
+      }
+    }
+    merged[event] = resultBlocks;
+  }
+  return merged;
 }
 
 // ============================================================================
@@ -243,6 +286,7 @@ async function main() {
   // ── MCP Servers (interactive selection) ───────────────────────────────
   let dbType = 'none';
   let selectedServers = [];
+  let adoOrgChoice = null;
   if (components.includes('mcp')) {
     console.log(chalk.yellow.bold('\n🔌 MCP Servers → .mcp.json\n'));
 
@@ -379,6 +423,7 @@ async function main() {
 
     dbType = mcpChoices.db;
     selectedServers = mcpChoices.servers;
+    adoOrgChoice = mcpChoices.adoOrg || null;
 
     const mcpPath = join(targetDir, '.mcp.json');
     if (await fs.pathExists(mcpPath)) {
@@ -388,15 +433,16 @@ async function main() {
       if (newContent.trim() === existingContent.trim()) {
         console.log(chalk.gray('  = .mcp.json (identical, skipped)'));
       } else {
+      // In --all mode, merge by default — preserves user-added MCP servers.
       const { action } = installAll
-        ? { action: 'overwrite' }
+        ? { action: 'merge' }
         : await inquirer.prompt([{
             type: 'list',
             name: 'action',
             message: '.mcp.json already exists:',
             choices: [
+              { name: 'Merge (add missing servers, keep yours)', value: 'merge' },
               { name: 'Overwrite with new config', value: 'overwrite' },
-              { name: 'Merge (add missing servers)', value: 'merge' },
               { name: 'Skip', value: 'skip' },
             ],
           }]);
@@ -422,11 +468,27 @@ async function main() {
   // ── Settings ──────────────────────────────────────────────────────────
   if (components.includes('settings')) {
     console.log(chalk.yellow.bold('\n⚙️  Settings → .claude/settings.json\n'));
-    await installFile(
-      join(TEMPLATES_DIR, 'infrastructure', 'settings.json'),
-      join(targetDir, '.claude', 'settings.json'),
-      'settings.json'
+    const templateSettings = await fs.readJson(
+      join(TEMPLATES_DIR, 'infrastructure', 'settings.json')
     );
+    const settingsPath = join(targetDir, '.claude', 'settings.json');
+    await fs.ensureDir(dirname(settingsPath));
+
+    if (!await fs.pathExists(settingsPath)) {
+      await fs.writeJson(settingsPath, templateSettings, { spaces: 2 });
+      console.log(chalk.green('  ✓ settings.json'));
+    } else {
+      const existing = await fs.readJson(settingsPath);
+      const merged = mergeSettings(existing, templateSettings);
+      const before = JSON.stringify(existing);
+      const after = JSON.stringify(merged);
+      if (before === after) {
+        console.log(chalk.gray('  = settings.json (no kit changes needed)'));
+      } else {
+        await fs.writeJson(settingsPath, merged, { spaces: 2 });
+        console.log(chalk.green('  ✓ settings.json (merged — kit hooks added, user customizations preserved)'));
+      }
+    }
   }
 
   // ── CLAUDE.md Workflow ────────────────────────────────────────────────
@@ -468,18 +530,27 @@ async function main() {
       existing = await fs.readFile(claudeMdPath, 'utf8');
 
       if (existing.includes('Claude Kit Workflow') || existing.includes('Care Solutions AI Workflow')) {
-        console.log(chalk.gray('  = Workflow section already exists'));
-        if (!installAll) {
+        // Check whether the existing workflow section matches the current template.
+        // If it does, nothing to do. If not, replace it (auto in --all, prompt otherwise).
+        const cleaned = existing.replace(/\n## (?:Claude Kit Workflow|Care Solutions AI Workflow)[\s\S]*$/, '').trimEnd();
+        const expected = `${cleaned}\n\n${workflowContent}`;
+        if (existing.trim() === expected.trim()) {
+          console.log(chalk.gray('  = Workflow section up to date'));
+        } else if (installAll) {
+          await fs.writeFile(claudeMdPath, expected);
+          console.log(chalk.green('  ✓ Workflow section re-synced to current template'));
+        } else {
           const { replace } = await inquirer.prompt([{
             type: 'confirm',
             name: 'replace',
-            message: 'Replace existing workflow section?',
-            default: false,
+            message: 'Workflow section differs from template — replace?',
+            default: true,
           }]);
           if (replace) {
-            const cleaned = existing.replace(/\n## (?:Claude Kit Workflow|Care Solutions AI Workflow)[\s\S]*$/, '').trimEnd();
-            await fs.writeFile(claudeMdPath, `${cleaned}\n\n${workflowContent}`);
+            await fs.writeFile(claudeMdPath, expected);
             console.log(chalk.green('  ✓ Workflow section replaced'));
+          } else {
+            console.log(chalk.gray('  ⊘ Workflow section left as-is'));
           }
         }
       } else {
@@ -517,6 +588,19 @@ async function main() {
       console.log(chalk.green('  ✓ Created .gitignore'));
     }
   }
+
+  // ── Install Manifest ──────────────────────────────────────────────────
+  // Records the kit version and the choices made (db, adoOrg) so the
+  // kit-update-check hook can re-run the installer non-interactively.
+  const manifestPath = join(targetDir, '.claude', '.kit-install.json');
+  await fs.ensureDir(dirname(manifestPath));
+  await fs.writeJson(manifestPath, {
+    version: KIT_VERSION,
+    choices: {
+      db: dbType,
+      adoOrg: selectedServers.includes('azuredevops') ? adoOrgChoice : null,
+    },
+  }, { spaces: 2 });
 
   // ── Summary ───────────────────────────────────────────────────────────
   const agentCount = (await fs.pathExists(join(targetDir, '.claude', 'agents')))
