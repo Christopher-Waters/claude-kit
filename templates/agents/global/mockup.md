@@ -2,7 +2,7 @@
 name: mockup
 description: Creates and updates HTML mockup files for new features. Maintains the design system and generates screen designs before implementation begins.
 tools: Read, Write, Edit, Glob, Grep
-model: opus
+model: inherit
 ---
 
 # Mockup Designer

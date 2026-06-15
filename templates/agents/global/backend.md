@@ -2,7 +2,7 @@
 name: backend
 description: Writes .NET 10/C# backend code following Clean Architecture across Domain, Application, Infrastructure, and API layers. Handles controllers, services, interfaces, DTOs, and repositories (MongoDB + SQL Server).
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: opus
+model: inherit
 ---
 
 # Backend Developer
