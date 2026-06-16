@@ -161,7 +161,23 @@ If the user provided hours (suggested or overridden):
    - **workItemType**: `Task`
    - **title**: `Rework AB#{id} — round {N}`
    - **fields**: JSON Patch document setting:
-     - `System.Description` — short summary of the rework feedback + link to the most recent PR
+     - `System.Description` — structured **HTML** (Azure DevOps does not render Markdown in this field). Use exactly these three sections, in this order, omitting any that have no content:
+
+       ```html
+       <h3>Summary</h3>
+       <p>{1–2 sentences describing the problem the rework addresses. Bold key terms, values, and outcomes with <strong>...</strong>.}</p>
+       <h3>Fix</h3>
+       <ul>
+         <li>{What changes. Wrap code identifiers, method names, fields, file paths, and literal values in <code>...</code>.}</li>
+       </ul>
+       <h3>Reference</h3>
+       <ul>
+         <li>Rework round {N} of AB#{id} ({date or tester} feedback).</li>
+         <li><a href="{PR url}">PR #{n}</a> — {one-line context, e.g. test-plan scenario, submission id in <code>...</code>}</li>
+       </ul>
+       ```
+
+       Render any code identifiers (method names, fields, file paths, hashes, literal values) inside `<code>` spans, and emphasize the key claim/value in each sentence with `<strong>`. Do not submit a wall of plain prose — every rework task must have at least the `Summary` and `Fix` sections in this shape.
      - `Microsoft.VSTS.Scheduling.OriginalEstimate` — the agreed hours
      - `Microsoft.VSTS.Scheduling.RemainingWork` — the agreed hours
      - `System.AreaPath` — same as the parent

@@ -237,6 +237,17 @@ Azure DevOps description and acceptance criteria fields are HTML — they do not
 
 Wrap each top-level section in `<p>...</p>`. Preserve any user-supplied `<img>` tags from Step 2 as-is.
 
+### Emphasis and code spans (required)
+
+A description that is one long paragraph of plain prose is not acceptable — even after Markdown is converted, the rendered output must guide the reader's eye. Before rendering, edit the draft so that:
+
+- **Key terms, values, and outcomes** in each sentence are wrapped in `**bold**` (renders as `<strong>...</strong>`). Bold the noun phrase that carries the claim, not the whole sentence.
+- **Code identifiers** — method names, class names, field names, file paths, route paths, JSON keys, env vars, commit hashes, IDs, literal values like `true` / `null` / numeric thresholds — are wrapped in `` `code spans` `` (renders as `<code>...</code>`).
+- **Lists** are used instead of comma-separated prose whenever the draft contains 2+ parallel items (steps, files, references, acceptance criteria).
+- **Section headings** (`### Description`, `### Acceptance Criteria`, etc.) are kept — they become `<h3>` and structure the rendered output.
+
+Apply this pass to every section (Description, Acceptance Criteria, Steps to Reproduce, Expected/Actual Behavior, Environment/Scope, Open Questions). Apply it equally to Bugs and User Stories.
+
 ### Call the create API
 
 Call `mcp__azure-devops__wit_create_work_item` with:
