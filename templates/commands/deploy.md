@@ -36,8 +36,7 @@ Wait for confirmation.
 1. Stage only the relevant files (never use `git add -A`)
 2. Never stage `.env`, `appsettings.*.json` with real secrets, or `node_modules`
 3. Commit with the provided message or auto-generated one
-4. Always end with: `Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>`
-5. Use HEREDOC format for the commit message
+4. Use HEREDOC format for the commit message
 
 ## Step 4: Push
 

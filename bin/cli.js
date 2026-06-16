@@ -375,7 +375,7 @@ async function main() {
     } else if (mcpChoices.db === 'mssql' || mcpChoices.db === 'azuresql') {
       mcpConfig.mcpServers.mssql = {
         command: 'npx',
-        args: ['-y', '@anthropic/mcp-mssql-server'],
+        args: ['-y', 'mssql-mcp-server'],
         env: { MSSQL_CONNECTION_STRING: '${MSSQL_CONNECTION_STRING}' },
       };
     } else if (mcpChoices.db === 'postgres') {
@@ -389,12 +389,7 @@ async function main() {
     if (mcpChoices.servers.includes('teams')) {
       mcpConfig.mcpServers.teams = {
         command: 'npx',
-        args: ['-y', '@anthropic/mcp-teams-server'],
-        env: {
-          TEAMS_TENANT_ID: '${TEAMS_TENANT_ID}',
-          TEAMS_CLIENT_ID: '${TEAMS_CLIENT_ID}',
-          TEAMS_CLIENT_SECRET: '${TEAMS_CLIENT_SECRET}',
-        },
+        args: ['-y', '@floriscornel/teams-mcp@latest'],
       };
     }
 
@@ -639,7 +634,6 @@ async function main() {
   if (dbType === 'mongo') exports.push('export MONGODB_CONNECTION_STRING="mongodb+srv://..."');
   if (dbType === 'mssql' || dbType === 'azuresql') exports.push('export MSSQL_CONNECTION_STRING="Server=...;Database=..."');
   if (dbType === 'postgres') exports.push('export POSTGRES_CONNECTION_STRING="postgresql://..."');
-  exports.push('export TEAMS_TENANT_ID="..."', 'export TEAMS_CLIENT_ID="..."', 'export TEAMS_CLIENT_SECRET="..."');
   if (selectedServers.includes('azuredevops')) exports.push('export AZURE_DEVOPS_PAT="..."  # mint at https://dev.azure.com/_usersSettings/tokens');
 
   console.log(chalk.yellow('  Environment variables to set:'));
@@ -654,6 +648,11 @@ async function main() {
   console.log(chalk.yellow('  Also run:'));
   console.log(chalk.gray('    az login'));
   console.log('');
+  if (selectedServers.includes('teams')) {
+    console.log(chalk.yellow('  Teams MCP uses Microsoft Graph device-code auth.'));
+    console.log(chalk.gray('    First use will print a code + URL to sign in. No env vars needed.'));
+    console.log('');
+  }
   console.log(`  Then: ${chalk.blue(`cd ${targetDir} && claude`)}`);
   console.log(`  Run:  ${chalk.blue('/implement AB#1234')} to start working`);
   console.log(`  Run:  ${chalk.blue('/review 142')} to review a PR`);

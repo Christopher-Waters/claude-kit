@@ -54,8 +54,6 @@ Revert AB#1234, AB#1235 on {environment}
 Reverted commits:
 - abc1234: Add payment export
 - def5678: Fix login redirect
-
-Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 EOF
 )"
 ```

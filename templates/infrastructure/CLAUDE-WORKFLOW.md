@@ -265,14 +265,12 @@ Each team member needs to set their own environment variables (never commit thes
 # MongoDB (required for db-admin agent)
 export MONGODB_CONNECTION_STRING="mongodb+srv://..."
 
-# Microsoft Teams (required for team notifications)
-export TEAMS_TENANT_ID="..."
-export TEAMS_CLIENT_ID="..."
-export TEAMS_CLIENT_SECRET="..."
-
 # Stripe (required when payment integration is active)
 export STRIPE_SECRET_KEY="sk_test_..."
 
 # Azure (use az login instead of env vars)
 az login
+
+# Microsoft Teams MCP — no env vars needed. First invocation prints a
+# device code + URL to sign in via Microsoft Graph (OAuth device flow).
 ```

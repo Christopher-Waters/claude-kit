@@ -666,16 +666,14 @@ export MSSQL_CONNECTION_STRING="Server=localhost;Database=MyDb;User Id=sa;Passwo
 # PostgreSQL (if your project uses PostgreSQL)
 export POSTGRES_CONNECTION_STRING="postgresql://user:password@localhost:5432/mydb"
 
-# Microsoft Teams (for team notifications and messages)
-export TEAMS_TENANT_ID="your-azure-ad-tenant-id"
-export TEAMS_CLIENT_ID="your-app-registration-client-id"
-export TEAMS_CLIENT_SECRET="your-client-secret"
-
 # Stripe (if your project uses Stripe payments)
 export STRIPE_SECRET_KEY="sk_test_..."
 
 # Azure CLI (no env var needed — just log in)
 az login
+
+# Microsoft Teams (no env vars needed — uses Microsoft Graph device-code auth;
+# first invocation prints a code + URL to sign in)
 ```
 
 ### Setting Up the Teams MCP Server

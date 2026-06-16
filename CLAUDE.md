@@ -95,6 +95,18 @@ Solo project — work on `main`. No PR gate. Commits land directly.
 
 `.gitignore` already covers `node_modules/`, `.env`, `_password`. Don't add npm tokens, PATs, or other secrets to the repo. The `NPM_TOKEN` secret lives in GitHub Actions secrets, not in any file.
 
+## Agent model selection
+
+Every agent .md under `templates/agents/` sets `model:` in its frontmatter. Three valid forms, picked deliberately:
+
+1. **`inherit`** — the agent uses whatever frontier model the user's session is on. Use this for agents that should match user intent (the user picked Opus for a reason — that reason applies to the manager and to the implementers too). Currently: `manager`, `backend`, `frontend`, `mockup`.
+2. **Tier alias** (`opus`, `sonnet`, `haiku`) — the agent always runs at a specific tier regardless of session model. Use this when the task has a known cost/capability target that's independent of what the user picked. Aliases auto-resolve to the latest model in that tier, so they don't rot.
+   - `sonnet` — specialized agents whose work doesn't need frontier reasoning: `api-tester`, `azure-ops`, `legacy`, `reviewer`, `security-auditor`, `test-runner`, `uat-generator`.
+   - `haiku` — cheap mechanical agents: `build-validator`, `lint-checker`.
+3. **Pinned model ID** (e.g. `claude-opus-4-7`) — DO NOT USE unless you have a hard reason. Pinned IDs rot the moment a new model ships, and a typo'd ID silently breaks the agent at runtime (the harness accepts any string). The kit briefly pinned `claude-opus-4-8` (didn't exist) in 2.1.13 and had to roll back in 2.1.14 — this is the exact failure mode to avoid.
+
+**Default decision tree:** Does the agent need to match the user's chosen capability level? → `inherit`. Is it a known-cheap mechanical job? → `haiku`. Otherwise → `sonnet`. Reach for a pinned ID only if you've manually verified the ID exists and have a reason aliases won't work.
+
 ## When editing template content
 
 Template files contain placeholders like `{{DEV_WEBSITE_NAME}}` (in `azure-pipelines-template.yml`) and Care Solutions example domains (`*.caresolutions.com`) that are intentionally illustrative. Don't strip placeholder syntax — `bin/cli.js` doesn't currently substitute these, so users edit them by hand after install. If you want to add substitution, that's an installer feature, not a template change.

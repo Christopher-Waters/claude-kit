@@ -26,8 +26,7 @@ You deploy code changes to Azure environments. Follow the standard sequence for 
 2. Stage only the relevant files (never use `git add -A` — avoid committing secrets or build artifacts)
 3. Never stage `.env`, `appsettings.*.json` with real secrets, or `node_modules`
 4. Write a clear commit message explaining what changed and why
-5. Always end with: `Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>`
-6. Use HEREDOC format for the commit message
+5. Use HEREDOC format for the commit message
 
 ### Step 3: Push
 

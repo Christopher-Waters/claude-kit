@@ -13,12 +13,7 @@
     },
     "teams": {
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-teams-server"],
-      "env": {
-        "TEAMS_TENANT_ID": "${TEAMS_TENANT_ID}",
-        "TEAMS_CLIENT_ID": "${TEAMS_CLIENT_ID}",
-        "TEAMS_CLIENT_SECRET": "${TEAMS_CLIENT_SECRET}"
-      }
+      "args": ["-y", "@floriscornel/teams-mcp@latest"]
     },
     "stripe": {
       "command": "npx",
