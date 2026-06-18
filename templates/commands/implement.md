@@ -131,6 +131,14 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
 1. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this change. A failure in an unrelated test means this change broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
 2. **Run lint** — ESLint and dotnet format
+3. **Environment configuration parity** — if the implementation added or changed any key in `appsettings.*.json` or `.env*`, verify every parallel environment file has a corresponding entry:
+
+   | File family | Parallel files to check |
+   |-------------|------------------------|
+   | `appsettings.json` | `appsettings.Development.json`, `appsettings.Staging.json`, `appsettings.QA.json`, `appsettings.Production.json` |
+   | `.env` | `.env.development`, `.env.staging`, `.env.qa`, `.env.production`, `.env.local`, `.env.example` |
+
+   Present a (key × environment) table. For every missing cell, prompt the user for a value (real, placeholder, or empty) **before creating the PR**. The PR should not be opened until every environment file is accounted for, or the user explicitly confirms the omission is intentional (e.g., the key is supplied via a pipeline variable group, Key Vault, or App Configuration for that environment).
 
 ## Step 8: Code Review
 

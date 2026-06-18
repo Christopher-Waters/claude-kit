@@ -19,6 +19,14 @@ You deploy code changes to Azure environments. Follow the standard sequence for 
 1. Run `dotnet build` on any modified .NET projects to verify compilation
 2. If frontend files changed, run `npx tsc --noEmit` in the relevant client directory
 3. If either fails, STOP and report the errors — do not deploy broken code
+4. **Environment configuration parity** — if `git diff` shows changes to any `appsettings.*.json` or `.env*` file, verify every key added or modified has a corresponding entry in each parallel environment file that exists in the repo:
+
+   | File family | Parallel files to check |
+   |-------------|------------------------|
+   | `appsettings.json` | `appsettings.Development.json`, `appsettings.Staging.json`, `appsettings.QA.json`, `appsettings.Production.json` |
+   | `.env` | `.env.development`, `.env.staging`, `.env.qa`, `.env.production`, `.env.local`, `.env.example` |
+
+   Present a (key × environment) table to the user. For any missing cell, prompt the user to supply a value (real, placeholder, or empty) before pushing, or to confirm the omission is intentional because the key is wired through a pipeline variable group, Key Vault, or App Configuration for that environment. Do NOT push until every missing entry is either filled in or explicitly skipped by the user.
 
 ### Step 2: Commit
 

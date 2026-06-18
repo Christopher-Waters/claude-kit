@@ -74,7 +74,20 @@ Check `*.csproj` files for incorrect `<ProjectReference>` entries.
 | Empty states | Components handle no-data scenarios with messages, not blank screens |
 | Accessibility | Semantic HTML, ARIA labels, keyboard navigation |
 
-### 6. Testing
+### 6. Environment Configuration Parity
+
+When the diff adds or modifies keys in any **backend `appsettings.*.json`** or **React `.env*`** file, every parallel environment file should have a corresponding entry (real value, placeholder, or explicit empty) so the app does not silently break in another environment.
+
+| File family | Parallel files to check |
+|-------------|------------------------|
+| `appsettings.json` | `appsettings.Development.json`, `appsettings.Staging.json`, `appsettings.QA.json`, `appsettings.Production.json` — whichever exist in the repo |
+| `.env` | `.env.development`, `.env.staging`, `.env.qa`, `.env.production`, `.env.local`, `.env.example` — whichever exist in the repo |
+
+For each new/changed key, list which environment files have it and which are missing it. Flag any missing entry as a **CRITICAL** issue — the PR should not merge until every environment file is accounted for, even if the value is a placeholder or intentionally blank. If a key is intentionally environment-specific (e.g., only relevant in Production), the diff should still leave a comment in the other files explaining why, or the omission should be called out explicitly in the PR description.
+
+Pipeline variable groups, Key Vault references, and Azure App Configuration entries count as valid sources for an environment — if a key is wired up there for a given environment, the file does not need to repeat it, but the reviewer should verify the wiring exists rather than assume it.
+
+### 7. Testing
 
 | Check | Expectation |
 |-------|-------------|

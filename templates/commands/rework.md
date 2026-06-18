@@ -220,7 +220,8 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
 1. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this rework. A failure in an unrelated test means this rework broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
 2. **Run lint** — ESLint and dotnet format
-3. **Acceptance Criteria check** — re-read the work item's full Acceptance Criteria (the same list captured in Step 3). For each AC, identify the test or piece of code that proves it's met. If any AC has no covering test or visible code path, flag it before moving on:
+3. **Environment configuration parity** — if the rework added or changed any key in `appsettings.*.json` or `.env*`, verify every parallel environment file (Development/Staging/QA/Production for backend; `.env.development`/`.env.staging`/`.env.production`/`.env.example` for React — whichever exist in the repo) has a corresponding entry. Present a (key × environment) table. Prompt the user to fill in any missing values (real, placeholder, or empty) **before pushing**, or to explicitly confirm the omission is intentional (e.g., supplied via a pipeline variable group, Key Vault, or App Configuration).
+4. **Acceptance Criteria check** — re-read the work item's full Acceptance Criteria (the same list captured in Step 3). For each AC, identify the test or piece of code that proves it's met. If any AC has no covering test or visible code path, flag it before moving on:
 
    ```
    ⚠ AC #{n} ({short form}) has no covering test or clear code path.

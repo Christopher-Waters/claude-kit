@@ -7,6 +7,28 @@ Commit, push, and deploy the current changes. Usage: `/deploy [message]`
 1. Run `dotnet build` on any modified .NET projects
 2. If frontend files changed, run `npx tsc --noEmit` in the relevant client directory
 3. If either fails, STOP and report the errors — do not deploy broken code
+4. **Environment configuration parity** — if `git diff` shows changes to any `appsettings.*.json` or `.env*` file, check that every key added or modified in one file has a corresponding entry in every parallel environment file that exists in the repo:
+
+   | File family | Parallel files to check |
+   |-------------|------------------------|
+   | `appsettings.json` | `appsettings.Development.json`, `appsettings.Staging.json`, `appsettings.QA.json`, `appsettings.Production.json` |
+   | `.env` | `.env.development`, `.env.staging`, `.env.qa`, `.env.production`, `.env.local`, `.env.example` |
+
+   Present a table of new/changed keys and which environment files contain them. If any are missing, STOP and prompt:
+
+   ```
+   ⚠ The following keys are missing from one or more environment files:
+
+   | Key | Dev | Staging | QA | Prod |
+   |-----|-----|---------|----|----- |
+   | Foo:Bar | ✅ | ❌ | ❌ | ❌ |
+
+   Add values (real, placeholder, or empty) for the missing environments before pushing?
+   - "add" → I'll prompt for each missing value and update the files
+   - "skip" → confirm the omission is intentional (e.g., key is wired through a pipeline variable group / Key Vault / App Configuration) and continue
+   ```
+
+   If the user picks "add", walk each missing cell, prompt for a value, and write it. If "skip", continue but note the skipped keys in the deploy summary.
 
 ## Step 2: Review Changes
 
