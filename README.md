@@ -246,6 +246,25 @@ Verify MCP servers are connected:
 /mcp
 ```
 
+### Ultracode (multi-agent workflows)
+
+The kit's agents normally run as **sequential delegation** — the `manager` agent hands work to one specialist at a time through the `Task` tool. **Ultracode** is a separate, harness-level gear that authorizes the `Workflow` tool to fan out many agents in parallel under a deterministic script. The two compose: ultracode doesn't replace the pipeline, it parallelizes the parts that are embarrassingly parallel.
+
+Ultracode is **opt-in**. It's on only when you type `ultracode` in a prompt, when a system-reminder confirms it, or when a slash command's instructions say to use `Workflow`. When it's off, everything runs the normal sequential way — nothing changes.
+
+Only the **main Claude Code loop** and **slash commands** can call `Workflow`. Subagents (anything running under `Task`, including `manager`) cannot — so ultracode-scale fan-out is a main-loop / slash-command concern.
+
+Kit operations that benefit from ultracode when it's on:
+
+| Operation | Fan-out unit |
+|-----------|--------------|
+| `/plan-backlog` | one agent per Dev Ready story — analyze, point, and propose tasks in parallel |
+| Backlog / board audits | one agent per work item — find stale, mislabeled, orphaned, or unestimated items |
+| Multi-file or cross-layer review | one agent per file/dimension, then adversarial verify before reporting |
+| Repo-wide sweeps (rename, dependency bump, pattern migration) | one agent per site, worktree-isolated |
+
+Short, single-query operations (`/status`, `/explain`, `/close-orphan-tasks`) don't need ultracode — they're already one pass and gain nothing from fan-out. Reach for it when the work-list is large and the per-item work is independent.
+
 ### Implement a Work Item
 
 ```
