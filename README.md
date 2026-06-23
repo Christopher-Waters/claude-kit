@@ -28,7 +28,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 | **Global Agents** | 13 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
 | **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
-| **Slash Commands** | 13 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/resolve-feedback`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches`, `/quote`, `/explain` |
+| **Slash Commands** | 13 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/resolve-feedback`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | **Azure DevOps** (work items, repos, pipelines, wiki), Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
 | **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
@@ -220,6 +220,7 @@ your-project/                      ← Project-specific
 │   │   ├── add-to-release.md      # /add-to-release 24 AB#4599
 │   │   ├── status.md              # /status release 24
 │   │   ├── cleanup-branches.md    # /cleanup-branches
+│   │   ├── close-orphan-tasks.md  # /close-orphan-tasks
 │   │   ├── quote.md               # /quote AB#1234
 │   │   └── explain.md             # /explain AB#1234
 │   │
@@ -629,6 +630,7 @@ Claude reviews for:
 | `/quote` | `/quote AB#1234` | Display a work item as a formatted blockquote |
 | `/explain` | `/explain AB#1234` | Summarize and explain a work item in plain language |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged feature/work branches |
+| `/close-orphan-tasks` | `/close-orphan-tasks --dry-run` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |
 
 ---
 

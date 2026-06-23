@@ -213,6 +213,7 @@ All deployment and release operations are available as slash commands:
 | `/status` | `/status release 24` | Check release, pipeline, or work item status |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
+| `/close-orphan-tasks` | `/close-orphan-tasks [scope] [--dry-run]` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |
 
 The CD pipeline is only triggered manually when pushing directly to an environment branch. For feature/work branches, the pipeline triggers on PR merge.
 

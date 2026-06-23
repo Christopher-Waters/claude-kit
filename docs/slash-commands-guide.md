@@ -679,6 +679,43 @@ Shows the same list but does not delete anything.
 
 ---
 
+## /close-orphan-tasks — Close Tasks Whose Parent Has Shipped
+
+When a parent work item reaches **Ready to Deploy**, **Deployed**, or **Closed**, any child Tasks left open are just board noise. This command finds and closes them.
+
+### Example: Tidy the board after a release
+
+```
+/close-orphan-tasks
+```
+
+**Claude finds the orphaned tasks:**
+```
+## Orphaned Tasks (3)
+
+| Task | Title | State | Parent | Parent State |
+|------|-------|-------|--------|--------------|
+| AB#4710 | Add export endpoint | Active | AB#4521 | Deployed |
+| AB#4711 | Wire up CSV service | New | AB#4521 | Deployed |
+| AB#4733 | Fix null check | Active | AB#4598 | Closed |
+
+These tasks will be set to Closed with a comment noting the parent's state.
+
+Close 3 orphaned tasks? (yes/no)
+```
+
+On `yes`, each task is set to **Closed** with a comment linking back to the parent's state, so the auto-close is traceable.
+
+### Example: Preview, or narrow the scope
+
+```
+/close-orphan-tasks --dry-run        → list orphaned tasks, close nothing
+/close-orphan-tasks COM              → only tasks under the Compass area/prefix
+/close-orphan-tasks COM --dry-run    → preview, scoped to Compass
+```
+
+---
+
 ## Full Workflow — End to End
 
 Here's a complete real-world scenario tying all commands together:
@@ -791,3 +828,5 @@ After fix is verified on develop and staging, add it to the release and cherry-p
 | See overall project status | `/status` |
 | Clean up old branches | `/cleanup-branches` |
 | Preview branch cleanup | `/cleanup-branches --dry-run` |
+| Close tasks whose parent already shipped | `/close-orphan-tasks` |
+| Preview orphaned-task cleanup | `/close-orphan-tasks --dry-run` |
