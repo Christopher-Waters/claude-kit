@@ -1,5 +1,18 @@
 Rework work item AB#$ARGUMENTS based on feedback received after the last pull request. Follow this workflow:
 
+## Always Use Ultracode
+
+This command **always orchestrates its analysis-heavy phases with the `Workflow` tool** — you do not wait to be asked, and you do not need the `ultracode` keyword. The slash command runs in the main loop, which has the `Workflow` tool, so fan-out is available throughout.
+
+What this means in practice:
+
+- **Fan out the read / analyze / verify work** — gathering feedback (Step 2), exploring the codebase (Step 4), and reviewing + verifying the diff and AC coverage (Steps 9–10) are run as `Workflow` scripts with one agent per independent unit (per comment, per subsystem, per review dimension, per acceptance criterion). Each agent returns **structured findings** via a `schema`; you synthesize the results in the main loop.
+- **Never fan out an interactive gate or a write.** Every user prompt (Steps 3, 4-approval, 5, 10-decisions, 11) and every work-item or git mutation (Step 5 create, Step 6 branch, Step 7 implement, Step 12 push/close) stays in the **main loop**. Workflow agents here are **read-only analysts** — they use MCP read tools, `Read`, and `Grep`, and they return data. They do not create or close work items, switch branches, write code, or ask the user anything.
+- **Stay in the loop between phases.** Run one `Workflow` per phase, read its results, present/await the user as the steps require, then launch the next phase's workflow. This is several short workflows in sequence — not one monolithic run that tries to swallow the approval gates.
+- **Review uses the canonical find → adversarially-verify pipeline** (Step 10): fan out per dimension, then spawn skeptic verifiers per finding and drop findings the majority refute, so only confirmed issues reach the user.
+
+If the `Workflow` tool is somehow unavailable, fall back to running each phase sequentially in the main loop — the output is identical, just slower.
+
 ## Step 1: Find the Latest Pull Request
 
 Handle `$ARGUMENTS` as either `1234` or `AB#1234` — strip the `AB#` prefix when calling the MCP API.
@@ -13,6 +26,8 @@ Find the most recent PR linked to this work item:
 Save the PR's `creationDate` as `LAST_PR_DATE` — everything after this timestamp is new feedback.
 
 ## Step 2: Gather Rework Feedback
+
+> **Ultracode:** Fan out the gathering with `Workflow` — one agent per new comment (parse its text and **download + view every embedded image** via `WebFetch`), plus one agent analyzing the description / acceptance-criteria revisions since `LAST_PR_DATE`. Each agent returns a structured feedback item (`{source, summary, imageObservations, referencedAC?}`). Synthesize them into the Step 3 list in the main loop. Reading and image analysis are independent per comment — this is the fan-out unit.
 
 ### New Comments
 
@@ -62,6 +77,8 @@ Does this capture the rework correctly? Any feedback items that should be flagge
 **Wait for the user to respond.** Do NOT proceed until the user confirms the AC mapping. If they reclassify any item as scope-creep, drop it from the plan and note it in the final summary. If they add context, incorporate it.
 
 ## Step 4: Explore & Plan
+
+> **Ultracode:** Fan out the exploration with `Workflow` — one read-only agent per subsystem touched by the last PR (and per new area the feedback implies), each returning the relevant files and how they relate to the feedback. In the same pass, fan out **one agent per acceptance criterion** to report whether the current code covers it and what's missing. Synthesize all findings into a single plan in the main loop, then present it. Exploration and per-AC coverage analysis are independent — fan them out; the plan synthesis and the approval gate stay in the main loop.
 
 1. **Explore** the codebase to map relevant files — focus on files changed in the last PR and any new areas needed
 2. **Plan** the rework approach
@@ -221,7 +238,9 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 1. **Run the full test suite** — every unit test in the repo, plus integration tests. Not just the tests added in this rework. A failure in an unrelated test means this rework broke something else; treat it as a regression, fix it, and re-run until the entire suite is green
 2. **Run lint** — ESLint and dotnet format
 3. **Environment configuration parity** — if the rework added or changed any key in `appsettings.*.json` or `.env*`, verify every parallel environment file (Development/Staging/QA/Production for backend; `.env.development`/`.env.staging`/`.env.production`/`.env.example` for React — whichever exist in the repo) has a corresponding entry. Present a (key × environment) table. Prompt the user to fill in any missing values (real, placeholder, or empty) **before pushing**, or to explicitly confirm the omission is intentional (e.g., supplied via a pipeline variable group, Key Vault, or App Configuration).
-4. **Acceptance Criteria check** — re-read the work item's full Acceptance Criteria (the same list captured in Step 3). For each AC, identify the test or piece of code that proves it's met. If any AC has no covering test or visible code path, flag it before moving on:
+4. **Acceptance Criteria check** — re-read the work item's full Acceptance Criteria (the same list captured in Step 3). For each AC, identify the test or piece of code that proves it's met. If any AC has no covering test or visible code path, flag it before moving on.
+
+   > **Ultracode:** Fan out this check with `Workflow` — one read-only agent per acceptance criterion, each returning `{ac, covered: bool, evidence, gap?}`. Collect the results in the main loop and act on any `covered: false`.
 
    ```
    ⚠ AC #{n} ({short form}) has no covering test or clear code path.
@@ -232,9 +251,11 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
 ## Step 10: Code Review
 
-Spawn the `reviewer` agent to review the rework diff for quality, security, Clean Architecture compliance, and CLAUDE.md adherence. Focus the review on the files changed since the last PR — call out any regression risk introduced by the rework. The agent is read-only — it reports findings, you act on them.
+> **Ultracode:** Run the review as a `Workflow` find → verify pipeline. **Find:** fan out one agent per dimension — correctness/quality, security, Clean Architecture compliance, CLAUDE.md adherence, and regression risk from the rework — each scoped to the files changed since the last PR and returning structured findings. **Verify:** for each finding, spawn independent skeptic agents prompted to *refute* it, and drop any finding the majority refute. Only confirmed findings reach the user. Use the `reviewer` agent type for the dimension agents (`agentType: 'reviewer'`) so they inherit its review rules. The fix/decision loop below stays in the main loop — workflow agents never edit code.
 
-Present the findings to the user grouped by severity:
+Review the rework diff for quality, security, Clean Architecture compliance, and CLAUDE.md adherence. Focus the review on the files changed since the last PR — call out any regression risk introduced by the rework. Review is read-only — it reports findings, you act on them.
+
+Present the confirmed findings to the user grouped by severity:
 
 ```
 ## Code Review Findings
@@ -251,11 +272,11 @@ Present the findings to the user grouped by severity:
 Address must-fix items? (yes / select / skip)
 ```
 
-- `yes` → fix every must-fix item, then re-run the reviewer agent on the updated diff
-- `select` → ask which items to address; fix only those, then re-run the reviewer agent
+- `yes` → fix every must-fix item, then re-run the review (the Step 10 find → verify workflow) on the updated diff
+- `select` → ask which items to address; fix only those, then re-run the review workflow
 - `skip` → proceed without fixes (only allowed if there are no must-fix items, or the user explicitly overrides)
 
-Loop until the reviewer reports no must-fix items, or the user explicitly accepts remaining findings. Do not proceed to UAT with unresolved must-fix items unless the user overrides.
+Loop until the review reports no must-fix items, or the user explicitly accepts remaining findings. Do not proceed to UAT with unresolved must-fix items unless the user overrides.
 
 ## Step 11: UAT Gate
 

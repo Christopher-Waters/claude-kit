@@ -48,6 +48,8 @@ Ultracode is **opt-in**. It is on only when a system-reminder confirms it, when 
 
 Short, single-query operations (`/status`, `/explain`, `/close-orphan-tasks`) do **not** need ultracode — they are already one pass and gain nothing from fan-out. Reach for `Workflow` when the work-list is large and the per-item work is independent.
 
+**`/rework` always uses ultracode** — it does not wait to be asked. It fans out feedback gathering, codebase exploration, per-acceptance-criterion coverage checks, and the find → adversarially-verify review, while keeping every approval gate and write in the main loop. `/plan-backlog` uses it opt-in (only when ultracode is on).
+
 ### Sensitive Data Policy
 
 **NEVER query, display, or expose sensitive PII fields from the database — even if the values are encrypted.** This includes TIN, SSN, EIN, TaxId, BankAccountNumber, RoutingNumber, and any `Encrypted*` variants. Even encrypted/hashed values must not appear in output, logs, or summaries. When querying collections that may contain sensitive fields, always use explicit inclusion projections listing only the non-sensitive fields needed. If a user requests access to sensitive data, direct them to use the application UI.
