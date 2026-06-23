@@ -89,6 +89,15 @@ Continue? (yes / cancel)
 
 **Wait for the user.** If `cancel`, stop with no changes.
 
+### Ultracode mode (optional fan-out)
+
+Only when **ultracode is on** (a system-reminder confirms it, or the user typed `ultracode`): the analysis in 5a–5c is independent per story, so pre-compute all proposals in parallel with the `Workflow` tool instead of analyzing one story at a time.
+
+- Fan out **one agent per story** that does 5a–5c — re-read the story, map points → budget, tailor the task list — and returns a structured proposal (story id, points, budget, and the list of `{title, hours}` tasks). Use a `schema` so each agent returns validated JSON.
+- Then run Step 5's loop **using the pre-computed proposals** — but keep 5d (approval) and 5e (creation) exactly as written: present each proposal, wait for `yes / edit / skip / cancel-all`, and create tasks only after approval. **Never fan out the approval or the work-item creation** — those stay sequential and interactive.
+
+If ultracode is off, ignore this and run Step 5 the normal sequential way. The output is identical either way; ultracode only makes the analysis faster for large backlogs.
+
 ## Step 5: Per-Story Task Breakdown (loop)
 
 For each remaining story, in order:

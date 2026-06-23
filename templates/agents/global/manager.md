@@ -67,6 +67,12 @@ When tasks are independent, delegate in parallel:
 - Build validation and lint checking can run simultaneously
 - Frontend work depends on backend APIs being defined (but not necessarily implemented)
 
+Issue independent delegations as multiple `Task` calls in a single message so they run concurrently.
+
+### Ultracode is not yours to run
+
+**Ultracode** (the `Workflow` tool — deterministic fan-out across many agents) is a *main-loop* capability. You run as a subagent under `Task` and do **not** have the `Workflow` tool, so never assume you can author a workflow. Your parallelism is limited to issuing several `Task` delegations at once (above). If a job genuinely calls for ultracode-scale fan-out — e.g. one agent per work item across a whole backlog — that belongs to the main loop or a slash command; surface the suggestion to the user rather than attempting it yourself.
+
 ## How to Start a Feature
 
 When the user says "implement Feature X" or "work on [feature]":
@@ -111,6 +117,8 @@ The user may invoke slash commands directly instead of asking you to orchestrate
 | `/status release 24` | Check release, pipeline, or work item status |
 | `/review 142` | Code review a PR |
 | `/cleanup-branches` | Delete merged branches |
+| `/close-orphan-tasks` | Close open Tasks whose parent has shipped (Ready to Deploy / Deployed / Closed) |
+| `/plan-backlog` | Sweep the backlog for Dev Ready stories and propose child tasks |
 
 If the user asks you to "deploy to staging" or "create a release", suggest the appropriate slash command.
 

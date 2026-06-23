@@ -29,6 +29,25 @@ You (give task)
   └── reviewer → reviews code quality
 ```
 
+### Ultracode (multi-agent workflows)
+
+The **agent pipeline** above (`manager` → specialists) is sequential delegation: one agent at a time, through the `Task` tool. **Ultracode** is a different, harness-level gear — it authorizes the `Workflow` tool to fan out many agents in parallel under a deterministic script. The two compose; ultracode does not replace the pipeline, it parallelizes the parts of it that are embarrassingly parallel.
+
+Ultracode is **opt-in**. It is on only when a system-reminder confirms it, when you type `ultracode` in a prompt, or when a slash command's instructions say to use `Workflow`. When it is off, everything below runs the normal sequential way — nothing changes.
+
+**Who can call `Workflow`:** the main Claude Code loop, and slash commands (they expand into the main conversation). **Subagents cannot** — so the `manager` agent, running under `Task`, never authors a workflow. Ultracode-scale fan-out is a main-loop / slash-command concern.
+
+**Kit operations that benefit from ultracode (when it's on):**
+
+| Operation | Fan-out unit |
+|-----------|--------------|
+| `/plan-backlog` | one agent per Dev Ready story — analyze, point, and propose tasks in parallel |
+| Backlog / board audits | one agent per work item — find stale, mislabeled, orphaned, or unestimated items |
+| Multi-file or cross-layer review | one agent per file/dimension, then adversarial verify before reporting |
+| Repo-wide sweeps (rename, dependency bump, pattern migration) | one agent per site, worktree-isolated |
+
+Short, single-query operations (`/status`, `/explain`, `/close-orphan-tasks`) do **not** need ultracode — they are already one pass and gain nothing from fan-out. Reach for `Workflow` when the work-list is large and the per-item work is independent.
+
 ### Sensitive Data Policy
 
 **NEVER query, display, or expose sensitive PII fields from the database — even if the values are encrypted.** This includes TIN, SSN, EIN, TaxId, BankAccountNumber, RoutingNumber, and any `Encrypted*` variants. Even encrypted/hashed values must not appear in output, logs, or summaries. When querying collections that may contain sensitive fields, always use explicit inclusion projections listing only the non-sensitive fields needed. If a user requests access to sensitive data, direct them to use the application UI.
