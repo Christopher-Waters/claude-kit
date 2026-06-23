@@ -48,7 +48,11 @@ Ultracode is **opt-in**. It is on only when a system-reminder confirms it, when 
 
 Short, single-query operations (`/status`, `/explain`, `/close-orphan-tasks`) do **not** need ultracode — they are already one pass and gain nothing from fan-out. Reach for `Workflow` when the work-list is large and the per-item work is independent.
 
-**`/rework` always uses ultracode** — it does not wait to be asked. It fans out feedback gathering, codebase exploration, per-acceptance-criterion coverage checks, and the find → adversarially-verify review, while keeping every approval gate and write in the main loop. `/plan-backlog` uses it opt-in (only when ultracode is on).
+**`/rework` always uses ultracode** — it does not wait to be asked. It fans out feedback gathering, codebase exploration, per-acceptance-criterion coverage checks, and the find → adversarially-verify review, while keeping every approval gate and write in the main loop.
+
+**`/implement` uses ultracode scaled to the change** — its code review always fans out (find → adversarially-verify), but exploration and per-AC coverage fan out only for non-trivial / full-stack stories; a one-line config change runs lean. It's the daily driver, so it doesn't blanket-fan-out like `/rework`.
+
+**`/plan-backlog` uses it opt-in** — only when ultracode is on.
 
 ### Sensitive Data Policy
 

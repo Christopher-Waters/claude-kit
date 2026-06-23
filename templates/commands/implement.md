@@ -1,5 +1,18 @@
 Implement work item AB#$ARGUMENTS. Follow this workflow:
 
+## Ultracode (scaled to the change)
+
+This command orchestrates its analysis phases with the `Workflow` tool, but **scaled to the size of the work** — `/implement` is the daily driver and spans one-line config tweaks to full features, so it does not blanket-fan-out the way `/rework` does. The slash command runs in the main loop, which has the `Workflow` tool.
+
+The rule:
+
+- **Code review (Step 8) always fans out** — the find → adversarially-verify pipeline. Review is bounded by the diff, so cost scales with the change, and review quality matters as much for fresh code as for rework.
+- **Exploration and per-AC coverage (Steps 3, 7) fan out only when the change is non-trivial** — a full-stack story, multiple subsystems, or several acceptance criteria. For a trivial single-file or config change, skip the fan-out and run those steps lean in the main loop. Judge this from the plan in Step 3.
+- **Never fan out an interactive gate or a write.** Every user prompt (Steps 2, 3-approval, 8-decisions, 9) and every git / work-item mutation (Steps 4, 5, 10) stays in the **main loop**. Workflow agents here are **read-only analysts** — they use MCP read tools, `Read`, and `Grep`, and return structured findings. They do not write code, create/close work items, switch branches, or ask the user anything.
+- **Stay in the loop between phases** — one short workflow per phase, read its results, present/await the user, then continue.
+
+If the `Workflow` tool is unavailable, run each phase sequentially in the main loop — the output is identical, just slower.
+
 ## Step 1: Read the Work Item
 
 Read the work item from Azure DevOps via MCP. Extract:
@@ -40,6 +53,8 @@ Does this look correct? Do you have any additional context or requirements?
 **Wait for the user to respond.** Do NOT proceed until the user confirms or provides additional context. If they add context, incorporate it into the plan.
 
 ## Step 3: Explore & Plan
+
+> **Ultracode (non-trivial only):** If the work is full-stack, spans multiple subsystems, or has several acceptance criteria, fan out the exploration with `Workflow` — one read-only agent per subsystem/area, each returning the relevant files and how they relate to the requirements, plus one agent per acceptance criterion reporting what already exists and what's missing. Synthesize into a single plan in the main loop. For a trivial single-file or config change, skip the fan-out and explore directly. Either way, the plan synthesis and the approval gate stay in the main loop.
 
 1. **Explore** the codebase to map relevant files
 2. **Plan** the implementation approach
@@ -140,11 +155,24 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
    Present a (key × environment) table. For every missing cell, prompt the user for a value (real, placeholder, or empty) **before creating the PR**. The PR should not be opened until every environment file is accounted for, or the user explicitly confirms the omission is intentional (e.g., the key is supplied via a pipeline variable group, Key Vault, or App Configuration for that environment).
 
+4. **Acceptance Criteria check** — re-read the work item's full Acceptance Criteria. For each AC, identify the test or piece of code that proves it's met. If any AC has no covering test or visible code path, flag it before moving on:
+
+   ```
+   ⚠ AC #{n} ({short form}) has no covering test or clear code path.
+     Add coverage now, or call this out to the user before UAT.
+   ```
+
+   Do not advance to Step 8 with any AC unverified.
+
+   > **Ultracode (non-trivial only):** When the story has several acceptance criteria, fan out this check with `Workflow` — one read-only agent per AC, each returning `{ac, covered: bool, evidence, gap?}`. Collect the results in the main loop and act on any `covered: false`. For a story with one or two ACs, just check them directly.
+
 ## Step 8: Code Review
 
-Spawn the `reviewer` agent to review the diff for quality, security, Clean Architecture compliance, and CLAUDE.md adherence. The agent is read-only — it reports findings, you act on them.
+> **Ultracode (always):** Run the review as a `Workflow` find → verify pipeline. **Find:** fan out one agent per dimension — correctness/quality, security, Clean Architecture compliance, and CLAUDE.md adherence — each scoped to the diff and returning structured findings. **Verify:** for each finding, spawn independent skeptic agents prompted to *refute* it, and drop any finding the majority refute. Only confirmed findings reach the user. Use the `reviewer` agent type for the dimension agents (`agentType: 'reviewer'`) so they inherit its review rules. The fix/decision loop below stays in the main loop — workflow agents never edit code.
 
-Present the findings to the user grouped by severity:
+Review the diff for quality, security, Clean Architecture compliance, and CLAUDE.md adherence. Review is read-only — it reports findings, you act on them.
+
+Present the confirmed findings to the user grouped by severity:
 
 ```
 ## Code Review Findings
@@ -161,11 +189,11 @@ Present the findings to the user grouped by severity:
 Address must-fix items? (yes / select / skip)
 ```
 
-- `yes` → fix every must-fix item, then re-run the reviewer agent on the updated diff
-- `select` → ask which items to address; fix only those, then re-run the reviewer agent
+- `yes` → fix every must-fix item, then re-run the review (the Step 8 find → verify workflow) on the updated diff
+- `select` → ask which items to address; fix only those, then re-run the review workflow
 - `skip` → proceed without fixes (only allowed if there are no must-fix items, or the user explicitly overrides)
 
-Loop until the reviewer reports no must-fix items, or the user explicitly accepts remaining findings. Do not proceed to UAT with unresolved must-fix items unless the user overrides.
+Loop until the review reports no must-fix items, or the user explicitly accepts remaining findings. Do not proceed to UAT with unresolved must-fix items unless the user overrides.
 
 ## Step 9: UAT Gate
 
