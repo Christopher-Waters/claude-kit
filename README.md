@@ -28,7 +28,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 | **Global Agents** | 13 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
 | **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
-| **Slash Commands** | 13 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deep-review`, `/resolve-feedback`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain` |
+| **Slash Commands** | 21 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | **Azure DevOps** (work items, repos, pipelines, wiki), Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
 | **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
@@ -639,6 +639,7 @@ Claude reviews for:
 | `/review` | `/review 142` | Full code review on a PR with inline comments |
 | `/deep-review` | `/deep-review 142` | Deep, Ultracode-orchestrated review: checks out the branch, builds/tests it, verifies every requirement, checks for regressions, flags out-of-scope changes, then comments + votes |
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
+| `/fix-review` | `/fix-review 142` | Fix everything flagged on a PR — human reviewer comments and automated `/review` findings alike: implement in severity order, validate, push, resolve threads |
 | `/deploy` | `/deploy "message"` | Commit, push, trigger pipeline if on environment branch |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 iteration with tags |
 | `/deploy-release` | `/deploy-release 23 staging` | Cherry-pick release work items to environment via PR |
