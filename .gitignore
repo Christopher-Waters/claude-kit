@@ -15,9 +15,8 @@ _password
 # =========================
 # Claude Code
 # =========================
-.claude/*
-!.claude/agents/
-!.claude/hooks/
-!.claude/commands/
-!.claude/settings.json
-.claude/settings.local.json
+# The installed kit (.claude/) is a duplicate of templates/ — the real source.
+# Don't track it in this repo.
+.claude/
+# Root Claude instructions — local only (templates/**/CLAUDE-*.md still ship).
+/CLAUDE.md
