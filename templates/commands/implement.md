@@ -1,13 +1,15 @@
 Implement work item AB#$ARGUMENTS. Follow this workflow:
 
-## Ultracode (scaled to the change)
+## Ultracode (opt-in — ask the user)
 
-This command orchestrates its analysis phases with the `Workflow` tool, but **scaled to the size of the work** — `/implement` is the daily driver and spans one-line config tweaks to full features, so it does not blanket-fan-out the way `/rework` does. The slash command runs in the main loop, which has the `Workflow` tool.
+This command **can** orchestrate its analysis phases with the `Workflow` tool, but only if the user opts in. The user is asked once, as part of the Step 2 confirmation, whether to use Ultracode effort for this run. Do not fan out before that answer, and do not silently decide for the user.
 
-The rule:
+- **If the user says yes:** apply the fan-out rules below — review (Step 8) runs as the find → adversarially-verify pipeline, and exploration / per-AC coverage (Steps 3, 7) fan out when the change is non-trivial (a full-stack story, multiple subsystems, or several acceptance criteria; skip the fan-out for a trivial single-file or config change).
+- **If the user says no:** run every phase sequentially in the main loop — same steps, same gates, no `Workflow` calls.
 
-- **Code review (Step 8) always fans out** — the find → adversarially-verify pipeline. Review is bounded by the diff, so cost scales with the change, and review quality matters as much for fresh code as for rework.
-- **Exploration and per-AC coverage (Steps 3, 7) fan out only when the change is non-trivial** — a full-stack story, multiple subsystems, or several acceptance criteria. For a trivial single-file or config change, skip the fan-out and run those steps lean in the main loop. Judge this from the plan in Step 3.
+When recommending a default in the Step 2 prompt, suggest **yes** for multi-subsystem / multi-AC work and **no** for trivial changes.
+
+The remaining rules apply whenever Ultracode is in use:
 - **Never fan out an interactive gate or a write.** Every user prompt (Steps 2, 3-approval, 8-decisions, 9) and every git / work-item mutation (Steps 4, 5, 10) stays in the **main loop**. Workflow agents here are **read-only analysts** — they use MCP read tools, `Read`, and `Grep`, and return structured findings. They do not write code, create/close work items, switch branches, or ask the user anything.
 - **Stay in the loop between phases** — one short workflow per phase, read its results, present/await the user, then continue.
 
@@ -48,13 +50,15 @@ Present a summary of the work item to the user:
 {acceptance criteria — numbered list}
 
 Does this look correct? Do you have any additional context or requirements?
+
+Use **Ultracode effort** for this run? Ultracode fans out exploration, AC-coverage checks, and code review across parallel agents — more thorough, but slower and more token-hungry. (yes / no — suggested: {yes for multi-subsystem / multi-AC work, no for trivial changes})
 ```
 
-**Wait for the user to respond.** Do NOT proceed until the user confirms or provides additional context. If they add context, incorporate it into the plan.
+**Wait for the user to respond.** Do NOT proceed until the user confirms or provides additional context. If they add context, incorporate it into the plan. Record the Ultracode answer — it governs whether the `Workflow` fan-outs in Steps 3, 7, and 8 run at all.
 
 ## Step 3: Explore & Plan
 
-> **Ultracode (non-trivial only):** If the work is full-stack, spans multiple subsystems, or has several acceptance criteria, fan out the exploration with `Workflow` — one read-only agent per subsystem/area, each returning the relevant files and how they relate to the requirements, plus one agent per acceptance criterion reporting what already exists and what's missing. Synthesize into a single plan in the main loop. For a trivial single-file or config change, skip the fan-out and explore directly. Either way, the plan synthesis and the approval gate stay in the main loop.
+> **Ultracode (if opted in, non-trivial only):** If the work is full-stack, spans multiple subsystems, or has several acceptance criteria, fan out the exploration with `Workflow` — one read-only agent per subsystem/area, each returning the relevant files and how they relate to the requirements, plus one agent per acceptance criterion reporting what already exists and what's missing. Synthesize into a single plan in the main loop. For a trivial single-file or config change, skip the fan-out and explore directly. Either way, the plan synthesis and the approval gate stay in the main loop.
 
 1. **Explore** the codebase to map relevant files
 2. **Plan** the implementation approach
@@ -164,11 +168,11 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
    Do not advance to Step 8 with any AC unverified.
 
-   > **Ultracode (non-trivial only):** When the story has several acceptance criteria, fan out this check with `Workflow` — one read-only agent per AC, each returning `{ac, covered: bool, evidence, gap?}`. Collect the results in the main loop and act on any `covered: false`. For a story with one or two ACs, just check them directly.
+   > **Ultracode (if opted in, non-trivial only):** When the story has several acceptance criteria, fan out this check with `Workflow` — one read-only agent per AC, each returning `{ac, covered: bool, evidence, gap?}`. Collect the results in the main loop and act on any `covered: false`. For a story with one or two ACs, just check them directly.
 
 ## Step 8: Code Review
 
-> **Ultracode (always):** Run the review as a `Workflow` find → verify pipeline. **Find:** fan out one agent per dimension — correctness/quality, security, Clean Architecture compliance, and CLAUDE.md adherence — each scoped to the diff and returning structured findings. **Verify:** for each finding, spawn independent skeptic agents prompted to *refute* it, and drop any finding the majority refute. Only confirmed findings reach the user. Use the `reviewer` agent type for the dimension agents (`agentType: 'reviewer'`) so they inherit its review rules. The fix/decision loop below stays in the main loop — workflow agents never edit code.
+> **Ultracode (if opted in):** Run the review as a `Workflow` find → verify pipeline. **Find:** fan out one agent per dimension — correctness/quality, security, Clean Architecture compliance, and CLAUDE.md adherence — each scoped to the diff and returning structured findings. **Verify:** for each finding, spawn independent skeptic agents prompted to *refute* it, and drop any finding the majority refute. Only confirmed findings reach the user. Use the `reviewer` agent type for the dimension agents (`agentType: 'reviewer'`) so they inherit its review rules. The fix/decision loop below stays in the main loop — workflow agents never edit code.
 
 Review the diff for quality, security, Clean Architecture compliance, and CLAUDE.md adherence. Review is read-only — it reports findings, you act on them.
 
