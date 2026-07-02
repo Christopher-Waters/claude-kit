@@ -11,31 +11,29 @@ When given a task, Claude Code can delegate through specialized agents:
 
 ```
 You (give task)
-  ├── manager → orchestrates workflow, delegates to agents below
-  ├── Explore → finds relevant files
-  ├── Plan → designs the approach
+  ├── Explore → finds relevant files (built-in)
+  ├── Plan → designs the approach (built-in)
   ├── mockup → creates HTML screen mockups before implementation
   ├── backend / frontend / legacy → implements code
   ├── deployer → commits, pushes, triggers CD pipeline
   ├── db-admin → queries/fixes MongoDB data
-  ├── devops-tracker → creates/updates Azure DevOps work items
   ├── test-runner → runs xUnit, Vitest, Playwright tests
   ├── build-validator → confirms builds pass
   ├── lint-checker → runs ESLint and dotnet format
-  ├── uat-generator → generates UAT checklists from requirements
   ├── security-auditor → scans for secrets, vulnerabilities
-  ├── api-tester → tests API endpoints with curl
   ├── azure-ops → manages Azure infrastructure
   └── reviewer → reviews code quality
 ```
 
+Orchestration, Azure DevOps work-item management, UAT checklist generation, and ad-hoc API testing are handled directly by the main Claude Code loop (via the `Workflow` tool, the Azure DevOps MCP server, the `/implement`/`/rework` UAT steps, and curl) — they no longer have dedicated agents.
+
 ### Ultracode (multi-agent workflows)
 
-The **agent pipeline** above (`manager` → specialists) is sequential delegation: one agent at a time, through the `Task` tool. **Ultracode** is a different, harness-level gear — it authorizes the `Workflow` tool to fan out many agents in parallel under a deterministic script. The two compose; ultracode does not replace the pipeline, it parallelizes the parts of it that are embarrassingly parallel.
+The **agent pipeline** above is sequential delegation: one specialist agent at a time, through the `Task` tool. **Ultracode** is a different, harness-level gear — it authorizes the `Workflow` tool to fan out many agents in parallel under a deterministic script. The two compose; ultracode does not replace the pipeline, it parallelizes the parts of it that are embarrassingly parallel.
 
 Ultracode is **opt-in**. It is on only when a system-reminder confirms it, when you type `ultracode` in a prompt, or when a slash command's instructions say to use `Workflow`. When it is off, everything below runs the normal sequential way — nothing changes.
 
-**Who can call `Workflow`:** the main Claude Code loop, and slash commands (they expand into the main conversation). **Subagents cannot** — so the `manager` agent, running under `Task`, never authors a workflow. Ultracode-scale fan-out is a main-loop / slash-command concern.
+**Who can call `Workflow`:** the main Claude Code loop, and slash commands (they expand into the main conversation). **Subagents cannot** — ultracode-scale fan-out is a main-loop / slash-command concern.
 
 **Kit operations that benefit from ultracode (when it's on):**
 
@@ -102,7 +100,7 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 5. **Create a release** using `/create-release <N>` to group work items
 6. **Deploy the release** using `/deploy-release 23 staging` then `/deploy-release 23 production`
 7. **Test** using Playwright MCP for browser testing
-8. **Track** work items using the devops-tracker agent
+8. **Track** work items via the Azure DevOps MCP server
 9. **Learn** — Claude saves what worked for next time
 
 ### Branching Strategy

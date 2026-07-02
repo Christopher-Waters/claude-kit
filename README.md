@@ -17,7 +17,7 @@ The slash commands assume Azure DevOps as the system of record:
 - **Releases & deployments** — tracked as Azure DevOps iterations (`Release #N`) and tags; CD runs on Azure Pipelines
 - **Wiki, test plans, advanced security alerts** — all surfaced through the same Azure DevOps MCP server
 
-> **Not using Azure DevOps?** The Claude Code primitives (agents, hooks, memory) are still useful, but the slash commands, the `devops-tracker` agent, and the deployment workflow won't apply out of the box — you'd need to rewrite the `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/rework`, and `/resolve-feedback` commands against GitHub / GitLab / Jira / etc.
+> **Not using Azure DevOps?** The Claude Code primitives (agents, hooks, memory) are still useful, but the slash commands and the deployment workflow won't apply out of the box — you'd need to rewrite the `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/rework`, and `/resolve-feedback` commands against GitHub / GitLab / Jira / etc.
 
 Every session Claude learns from your feedback and gets better at helping you specifically. The infrastructure is modular — install only what your project needs.
 
@@ -25,8 +25,8 @@ Every session Claude learns from your feedback and gets better at helping you sp
 
 | Component | Count | Where Installed | Description |
 |-----------|-------|----------------|-------------|
-| **Global Agents** | 13 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester |
-| **Project Agents** | 3 | `.claude/agents/` (in the project) | deployer, db-admin, devops-tracker |
+| **Global Agents** | 10 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), mockup, reviewer, test-runner, build-validator, lint-checker, azure-ops, security-auditor |
+| **Project Agents** | 2 | `.claude/agents/` (in the project) | deployer, db-admin |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
 | **Slash Commands** | 21 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | **Azure DevOps** (work items, repos, pipelines, wiki), Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
@@ -71,7 +71,7 @@ npx @chris1807/claude-kit init
 You'll be asked:
 1. **Target directory** — where is your project?
 2. **Components** — checkboxes to pick which parts to install:
-   - ☑ Project Agents (deployer, db-admin, devops-tracker)
+   - ☑ Project Agents (deployer, db-admin)
    - ☑ Hooks (secret blocker, auto-format, etc.)
    - ☑ Slash Commands (/implement, /review, /resolve-feedback, /deploy, /create-release, /deploy-release, /add-to-release, /cherry-pick, /promote, /rollback, /status, /cleanup-branches, /quote, /explain)
    - ☑ MCP Servers
@@ -103,8 +103,8 @@ npx @chris1807/claude-kit init --all
 ```
 
 This installs:
-- ✅ Global agents (backend, frontend, legacy, manager, mockup, reviewer, test-runner, build-validator, lint-checker, uat-generator, azure-ops, security-auditor, api-tester)
-- ✅ Project agents (deployer, db-admin, devops-tracker)
+- ✅ Global agents (backend, frontend, legacy, mockup, reviewer, test-runner, build-validator, lint-checker, azure-ops, security-auditor)
+- ✅ Project agents (deployer, db-admin)
 - ✅ All 9 hooks
 - ✅ All 13 slash commands
 - ✅ MCP servers: Playwright, Teams, Azure CLI (+ your DB choice)
@@ -161,12 +161,11 @@ The installer automatically **skips global agents** that are already installed (
 📦 Global Agents → ~/.claude/agents/
   = azure-ops.md (identical, skipped)       ← already installed, skipped
   = security-auditor.md (identical, skipped)
-  = api-tester.md (identical, skipped)
+  = reviewer.md (identical, skipped)
 
 📦 Project Agents → .claude/agents/         ← fresh install for this project
   ✓ deployer.md
   ✓ db-admin.md
-  ✓ devops-tracker.md
   ...
 ```
 
@@ -179,23 +178,19 @@ The installer automatically **skips global agents** that are already installed (
 ├── backend.md                     # .NET/C# backend developer (Clean Architecture)
 ├── frontend.md                    # React/TypeScript frontend developer
 ├── legacy.md                      # Lucee/CFML legacy app developer (RBWO + others)
-├── manager.md                     # Workflow orchestrator (delegates to other agents)
 ├── mockup.md                      # HTML mockup designer
 ├── reviewer.md                    # Code reviewer (read-only)
 ├── test-runner.md                 # Test executor — xUnit, Vitest, Playwright (read-only)
 ├── build-validator.md             # Build checker (read-only)
 ├── lint-checker.md                # ESLint + dotnet format checker
-├── uat-generator.md               # UAT checklist generator (read-only)
 ├── azure-ops.md                   # Azure infrastructure management
-├── security-auditor.md            # Security scanning (read-only)
-└── api-tester.md                  # API endpoint testing
+└── security-auditor.md            # Security scanning (read-only)
 
 your-project/                      ← Project-specific
 ├── .claude/
 │   ├── agents/
 │   │   ├── deployer.md            # Commit → push → deploy → monitor
-│   │   ├── db-admin.md            # Database queries and data management
-│   │   └── devops-tracker.md      # Azure DevOps work item management
+│   │   └── db-admin.md            # Database queries and data management
 │   │
 │   ├── hooks/
 │   │   ├── sensitive-data-blocker.sh       # BLOCKS mongosh queries for TIN/SSN/PII
@@ -248,11 +243,11 @@ Verify MCP servers are connected:
 
 ### Ultracode (multi-agent workflows)
 
-The kit's agents normally run as **sequential delegation** — the `manager` agent hands work to one specialist at a time through the `Task` tool. **Ultracode** is a separate, harness-level gear that authorizes the `Workflow` tool to fan out many agents in parallel under a deterministic script. The two compose: ultracode doesn't replace the pipeline, it parallelizes the parts that are embarrassingly parallel.
+The kit's agents normally run as **sequential delegation** — the main loop hands work to one specialist at a time through the `Task` tool. **Ultracode** is a separate, harness-level gear that authorizes the `Workflow` tool to fan out many agents in parallel under a deterministic script. The two compose: ultracode doesn't replace the pipeline, it parallelizes the parts that are embarrassingly parallel.
 
 Ultracode is **opt-in**. It's on only when you type `ultracode` in a prompt, when a system-reminder confirms it, or when a slash command's instructions say to use `Workflow`. When it's off, everything runs the normal sequential way — nothing changes.
 
-Only the **main Claude Code loop** and **slash commands** can call `Workflow`. Subagents (anything running under `Task`, including `manager`) cannot — so ultracode-scale fan-out is a main-loop / slash-command concern.
+Only the **main Claude Code loop** and **slash commands** can call `Workflow`. Subagents (anything running under `Task`) cannot — so ultracode-scale fan-out is a main-loop / slash-command concern.
 
 Kit operations that benefit from ultracode when it's on:
 

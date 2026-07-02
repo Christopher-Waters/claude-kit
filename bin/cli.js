@@ -156,6 +156,24 @@ function mergeHooks(existing, template) {
 // ============================================================================
 // Step 1: Global Agents (always)
 // ============================================================================
+
+// Agents removed from the kit, cleaned up on install/update so stale copies
+// don't linger. manager/uat-generator/api-tester were superseded by the
+// Workflow tool and inline command steps; devops-tracker by direct Azure
+// DevOps MCP access in the main loop.
+const RETIRED_GLOBAL_AGENTS = ['manager.md', 'uat-generator.md', 'api-tester.md'];
+const RETIRED_PROJECT_AGENTS = ['devops-tracker.md'];
+
+async function removeRetiredAgents(agentsDir, retired) {
+  for (const file of retired) {
+    const target = join(agentsDir, file);
+    if (await fs.pathExists(target)) {
+      await fs.remove(target);
+      console.log(chalk.gray(`  - ${file} (retired, removed)`));
+    }
+  }
+}
+
 async function installGlobalAgents() {
   console.log(chalk.yellow.bold('\n📦 Global Agents → ~/.claude/agents/\n'));
 
@@ -172,6 +190,7 @@ async function installGlobalAgents() {
       );
     }
   }
+  await removeRetiredAgents(globalAgentsDir, RETIRED_GLOBAL_AGENTS);
 }
 
 // ============================================================================
@@ -219,7 +238,7 @@ async function main() {
       name: 'selected',
       message: 'Select components to install:',
       choices: [
-        { name: 'Project Agents (deployer, db-admin, devops-tracker)', value: 'agents', checked: true },
+        { name: 'Project Agents (deployer, db-admin)', value: 'agents', checked: true },
         { name: 'Hooks (secret blocker, auto-format, test suggestions)', value: 'hooks', checked: true },
         { name: 'Slash Commands (implement, review, deploy, releases, cherry-pick, promote, rollback, status, cleanup, create-work-item, …)', value: 'commands', checked: true },
         { name: 'MCP Servers (Playwright, DB, Teams, Stripe, Azure, Azure DevOps)', value: 'mcp', checked: true },
@@ -246,6 +265,7 @@ async function main() {
         );
       }
     }
+    await removeRetiredAgents(agentsDir, RETIRED_PROJECT_AGENTS);
   }
 
   // ── Hooks ─────────────────────────────────────────────────────────────
