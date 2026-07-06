@@ -320,7 +320,7 @@ Wait for the user's response before proceeding. Do NOT push until confirmed.
 ## Step 12: Push and Update
 
 1. Push the changes: `git push`
-2. Add a comment on the existing PR summarizing what was changed in the rework
+2. **Do not post a rework summary comment.** Do not add a summary of what changed to the work item Discussion (`wit_add_work_item_comment`) or as a PR thread. The pushed commits and the PR diff are the record of what changed — a prose summary duplicates them and clutters the work item. If the reviewer left specific PR comment threads, reply on those threads directly (that is what `/resolve-feedback` and `/fix-review` do); otherwise post nothing.
 3. **Close related Tasks and log hours** — see "Closing Related Tasks" below. This includes the rework Task created in Step 5 as well as any other child Tasks that became `Completed` as a result of this rework round.
 4. **Move the work item back to `Code Review`** via `wit_update_work_item`:
    - **path**: `/fields/System.State`
