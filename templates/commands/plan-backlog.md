@@ -1,6 +1,6 @@
-Sweep an Azure DevOps backlog for Dev Ready user stories without child tasks and propose a per-story task breakdown with hour estimates. Usage: `/plan-backlog [project]`
+Sweep an Azure DevOps backlog for Dev Ready user stories without child tasks and propose a single implementation task per story with an hour estimate. Usage: `/plan-backlog [project]`
 
-This command walks the **backlog** of a chosen Azure DevOps project (work items not assigned to any sprint), finds user stories that are **Dev Ready**, **have Story Points**, and **have no child tasks yet**, and — story by story — proposes a tailored Task breakdown with hour estimates for the user to approve before any work items are created.
+This command walks the **backlog** of a chosen Azure DevOps project (work items not assigned to any sprint), finds user stories that are **Dev Ready**, **have Story Points**, and **have no child tasks yet**, and — story by story — proposes **one child Task** with an hour estimate for the user to approve before any work items are created. Exactly one task per story — never a multi-task breakdown.
 
 Treat `$ARGUMENTS` as an optional project name (e.g. `/plan-backlog CSI Development`). If provided, skip the project prompt in Step 1.
 
@@ -81,8 +81,8 @@ Found {n} Dev Ready stories with Story Points and no child tasks on the {project
 | 3  | AB#4530  | COM - Dashboard trend graphs             |   3    |
 | .. | ...      | ...                                      |  ...   |
 
-I'll walk through each one. For each story you'll see a proposed task list
-with hours; you can approve, edit, or skip per story.
+I'll walk through each one. For each story you'll see one proposed task
+with an hour estimate; you can approve, edit, or skip per story.
 
 Continue? (yes / cancel)
 ```
@@ -93,18 +93,18 @@ Continue? (yes / cancel)
 
 Only when **ultracode is on** (a system-reminder confirms it, or the user typed `ultracode`): the analysis in 5a–5c is independent per story, so pre-compute all proposals in parallel with the `Workflow` tool instead of analyzing one story at a time.
 
-- Fan out **one agent per story** that does 5a–5c — re-read the story, map points → budget, tailor the task list — and returns a structured proposal (story id, points, budget, and the list of `{title, hours}` tasks). Use a `schema` so each agent returns validated JSON.
-- Then run Step 5's loop **using the pre-computed proposals** — but keep 5d (approval) and 5e (creation) exactly as written: present each proposal, wait for `yes / edit / skip / cancel-all`, and create tasks only after approval. **Never fan out the approval or the work-item creation** — those stay sequential and interactive.
+- Fan out **one agent per story** that does 5a–5c — re-read the story, map points → budget, draft the single task — and returns a structured proposal (story id, points, budget, and one `{title, hours}` task). Use a `schema` so each agent returns validated JSON.
+- Then run Step 5's loop **using the pre-computed proposals** — but keep 5d (approval) and 5e (creation) exactly as written: present each proposal, wait for `yes / edit / skip / cancel-all`, and create the task only after approval. **Never fan out the approval or the work-item creation** — those stay sequential and interactive.
 
 If ultracode is off, ignore this and run Step 5 the normal sequential way. The output is identical either way; ultracode only makes the analysis faster for large backlogs.
 
-## Step 5: Per-Story Task Breakdown (loop)
+## Step 5: Per-Story Task (loop)
 
 For each remaining story, in order:
 
 ### 5a. Re-read the story in full
 
-Fetch the work item again (Description and Acceptance Criteria fields) if not already cached. You need the AC text to tailor the task list.
+Fetch the work item again (Description and Acceptance Criteria fields) if not already cached. You need the AC text to write an accurate task title.
 
 ### 5b. Map Story Points → total hour budget
 
@@ -124,64 +124,39 @@ Use this mapping (calibrated for a senior developer at ~6 productive hours per d
 
 If the points value isn't on the Fibonacci scale, round to the nearest entry above. If the story has tags like `spike`, `research`, or `unknown-stack`, add 20–30% on top — those are the cases where seniority doesn't help.
 
-### 5c. Tailor the task list (hybrid template)
+### 5c. Draft the single task
 
-Start from this template, then **add, remove, or rename** tasks based on what the AC actually describes:
+Create **exactly one task** covering all the work for the story — implementation, tests, code review revisions, and UAT support are all rolled into it. Do not split the story into design/backend/frontend/test tasks.
 
-| Default task           | When to include                                          |
-|------------------------|----------------------------------------------------------|
-| Design / Spike         | AC has open questions or the implementation isn't obvious |
-| Backend implementation | AC mentions API, service, job, persistence, or data flow |
-| Frontend implementation| AC mentions UI, screen, form, button, or workflow         |
-| Database / migration   | AC requires schema changes or data backfill              |
-| Automated tests        | Always include unless the story is purely a config tweak |
-| Code review revisions  | Always include                                           |
-| UAT support            | Always include unless explicitly out of scope            |
-
-Distribute the hour budget across the chosen tasks. Reasonable defaults:
-
-- Code review revisions: ~10% of budget (min 1 hr)
-- UAT support: ~10% of budget (min 1 hr)
-- Automated tests: ~15–25% of budget
-- Design / Spike (if present): ~10–20% of budget
-- Remaining hours split across implementation tasks based on the AC
-
-Round each task to a whole hour. Final total should equal the budget (give or take 1 hr from rounding).
+- **Title**: `{Prefix} - Implement: {short summary of the story}` — use the same product prefix as the parent (e.g. `COM`, `PAY`, `CDA`), extracted from the parent's title.
+- **Hours**: the full hour budget from 5b, rounded to a whole hour.
 
 ### 5d. Show the proposal
 
 ```
 ─────────────────────────────────────────────────────────────
-AB#{id}: {title}      ({points} pts → {budget} hrs total)
+AB#{id}: {title}      ({points} pts → {budget} hrs)
 ─────────────────────────────────────────────────────────────
 
-Proposed child tasks:
+Proposed child task:
 
-| # | Task title                                    | Hours |
-|---|-----------------------------------------------|-------|
-| 1 | {Prefix} - Design: clarify export field set   |   3   |
-| 2 | {Prefix} - Backend: CSV export endpoint       |   8   |
-| 3 | {Prefix} - Frontend: export button + download |   6   |
-| 4 | {Prefix} - Tests: export endpoint + UI        |   4   |
-| 5 | {Prefix} - Code review revisions              |   2   |
-| 6 | {Prefix} - UAT support                        |   1   |
-|   | **Total**                                     | **24**|
+| Task title                                     | Hours |
+|------------------------------------------------|-------|
+| {Prefix} - Implement: payments CSV export      |  24   |
 
 Approve? (yes / edit / skip / cancel-all)
 ```
 
-Task titles use the same product prefix as the parent (e.g. `COM`, `PAY`, `CDA`) — extract it from the parent's title. Use the format `{Prefix} - {what the task does}`.
-
 **Wait for the user.**
 
-- `yes` → proceed to 5e (create the tasks)
-- `edit` → ask which row to change (title or hours), revise, re-show the table, ask again
+- `yes` → proceed to 5e (create the task)
+- `edit` → ask what to change (title or hours), revise, re-show, ask again
 - `skip` → skip this story, move to the next; record it as skipped
 - `cancel-all` → stop the entire loop with no further changes. Report what was already created.
 
-### 5e. Create the child tasks
+### 5e. Create the child task
 
-For each approved task, call `mcp__azure-devops__wit_create_work_item` with:
+Create the approved task with `mcp__azure-devops__wit_create_work_item`:
 
 - **project**: the chosen project
 - **workItemType**: `Task`
@@ -195,12 +170,12 @@ For each approved task, call `mcp__azure-devops__wit_create_work_item` with:
 
 Then link the new task as a child of the parent with `mcp__azure-devops__wit_add_child_work_items` (or fall back to `wit_work_items_link` with link type `System.LinkTypes.Hierarchy-Forward` from parent → task).
 
-If any create or link call fails, report the failure for that task, stop creating tasks for this story, and ask the user whether to continue with the next story or abort the loop.
+If the create or link call fails, report the failure and ask the user whether to continue with the next story or abort the loop.
 
 ### 5f. Confirm per-story result
 
 ```
-✓ AB#{id}: created {k} child tasks ({budget} hrs total)
+✓ AB#{id}: created 1 child task ({budget} hrs)
 ```
 
 Then move to the next story.
@@ -213,14 +188,14 @@ Once the loop ends (all stories handled, or user said `cancel-all`):
 ## Backlog Planning Complete — {project}
 
 Stories planned:    {n_planned}
-  ✓ Tasks created:  {n_tasks_total} ({hours_total} hrs)
+  ✓ Tasks created:  {n_tasks_total} — one per story ({hours_total} hrs)
 Stories skipped:    {n_skipped}
   - already had tasks: {n_existing}
   - user skipped:      {n_user_skipped}
 
 Planned stories:
-- AB#4521: 6 tasks, 24 hrs
-- AB#4530: 4 tasks, 14 hrs
+- AB#4521: 1 task, 24 hrs
+- AB#4530: 1 task, 14 hrs
 - ...
 
 Next steps:
