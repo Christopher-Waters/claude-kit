@@ -41,6 +41,27 @@ For each flagged item, capture:
 
 If there are zero qualifying threads, tell the user `No open reviewer feedback on PR #{id}.` and stop.
 
+### Effort gate — before planning and applying fixes (Steps 4–5)
+
+Reasoning effort is a harness setting the user controls; this command cannot change it. Recommend a level based on the flagged items you just collected, then let the user set it. Rubric (the session default is usually `high`):
+
+| Effort | When |
+|--------|------|
+| `medium` | A short list of low-severity, mechanical fixes (renames, nits, one or two obvious changes). |
+| `high` | The common case — a mix of warnings and a few criticals across several files. Recommend this unless clearly lighter or heavier. |
+| `xhigh` | Many findings, multiple critical issues, or fixes that touch subtle logic / span subsystems and risk regressions. |
+| `max` | Exceptional: a critical finding that requires a genuine rethink or security-critical fix. Session-only. |
+
+Signals: total flagged-item count and the severity mix (how many critical), plus whether the fixes concentrate in tricky code. Present:
+
+```
+Suggested reasoning effort for these fixes: **{level}** — {one-line justification citing the counts}.
+Effort is set by you, not me. Run `/effort` to adjust if needed, then reply **ready** —
+or reply **go** to proceed at your current level.
+```
+
+**Wait for `ready` or `go` before switching branches and planning.** Never try to set the effort level yourself; only recommend it.
+
 ## Step 3: Switch to the PR Branch
 
 Before reading code or proposing fixes, make sure local state matches the PR:

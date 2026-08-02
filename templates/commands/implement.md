@@ -34,6 +34,19 @@ Read the work item comments via `wit_list_work_item_comments`. Comments often co
 
 ## Step 2: Summarize and Confirm
 
+### Assess reasoning effort
+
+Reasoning effort is a **harness setting the user controls** — this command cannot change it, and no prompt or hook can. Your job is to *recommend* a level; the user applies it (via `/effort`) before the heavy work in Steps 3–8 runs. Base the recommendation on the work item's scope using this rubric (the session default is usually `high`):
+
+| Effort | When |
+|--------|------|
+| `medium` | Trivial / mechanical: single-file or config change, copy tweak, one obvious fix. |
+| `high` | Standard work: cross-layer change, a handful of files, normal test + review load. Recommend this unless the work is clearly lighter or heavier. |
+| `xhigh` | Heavy: multi-subsystem or full-stack change, many acceptance criteria, subtle logic, tricky regressions, or ambiguous requirements. |
+| `max` | Exceptional: genuinely novel design, security-critical, or high-uncertainty work. Session-only. |
+
+Concrete signals for this command: number of subsystems/layers touched, acceptance-criteria count, and how much is net-new logic vs. following an existing pattern.
+
 Present a summary of the work item to the user:
 
 ```
@@ -51,10 +64,15 @@ Present a summary of the work item to the user:
 
 Does this look correct? Do you have any additional context or requirements?
 
+**Suggested reasoning effort: {level}** — {one-line justification citing the signals above}.
+Effort is set by you, not me. If your current level differs, run `/effort` to adjust before replying.
+
 Use **Ultracode effort** for this run? Ultracode fans out exploration, AC-coverage checks, and code review across parallel agents — more thorough, but slower and more token-hungry. (yes / no — suggested: {yes for multi-subsystem / multi-AC work, no for trivial changes})
+
+Reply with your Ultracode choice (and any added context). Say **ready** once your effort level is set, or **go** to proceed at your current level.
 ```
 
-**Wait for the user to respond.** Do NOT proceed until the user confirms or provides additional context. If they add context, incorporate it into the plan. Record the Ultracode answer — it governs whether the `Workflow` fan-outs in Steps 3, 7, and 8 run at all.
+**Wait for the user to respond.** Do NOT proceed until the user confirms or replies `ready`/`go`. If they add context, incorporate it into the plan. Record the Ultracode answer — it governs whether the `Workflow` fan-outs in Steps 3, 7, and 8 run at all. Never try to set the effort level yourself; only recommend it.
 
 ## Step 3: Explore & Plan
 

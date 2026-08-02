@@ -53,6 +53,19 @@ Regardless of whether description/acceptance criteria changed, **always read the
 
 ## Step 3: Summarize Rework and Confirm
 
+### Assess reasoning effort
+
+Reasoning effort is a **harness setting the user controls** — this command cannot change it, and no prompt or hook can. Recommend a level; the user applies it (via `/effort`) before the rework in Steps 4–10 runs. Base it on the rework's scope using this rubric (the session default is usually `high`):
+
+| Effort | When |
+|--------|------|
+| `medium` | A small targeted fix: one or two files, a single low-risk feedback item. |
+| `high` | Standard rework: a handful of files, a few feedback items across a layer or two. Recommend this unless clearly lighter or heavier. |
+| `xhigh` | Heavy rework: multi-subsystem changes, many feedback items / ACs, subtle regressions, or ambiguous feedback. |
+| `max` | Exceptional: the feedback exposes a design flaw needing a rethink, or security-critical work. Session-only. |
+
+Concrete signals for this command: number of feedback items, how many ACs they map to, and how many subsystems the fixes touch.
+
 Present a summary of the rework feedback to the user. **Every feedback item must be mapped to an Acceptance Criterion** — if a feedback item doesn't map to any AC, flag it explicitly as either (a) implied by an AC that's worded too loosely or (b) scope-creep that should be a separate work item.
 
 ```
@@ -78,10 +91,15 @@ Present a summary of the rework feedback to the user. **Every feedback item must
 
 Does this capture the rework correctly? Any feedback items that should be flagged as scope-creep (separate work item) instead of being addressed here?
 
+**Suggested reasoning effort: {level}** — {one-line justification citing the signals above}.
+Effort is set by you, not me. If your current level differs, run `/effort` to adjust before replying.
+
 Use **Ultracode effort** for this rework? Ultracode fans out exploration, AC-coverage checks, and code review across parallel agents — more thorough, but slower and more token-hungry. (yes / no — suggested: {yes for multi-file / multi-AC rework, no for a small targeted fix})
+
+Reply with your Ultracode choice (and any reclassifications or context). Say **ready** once your effort level is set, or **go** to proceed at your current level.
 ```
 
-**Wait for the user to respond.** Do NOT proceed until the user confirms the AC mapping. Record the Ultracode answer — it governs whether the `Workflow` fan-outs in Steps 4, 9, and 10 run at all. If they reclassify any item as scope-creep, drop it from the plan and note it in the final summary. If they add context, incorporate it.
+**Wait for the user to respond.** Do NOT proceed until the user confirms the AC mapping and replies `ready`/`go`. Record the Ultracode answer — it governs whether the `Workflow` fan-outs in Steps 4, 9, and 10 run at all. If they reclassify any item as scope-creep, drop it from the plan and note it in the final summary. If they add context, incorporate it. Never try to set the effort level yourself; only recommend it.
 
 ## Step 4: Explore & Plan
 

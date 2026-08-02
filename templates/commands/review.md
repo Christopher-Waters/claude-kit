@@ -4,6 +4,25 @@ Review PR #$ARGUMENTS in the current project. Automatically:
 
 2. **Read the linked work item** and gather the full acceptance criteria.
 
+   **Effort gate — do this before the review reasoning (steps 3+).** Reasoning effort is a harness setting the user controls; this command cannot change it. Recommend a level based on the diff you just read, then let the user set it. Rubric (the session default is usually `high`):
+
+   | Effort | When |
+   |--------|------|
+   | `medium` | Small diff — a few files, mechanical or well-scoped change, short AC list. |
+   | `high` | Standard PR — cross-layer diff, a handful of files, a normal AC set. Recommend this unless clearly lighter or heavier. |
+   | `xhigh` | Large or subtle diff — many files/subsystems, many acceptance criteria, security-sensitive or concurrency-heavy code. |
+   | `max` | Exceptional: security-critical or architecturally risky change where you want maximum scrutiny. Session-only. |
+
+   Signals: files changed, additions/deletions, acceptance-criteria count, and whether the diff touches security- or data-integrity-sensitive code. Present:
+
+   ```
+   Suggested reasoning effort for this review: **{level}** — {one-line justification}.
+   Effort is set by you, not me. Run `/effort` to adjust if needed, then reply **ready** —
+   or reply **go** to review at your current level.
+   ```
+
+   **Wait for `ready` or `go` before continuing.** Never try to set the effort level yourself; only recommend it.
+
 3. **Detect rework context — do this BEFORE judging acceptance criteria.**
 
    A small diff does not mean a small feature. The PR you are reviewing may be a rework that only addresses targeted feedback, while the bulk of the implementation already shipped in earlier PRs. Judging acceptance criteria against the current diff alone will produce false "not met" findings.

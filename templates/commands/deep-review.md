@@ -40,6 +40,26 @@ Unlike `/review`, this command works against the real working tree so it can bui
 
 If checkout fails (branch deleted after merge, etc.), tell the user and offer to fall back to a diff-only review (the `/review` behavior) instead.
 
+### Effort gate — before the deep analysis (Steps 3–8)
+
+Reasoning effort is a harness setting the user controls; this command cannot change it. `/deep-review` is the exhaustive, checkout-based review, so its analysis is heavy by nature — bias the recommendation upward. Rubric:
+
+| Effort | When |
+|--------|------|
+| `high` | A focused PR — small diff, few subsystems, straightforward acceptance criteria. The floor for this command. |
+| `xhigh` | The common case for a deep review — a real feature diff, several subsystems or acceptance criteria, regressions to reason about. Recommend this by default. |
+| `max` | Large, security-critical, or architecturally risky PRs where you want maximum scrutiny. Session-only. |
+
+Signals: files changed (from the confirmation above), acceptance-criteria count, number of subsystems touched, and whether the code is security- or data-integrity-sensitive. Present:
+
+```
+Suggested reasoning effort for this deep review: **{level}** — {one-line justification}.
+Effort is set by you, not me. Run `/effort` to adjust if needed, then reply **ready** —
+or reply **go** to proceed at your current level.
+```
+
+**Wait for `ready` or `go` before launching the Step 3 workflow.** Never try to set the effort level yourself; only recommend it.
+
 ## Step 3: Detect Rework Context — do this BEFORE judging acceptance criteria
 
 A small diff does not mean a small feature. The PR you are reviewing may be a rework that only addresses targeted feedback, while the bulk of the implementation already shipped in earlier PRs. Judging acceptance criteria against the current diff alone will produce false "not met" findings.
