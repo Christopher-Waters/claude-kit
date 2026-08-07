@@ -24,6 +24,8 @@ Read the work item from Azure DevOps via MCP. Extract:
 
 Handle `$ARGUMENTS` as either `1234` or `AB#1234` — strip the `AB#` prefix when calling the MCP API.
 
+**If `System.WorkItemType` is `Feature`, switch to the [Feature Workflow](#feature-workflow-ordered-story-waves) at the bottom of this document.** Steps 2–10 below describe the single-work-item flow; the Feature Workflow reuses them per child User Story.
+
 ### Embedded Images
 
 The description and acceptance criteria fields may contain embedded images (screenshots, mockups, diagrams). These are typically `<img>` tags with `src` URLs pointing to Azure DevOps attachments. **Download and view every embedded image** using WebFetch — they often contain critical visual requirements (UI layouts, expected behavior, error states) that are not described in the text.
@@ -326,3 +328,89 @@ Once the user has answered, update each task via `wit_update_work_item`:
 - `System.State` → `Closed` (fall back to `Done` if the project's task template uses Agile; warn if neither is valid)
 
 Confirm with a summary line per task: `Closed AB#xxxx — {hours}h logged`.
+
+## Feature Workflow (ordered story waves)
+
+Used when the work item passed to `/implement` is a **Feature**. The Feature's child User Stories are implemented in **waves** driven by the custom order field (`Custom.Order`): all stories sharing the same order value run **in parallel** (one implementation agent each), and waves run sequentially in ascending order — wave 2 starts only after wave 1 is merged, built, and green, so later stories can build on earlier ones.
+
+The single-work-item gates still exist, but they are **batched per wave** so parallel agents never have to prompt the user: one confirmation for the whole feature, one plan approval per wave, one review/UAT/PR cycle for the feature.
+
+### F1: Load Child Stories and Build Waves
+
+1. Fetch the Feature with `expand: Relations` (Step 1 rules apply — description, embedded images, comments).
+2. Collect children (`System.LinkTypes.Hierarchy-Forward`) and fetch them via `wit_work_item` `get_batch` with fields: `System.Id`, `System.Title`, `System.State`, `System.WorkItemType`, `System.AssignedTo`, `Custom.Order`, `Microsoft.VSTS.Scheduling.StoryPoints`.
+3. Keep children of type **User Story** or **Bug** that are not already `Closed`, `Resolved`, or `Removed`. List anything skipped (and why) in the F2 summary.
+4. Group the remaining stories by `Custom.Order` ascending — each distinct value is one **wave**. Stories with equal order values share a wave and run in parallel.
+5. Stories with **no** `Custom.Order` value form a final catch-all wave — flag them in F2 so the user can either accept that placement or set order values in Azure DevOps and re-run.
+6. Read each story fully per Step 1 (description, acceptance criteria, embedded images, comments).
+
+If the Feature has **no** implementable child stories, stop and tell the user; offer to implement the Feature itself via the standard single-work-item flow (Steps 2–10) if its own description/AC support that.
+
+### F2: Summarize and Confirm (one gate for the whole Feature)
+
+Present the Feature summary plus the wave plan:
+
+```
+## AB#{feature-id}: {feature title} (Feature)
+
+**State:** {state}    **Child stories:** {n} implementable ({m} skipped: {ids + reason})
+
+### Description
+{feature description summary}
+
+### Execution Waves (Custom.Order)
+
+| Wave | Order | Story | Title | Points | State |
+|------|-------|-------|-------|--------|-------|
+| 1 | 1 | AB#6242 | ... | 3 | Dev Ready |
+| 1 | 1 | AB#6243 | ... | 2 | Dev Ready |
+| 2 | 2 | AB#6244 | ... | 5 | Dev Ready |
+| 3 | — | AB#6245 | ... | 3 | Dev Ready |  ← no Custom.Order set; runs last
+
+Stories in the same wave are implemented in parallel; waves run in order.
+
+Does this look correct? Any stories to skip, reorder, or context to add?
+```
+
+Include the Step 2 reasoning-effort recommendation (a multi-story Feature is almost always `xhigh`) and the **single** Ultracode question — the answer applies to every story in the run. **Wait for the user** exactly as in Step 2.
+
+### F3: Create the Feature Branch
+
+Capture `BASE_BRANCH` and create `feature/AB#{feature-id}-{sanitized-title}` per Step 4 rules. All story work merges into this branch; the single PR in F7 targets `BASE_BRANCH`.
+
+### F4: Execute Waves
+
+For each wave in ascending order:
+
+1. **Explore & plan** each story in the wave (Step 3 rules; Ultracode fan-outs apply per story if opted in). Present **one combined plan** with a section per story — each section covering approach, files, unit tests, and agents — plus a note on any files touched by more than one story in the wave (a conflict warning). **One approval gate per wave**; wait for the user.
+2. **Implement:**
+   - **Single-story wave** → implement directly on the feature branch in the main loop (Step 5).
+   - **Multi-story wave** → isolate each story in its own worktree so parallel agents never clobber each other:
+
+     ```bash
+     git worktree add "{scratchpad}/wt-{story-id}" -b "story/AB#{story-id}-{sanitized-title}" "{feature-branch}"
+     ```
+
+     Launch **one implementation agent per story, all in a single message** so they run concurrently (`backend`/`frontend`/`general-purpose` per the approved plan; if a story needs both backend and frontend work, give one agent the whole story rather than splitting it). Each agent's prompt must include: the approved plan for its story, the story's full AC, its worktree path, and these rules — work **only** inside your worktree, implement the plan plus its unit tests, run the tests you added, commit to the story branch, and report what you changed. Agents never push, never create PRs, never touch work items, and never ask the user anything.
+   - **Merge back (main loop):** merge each story branch into the feature branch (`git merge --no-ff`), resolving conflicts yourself using both stories' plans as the guide. Then `git worktree remove` and delete the story branch. Merge in `Custom.Order`-then-ID order so conflict resolution is deterministic.
+3. **Wave gate:** run Step 6 (build validation) and Step 7.1–7.2 (full test suite + lint) on the merged feature branch. Fix failures before starting the next wave — the next wave branches from this merged, green state.
+
+### F5: Feature-Level Quality and Review
+
+After the last wave:
+
+1. **Environment config parity** (Step 7.3) across the whole feature diff vs `BASE_BRANCH`.
+2. **Acceptance Criteria check** (Step 7.4) for **every AC of every implemented story** — do not proceed with any AC unverified.
+3. **Code review** (Step 8, including the Ultracode find → verify pipeline if opted in) over the entire feature diff, with the same must-fix loop.
+
+### F6: UAT Gate
+
+Present **one combined UAT checklist grouped by story** (Step 9 rules). Wait for `testing passed` before creating the PR.
+
+### F7: PR and Work Item Updates
+
+1. Push the feature branch and create **one PR**: title `AB#{feature-id}: {feature title}`, source `feature/...`, target `BASE_BRANCH`.
+2. Link the **Feature and every implemented story** to the PR.
+3. Run **Closing Related Tasks** (Step 10) once, covering the child Tasks of every implemented story — one combined table, then the usual per-task hour prompts.
+4. Move each implemented story **and** the Feature to `Code Review` (same fallback rules as Step 10).
+5. The Step 10 PR-completion rule applies unchanged: when the PR merges, only child **Tasks** may be closed — never the stories or the Feature.

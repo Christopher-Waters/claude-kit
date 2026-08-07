@@ -277,6 +277,8 @@ Claude automatically:
 8. **Pauses for you to manually test**
 9. Creates the PR after you confirm
 
+**Implementing a whole Feature:** point `/implement` at a Feature work item and it implements the child User Stories in waves driven by the `Custom.Order` field — stories with the same order value are implemented in parallel (one agent per story, each in an isolated git worktree), and the next order value starts only after the previous wave is merged and green. Everything lands on one `feature/` branch with a single review, UAT pass, and PR that links every story.
+
 ### Review a Pull Request
 
 ```
@@ -630,7 +632,7 @@ Claude reviews for:
 
 | Command | Usage | What It Does |
 |---------|-------|-------------|
-| `/implement` | `/implement AB#1234` | Read work item → summarize → approve plan → implement → quality checks → UAT → PR |
+| `/implement` | `/implement AB#1234` | Read work item → summarize → approve plan → implement → quality checks → UAT → PR. On a Feature: implements child stories in `Custom.Order` waves, same-order stories in parallel |
 | `/review` | `/review 142` | Full code review on a PR with inline comments |
 | `/deep-review` | `/deep-review 142` | Deep, Ultracode-orchestrated review: checks out the branch, builds/tests it, verifies every requirement, checks for regressions, flags out-of-scope changes, then comments + votes |
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |

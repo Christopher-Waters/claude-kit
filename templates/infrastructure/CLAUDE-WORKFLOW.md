@@ -217,13 +217,17 @@ PRs always target the branch you were on when `/implement` was invoked. The base
 
 Hot Fix work items follow the same automated checks (build, lint, tests, review) but skip manual UAT. An abbreviated confirmation is shown instead. Hot Fix PRs get a `hotfix` label. Hot Fixes target the current branch (which should be the project's production branch for production hot fixes).
 
+#### Feature Workflow (ordered story waves)
+
+Running `/implement` on a **Feature** implements its child User Stories in **waves** driven by the `Custom.Order` field: stories sharing the same order value are implemented **in parallel** (one agent per story, each in an isolated git worktree), and waves run sequentially in ascending order so later stories build on earlier ones. All work merges into a single `feature/AB#<id>-...` branch; quality checks, code review, UAT, and one PR happen at the feature level, and every implemented story is linked to that PR. Stories without a `Custom.Order` value run in a final catch-all wave (flagged for confirmation first).
+
 #### Slash Commands Reference
 
 All deployment and release operations are available as slash commands:
 
 | Command | Usage | What It Does |
 |---|---|---|
-| `/implement` | `/implement AB#1234` | Summarize work item → approve plan → implement → PR |
+| `/implement` | `/implement AB#1234` | Summarize work item → approve plan → implement → PR. On a Feature: child stories in `Custom.Order` waves, same-order stories in parallel |
 | `/review` | `/review 142` | Automated code review on a PR |
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
 | `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline |
