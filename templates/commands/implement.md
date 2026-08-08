@@ -412,5 +412,5 @@ Present **one combined UAT checklist grouped by story** (Step 9 rules). Wait for
 1. Push the feature branch and create **one PR**: title `AB#{feature-id}: {feature title}`, source `feature/...`, target `BASE_BRANCH`.
 2. Link the **Feature and every implemented story** to the PR.
 3. Run **Closing Related Tasks** (Step 10) once, covering the child Tasks of every implemented story — one combined table, then the usual per-task hour prompts.
-4. Move each implemented story **and** the Feature to `Code Review` (same fallback rules as Step 10).
+4. Move each implemented story to `Code Review` (same fallback rules as Step 10). **Do not change the Feature's state** — the Feature is a parent container; it advances only when its child stories are verified/closed, not when the PR goes up for review.
 5. The Step 10 PR-completion rule applies unchanged: when the PR merges, only child **Tasks** may be closed — never the stories or the Feature.
