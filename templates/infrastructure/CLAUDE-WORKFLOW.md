@@ -221,7 +221,7 @@ Hot Fix work items follow the same automated checks (build, lint, tests, review)
 
 Running `/implement` on a **Feature** implements its child User Stories in **waves** driven by the `Custom.Order` field: stories sharing the same order value are implemented **in parallel** (one agent per story, each in an isolated git worktree), and waves run sequentially in ascending order so later stories build on earlier ones. All work merges into a single `feature/AB#<id>-...` branch; quality checks, code review, UAT, and one PR happen at the feature level, and every implemented story is linked to that PR. Stories without a `Custom.Order` value run in a final catch-all wave (flagged for confirmation first).
 
-**Work item states:** when the PR is created, each implemented child **User Story** moves to `Code Review` — the **Feature's state is never changed**. The Feature is a parent container; it advances only as its child stories are verified/closed. When the PR merges, only child **Tasks** are closed — never the stories or the Feature.
+**Work item states:** `/implement` moves the work item to `Active` when implementation starts — for a single work item (User Story, Bug, Hot Fix) right after the branch is created; for a Feature, each child story goes `Active` as its wave begins. When the PR is created, each implemented child **User Story** moves to `Code Review` — the **Feature's state is never changed**. The Feature is a parent container; it advances only as its child stories are verified/closed. When the PR merges, only child **Tasks** are closed — never the stories or the Feature.
 
 #### Slash Commands Reference
 

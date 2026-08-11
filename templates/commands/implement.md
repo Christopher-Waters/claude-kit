@@ -153,6 +153,14 @@ If the branch already exists, switch to it with `git checkout <branch-name>` ins
 
 Remember the `BASE_BRANCH` — you will need it for the PR step.
 
+### Move the Work Item to Active
+
+Once the branch is created, move the work item (User Story, Bug, Hot Fix, or other single work item — never a Feature) to `Active` via `wit_update_work_item`:
+- **path**: `/fields/System.State`
+- **value**: `Active`
+
+If the work item is already `Active`, skip the update. If the project's process template does not have an `Active` state (the update call returns an invalid-state error), fall back in this order: `In Progress` → `Doing` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
+
 ## Step 5: Implement
 
 1. **Implement** using backend and/or frontend agents according to the approved plan
@@ -384,6 +392,7 @@ For each wave in ascending order:
 
 1. **Explore & plan** each story in the wave (Step 3 rules; Ultracode fan-outs apply per story if opted in). Present **one combined plan** with a section per story — each section covering approach, files, unit tests, and agents — plus a note on any files touched by more than one story in the wave (a conflict warning). **One approval gate per wave**; wait for the user.
 2. **Implement:**
+   - **Move every story in the wave to `Active`** first (same rules and fallbacks as "Move the Work Item to Active" in Step 4). The Feature's state is never changed.
    - **Single-story wave** → implement directly on the feature branch in the main loop (Step 5).
    - **Multi-story wave** → isolate each story in its own worktree so parallel agents never clobber each other:
 
