@@ -132,7 +132,7 @@ Severity describes user impact; Priority describes scheduling urgency. They are 
 
 ### Title Prefix
 
-The title MUST start with one of the product prefixes from the project's CLAUDE.md (e.g. `COM`, `CDA`, `PAY`, `AUD`, `SER`, `PSSF`, `TPS`). If the project CLAUDE.md does not define a prefix table, ask the user which prefix to use before drafting. Format is `PREFIX - Title Here`.
+The title MUST start with one of the product prefixes from the project's CLAUDE.md (e.g. `COM`, `CDA`, `PAY`, `AUD`, `SER`, `PSSF`, `TPS`, `MTG`). If the project CLAUDE.md does not define a prefix table, ask the user which prefix to use before drafting. Format is `PREFIX - Title Here`.
 
 ### Approval
 
@@ -175,7 +175,7 @@ Before prompting, attempt to detect the default Azure DevOps project from CLAUDE
 
 1. **Project CLAUDE.md** — read `<current-repo>/CLAUDE.md`. Look for an explicit `project: <name>` declaration, a "Work items live in **<Project Name>**" sentence, or a `## Pipeline Configuration` table with project references.
 2. **Parent CLAUDE.md** — read `<parent-dir>/CLAUDE.md` (e.g. `~/Projects/CLAUDE.md`). Look for the same patterns. The CSI parent CLAUDE.md, for example, declares: "Work items for both **COMPASS** and **CSI Pay** live in the **CSI Development** Azure DevOps project."
-3. **Prefix mapping** — if the title prefix chosen in Step 3 is in a known mapping (e.g. `COM`, `CDA`, `PAY` → `CSI Development`), use that.
+3. **Prefix mapping** — if the title prefix chosen in Step 3 is in a known mapping (e.g. `COM`, `CDA`, `PAY`, `MTG` → `CSI Development`), use that.
 
 If a default is found, present it pre-selected:
 
