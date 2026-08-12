@@ -40,6 +40,7 @@ Ultracode is **opt-in**. It is on only when a system-reminder confirms it, when 
 | Operation | Fan-out unit |
 |-----------|--------------|
 | `/plan-backlog` | one agent per Dev Ready story — analyze, point, and propose tasks in parallel |
+| `/plan-sprint` | one agent per sprint item — analyze and propose tasks in parallel |
 | Backlog / board audits | one agent per work item — find stale, mislabeled, orphaned, or unestimated items |
 | Multi-file or cross-layer review | one agent per file/dimension, then adversarial verify before reporting |
 | Repo-wide sweeps (rename, dependency bump, pattern migration) | one agent per site, worktree-isolated |
@@ -50,7 +51,7 @@ Short, single-query operations (`/status`, `/explain`, `/close-orphan-tasks`) do
 
 **`/implement` uses ultracode scaled to the change** — its code review always fans out (find → adversarially-verify), but exploration and per-AC coverage fan out only for non-trivial / full-stack stories; a one-line config change runs lean. It's the daily driver, so it doesn't blanket-fan-out like `/rework`.
 
-**`/plan-backlog` uses it opt-in** — only when ultracode is on.
+**`/plan-backlog` and `/plan-sprint` use it opt-in** — only when ultracode is on.
 
 ### Sensitive Data Policy
 
@@ -241,6 +242,7 @@ All deployment and release operations are available as slash commands:
 | `/rollback` | `/rollback AB#1234 production` | Revert commits on an environment |
 | `/status` | `/status release 24` | Check release, pipeline, or work item status |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
+| `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
 | `/close-orphan-tasks` | `/close-orphan-tasks [scope] [--dry-run]` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |
 

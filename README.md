@@ -28,7 +28,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 | **Global Agents** | 10 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), mockup, reviewer, test-runner, build-validator, lint-checker, azure-ops, security-auditor |
 | **Project Agents** | 2 | `.claude/agents/` (in the project) | deployer, db-admin |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
-| **Slash Commands** | 21 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain` |
+| **Slash Commands** | 22 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/plan-backlog`, `/plan-sprint`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | **Azure DevOps** (work items, repos, pipelines, wiki), Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
 | **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
@@ -254,6 +254,7 @@ Kit operations that benefit from ultracode when it's on:
 | Operation | Fan-out unit |
 |-----------|--------------|
 | `/plan-backlog` | one agent per Dev Ready story — analyze, point, and propose tasks in parallel |
+| `/plan-sprint` | one agent per sprint item — analyze and propose tasks in parallel |
 | Backlog / board audits | one agent per work item — find stale, mislabeled, orphaned, or unestimated items |
 | Multi-file or cross-layer review | one agent per file/dimension, then adversarial verify before reporting |
 | Repo-wide sweeps (rename, dependency bump, pattern migration) | one agent per site, worktree-isolated |
@@ -645,6 +646,8 @@ Claude reviews for:
 | `/promote` | `/promote staging production` | PR to promote all code between environments |
 | `/rollback` | `/rollback AB#1234 production` | Revert specific commits on an environment via PR |
 | `/status` | `/status release 24` | Check status of a release, pipeline, work item, or environment |
+| `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose one child task with hours per story |
+| `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/quote` | `/quote AB#1234` | Display a work item as a formatted blockquote |
 | `/explain` | `/explain AB#1234` | Summarize and explain a work item in plain language |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged feature/work branches |
