@@ -649,7 +649,7 @@ Claude reviews for:
 | `/status` | `/status release 24` | Check status of a release, pipeline, work item, or environment |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose one child task with hours per story |
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
-| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for Design Approved items without points → review completeness, check for duplicates, propose points + creator comments (10 at a time, approval-gated) |
+| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for Design Approved items without points → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated) |
 | `/quote` | `/quote AB#1234` | Estimate a work item in story points (senior-calibrated Fibonacci rubric) |
 | `/explain` | `/explain AB#1234` | Summarize and explain a work item in plain language |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged feature/work branches |

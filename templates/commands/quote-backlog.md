@@ -7,6 +7,7 @@ This command walks the **backlog** of a chosen Azure DevOps project, finds user 
 3. **Looks at the code when it makes sense** — to validate the described approach and suggest changes.
 4. **Proposes a story point estimate** — using the same senior-calibrated rubric as `/quote`.
 5. **Drafts a comment for the item's creator** when issues are found.
+6. **Suggests a rewrite** of the description/acceptance criteria when they need work — offered to the creator in the comment, or applied directly if the user chooses.
 
 **Hard batch limit: 10 items per run.** If more qualify, process the first 10 (by backlog rank) and report how many remain.
 
@@ -151,9 +152,19 @@ If 3b–3d surfaced anything — gaps, a duplicate, a suggested approach change 
 
 Keep it professional and brief — findings only, no filler. Items with no issues get **no comment**; don't post "looks good" noise.
 
+### 3g. Draft a suggested rewrite (when needed)
+
+If the completeness review found the **description or acceptance criteria** to be vague, contradictory, or structurally weak — not just missing one detail — draft a full rewrite that preserves the creator's intent:
+
+- **Description**: what is being built, why, and for whom — written from what the item, its links, and the code reconnaissance establish. Never invent requirements; where intent is unknowable, leave an explicit `{question for creator}` placeholder instead of guessing.
+- **Acceptance criteria**: a numbered, testable list — each criterion something UAT could verify.
+- **Title**: only if it violates the `PREFIX - Title` convention or misdescribes the work.
+
+The rewrite is a *suggestion*: by default it travels inside the creator comment (3f) under a "Suggested rewrite:" heading so the creator stays in control of their item. It is applied directly to the work item only if the user explicitly chooses that in Step 4. Skip this for items that are Complete or only missing a one-line answer — a rewrite should earn its place.
+
 ### Ultracode mode (optional fan-out)
 
-Only when **ultracode is on** (a system-reminder confirms it, or the user typed `ultracode`): the analysis in 3a–3f is independent per item, so fan out **one agent per item** with the `Workflow` tool. Each agent does the full 3a–3f pass and returns a structured result (item id, creator, completeness verdict, duplicate findings, code notes, proposed points, draft comment) — use a `schema` so each agent returns validated JSON.
+Only when **ultracode is on** (a system-reminder confirms it, or the user typed `ultracode`): the analysis in 3a–3g is independent per item, so fan out **one agent per item** with the `Workflow` tool. Each agent does the full 3a–3g pass and returns a structured result (item id, creator, completeness verdict, duplicate findings, code notes, proposed points, draft comment, suggested rewrite) — use a `schema` so each agent returns validated JSON.
 
 **Never fan out Step 4 or Step 5** — presentation, approval, and every write stay sequential in the main loop. If ultracode is off, analyze the batch one item at a time; the output is identical either way.
 
@@ -165,27 +176,28 @@ Show the whole batch **before writing anything**. Start with the summary table:
 Quote sweep — {project} backlog, Design Approved without Story Points
 Batch: {n} of {total} qualifying items{ — run /quote-backlog again for the next 10}
 
-| #  | ID       | Title                                  | Completeness  | Points | Comment |
-|----|----------|----------------------------------------|---------------|--------|---------|
-| 1  | AB#4611  | COM - Payment reminder emails          | Complete      |   5    | —       |
-| 2  | AB#4614  | COM - Bulk close inactive accounts     | Minor gaps    |   8    | yes     |
-| 3  | AB#4617  | PAY - Refund webhook handling          | Blocking gaps |   —    | yes     |
-| 4  | AB#4620  | COM - Export audit log                 | Already done? |   —    | yes     |
+| #  | ID       | Title                                  | Completeness  | Points | Comment | Rewrite |
+|----|----------|----------------------------------------|---------------|--------|---------|---------|
+| 1  | AB#4611  | COM - Payment reminder emails          | Complete      |   5    | —       | —       |
+| 2  | AB#4614  | COM - Bulk close inactive accounts     | Minor gaps    |   8    | yes     | —       |
+| 3  | AB#4617  | PAY - Refund webhook handling          | Blocking gaps |   —    | yes     | yes     |
+| 4  | AB#4620  | COM - Export audit log                 | Already done? |   —    | yes     | —       |
 ```
 
-Then a detail block per item — estimate reasoning (2–3 bullets), completeness findings, duplicate evidence with links/IDs, code notes, and the **full text of any draft comment**. The user must be able to read every word that would be posted.
+Then a detail block per item — estimate reasoning (2–3 bullets), completeness findings, duplicate evidence with links/IDs, code notes, the **full text of any draft comment**, and the **full text of any suggested rewrite**. The user must be able to read every word that would be posted.
 
 Then ask:
 
 ```
-Approve? (all / numbers e.g. "1,2,4" / edit N / skip N / cancel)
+Approve? (all / numbers e.g. "1,2,4" / edit N / skip N / apply rewrite N / cancel)
 ```
 
 **Wait for the user.**
 
-- `all` → apply every proposed write (points and comments) in Step 5
+- `all` → apply every proposed write (points and comments) in Step 5; rewrites stay inside the comments as suggestions
 - `1,2,4` → apply only those items; the rest are recorded as skipped
-- `edit N` → ask what to change on item N (points value or comment text), revise, re-show that item, ask again
+- `edit N` → ask what to change on item N (points value, comment text, or rewrite text), revise, re-show that item, ask again
+- `apply rewrite N` → write item N's rewrite directly onto the work item in Step 5 (instead of only suggesting it in the comment)
 - `skip N` → drop item N, re-ask for the rest
 - `cancel` → stop with **zero changes** to Azure DevOps
 
@@ -195,6 +207,7 @@ Only for approved items, in batch order:
 
 1. **Set Story Points** (items with a proposed number): update `Microsoft.VSTS.Scheduling.StoryPoints` via `mcp__azure-devops__wit_update_work_item`. Touch no other field — state, assignee, iteration, and tags stay as they are.
 2. **Post the comment** (items with an approved draft): add it with `mcp__azure-devops__wit_add_work_item_comment` (or the server's work-item comment tool). Use the mention syntax the server supports so the creator is notified; otherwise lead with their display name as drafted.
+3. **Apply the rewrite** (only items the user marked `apply rewrite N`): update `System.Description` and/or `Microsoft.VSTS.Common.AcceptanceCriteria` via `wit_update_work_item`, and adjust the comment to say the rewrite was applied ("rewrote the description/AC per the above — please review") rather than suggesting it. Never apply a rewrite the user didn't explicitly mark.
 
 If a write fails, report the failure and ask whether to continue with the remaining items or stop.
 
@@ -206,6 +219,7 @@ If a write fails, report the failure and ask whether to continue with the remain
 Items analyzed:   {n} (of {total} qualifying — {remaining} left for the next run)
   ✓ Points set:   {n_pointed}  (total {sum} pts)
   ✓ Comments:     {n_comments} posted to creators
+  ✓ Rewrites:     {n_rewrites_applied} applied, {n_rewrites_suggested} suggested in comments
   ⏭ Skipped:      {n_skipped} ({reasons: user skipped / blocking gaps / possible duplicate})
 
 Pointed items:
