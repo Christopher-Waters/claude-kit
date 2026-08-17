@@ -14,9 +14,9 @@ Capture: title, type, description, acceptance criteria, attached child items, an
 
 Use the **modified Fibonacci scale** for story points: `1, 2, 3, 5, 8, 13, 21`. Anything that feels larger than 21 should be flagged as "needs to be split" rather than given a number.
 
-> **Assume a senior developer is the implementer.** Don't pad for ramp-up, routine architectural decisions, or familiarity with the stack. A senior is expected to read the codebase, find existing patterns, and resolve ordinary unknowns without help — that effort is already priced into the rubric below. Only pad for things a senior *cannot* shortcut: genuinely novel work, missing AC, cross-team coordination, or external dependencies.
+> **Assume a senior developer working with Claude assistance is the implementer.** Don't pad for ramp-up, routine architectural decisions, or familiarity with the stack. A senior is expected to read the codebase, find existing patterns, and resolve ordinary unknowns without help — that effort is already priced into the rubric below. Only pad for things a senior *cannot* shortcut: genuinely novel work, missing AC, cross-team coordination, or external dependencies.
 
-Rough sizing rubric (calibrated for a senior developer working in a codebase they know):
+Rough sizing rubric (calibrated for a senior developer, assisted by Claude, working in a codebase they know):
 
 | Points | Looks like |
 |--------|-----------|
@@ -64,8 +64,15 @@ If an existing `Story Points` value is already set on the work item and your est
 
 If the work looks larger than 21 points, do not assign a number — instead report `**Estimate:** needs to be split` and suggest 2–4 candidate split points based on the acceptance criteria.
 
-## Step 4: Offer to Persist
+## Step 4: Offer to Persist (Points + Dev Ready)
 
-After displaying the estimate, ask the user: *"Want me to set Story Points = {n} on AB#{id}?"*
+After displaying the estimate, ask the user: *"Want me to set Story Points = {n} on AB#{id}? (This will also move it to Dev Ready.)"*
 
 Only update the work item if the user explicitly says yes. Do not modify anything otherwise.
+
+When the user agrees, in the **same** `wit_update_work_item` call:
+
+1. Set `Microsoft.VSTS.Scheduling.StoryPoints` to the agreed value (the user's number wins if they adjusted it).
+2. Set `System.State` to `Dev Ready` — **but only if** the work item type is `User Story`, `Bug`, or `Hot Fix` **and** the item is not already past Dev Ready in the workflow (e.g. `Active`, `Code Review`, `Ready to Deploy`). Never move an item backward — if it's already past Dev Ready, set the points only and mention the state was left alone.
+
+**Never change the state of a Feature or a Task** — if the sized item is a Feature, persist points only (or per-child points on the children, each of which does get Dev Ready if it qualifies).

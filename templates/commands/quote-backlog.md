@@ -11,7 +11,7 @@ This command walks the **backlog** of a chosen Azure DevOps project, finds user 
 
 **Hard batch limit: 10 items per run.** If more qualify, process the first 10 (by backlog rank) and report how many remain.
 
-**Nothing is written to Azure DevOps — no points, no comments — until the user has seen the full batch and approved.** This command never modifies code, never changes work item state, and never reassigns items.
+**Nothing is written to Azure DevOps — no points, no comments — until the user has seen the full batch and approved.** This command never modifies code and never reassigns items. The only state change it makes: when approved points are written to an item, that item also moves to **Dev Ready** (see Step 5).
 
 Treat `$ARGUMENTS` as an optional project name (e.g. `/quote-backlog CSI Development`). If provided, skip the project prompt in Step 1.
 
@@ -121,7 +121,7 @@ This is read-only reconnaissance. Skip it for non-technical items or when the co
 
 Use the **modified Fibonacci scale**: `1, 2, 3, 5, 8, 13, 21`. Anything larger than 21 is flagged as "needs to be split" rather than given a number.
 
-> **Assume a senior developer is the implementer.** Don't pad for ramp-up, routine architectural decisions, or familiarity with the stack — that's already priced into the rubric. Only pad for things a senior *cannot* shortcut: genuinely novel work, missing AC, cross-team coordination, or external dependencies. Do not apply a second seniority discount on top of the rubric.
+> **Assume a senior developer working with Claude assistance is the implementer.** Don't pad for ramp-up, routine architectural decisions, or familiarity with the stack — that's already priced into the rubric. Only pad for things a senior *cannot* shortcut: genuinely novel work, missing AC, cross-team coordination, or external dependencies. Do not apply a second seniority discount on top of the rubric.
 
 | Points | Looks like |
 |--------|-----------|
@@ -186,6 +186,8 @@ Batch: {n} of {total} qualifying items{ — run /quote-backlog again for the nex
 
 Then a detail block per item — estimate reasoning (2–3 bullets), completeness findings, duplicate evidence with links/IDs, code notes, the **full text of any draft comment**, and the **full text of any suggested rewrite**. The user must be able to read every word that would be posted.
 
+Note above the prompt: **items that get points will also move to Dev Ready** — approving the points approves the state change.
+
 Then ask:
 
 ```
@@ -205,7 +207,7 @@ Approve? (all / numbers e.g. "1,2,4" / edit N / skip N / apply rewrite N / cance
 
 Only for approved items, in batch order:
 
-1. **Set Story Points** (items with a proposed number): update `Microsoft.VSTS.Scheduling.StoryPoints` via `mcp__azure-devops__wit_update_work_item`. Touch no other field — state, assignee, iteration, and tags stay as they are.
+1. **Set Story Points and move to Dev Ready** (items with a proposed number): in one `mcp__azure-devops__wit_update_work_item` call, set `Microsoft.VSTS.Scheduling.StoryPoints` **and** `System.State` = `Dev Ready`. The state change applies only to `User Story`, `Bug`, and `Hot Fix` types, and never moves an item backward — if an item is somehow already past Dev Ready, set the points only and note it. Touch no other field — assignee, iteration, and tags stay as they are.
 2. **Post the comment** (items with an approved draft): add it with `mcp__azure-devops__wit_add_work_item_comment` (or the server's work-item comment tool). Use the mention syntax the server supports so the creator is notified; otherwise lead with their display name as drafted.
 3. **Apply the rewrite** (only items the user marked `apply rewrite N`): update `System.Description` and/or `Microsoft.VSTS.Common.AcceptanceCriteria` via `wit_update_work_item`, and adjust the comment to say the rewrite was applied ("rewrote the description/AC per the above — please review") rather than suggesting it. Never apply a rewrite the user didn't explicitly mark.
 
@@ -217,7 +219,7 @@ If a write fails, report the failure and ask whether to continue with the remain
 ## Quote Sweep Complete — {project}
 
 Items analyzed:   {n} (of {total} qualifying — {remaining} left for the next run)
-  ✓ Points set:   {n_pointed}  (total {sum} pts)
+  ✓ Points set:   {n_pointed}  (total {sum} pts — each moved to Dev Ready)
   ✓ Comments:     {n_comments} posted to creators
   ✓ Rewrites:     {n_rewrites_applied} applied, {n_rewrites_suggested} suggested in comments
   ⏭ Skipped:      {n_skipped} ({reasons: user skipped / blocking gaps / possible duplicate})
@@ -236,4 +238,4 @@ Next steps:
   /quote AB#{id}             — re-estimate a single item after the creator responds
 ```
 
-Do not change item state, create tasks, or assign items — those are downstream decisions (`/plan-backlog` picks up once items are pointed and Dev Ready).
+Do not create tasks or assign items — those are downstream decisions. Pointed items are now Dev Ready, so `/plan-backlog` picks them up on its next run. Make no state change other than the points→Dev Ready move described in Step 5.

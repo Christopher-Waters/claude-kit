@@ -105,6 +105,14 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 8. **Track** work items via the Azure DevOps MCP server
 9. **Learn** — Claude saves what worked for next time
 
+### Story Points & Dev Ready Policy
+
+These rules apply to **every** command or flow that creates or estimates work items:
+
+1. **Every work item Claude creates gets a proposed story point estimate** — User Stories and Bugs are never created unpointed by default. Estimates use the modified Fibonacci scale (`1, 2, 3, 5, 8, 13, 21`), calibrated for a **senior developer working with Claude assistance** — no ramp-up padding; pad only for what seniority + Claude can't shortcut (novel work, missing AC, cross-team coordination, external dependencies).
+2. **The user must agree before points are written.** Claude proposes the number with a one-line rationale; the user confirms, adjusts (their number wins), or skips. Points are never set silently.
+3. **Setting points moves the item to Dev Ready.** Any time story points are written to a **User Story**, **Bug**, or **Hot Fix**, `System.State` is set to `Dev Ready` in the same update. Never for Features or Tasks (a Feature's state is never touched; Tasks carry hour estimates, not points), and never backward — an item already past Dev Ready keeps its state, with a note.
+
 ### Branching Strategy
 
 #### Target Branch-to-Environment Mapping
@@ -244,7 +252,9 @@ All deployment and release operations are available as slash commands:
 | `/status` | `/status release 24` | Check release, pipeline, or work item status |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
-| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for Design Approved items without points → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated) |
+| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for Design Approved items without points → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated; approved points also move the item to Dev Ready) |
+| `/quote` | `/quote AB#1234` | Estimate story points for one work item; on approval, sets the points and moves the item to Dev Ready |
+| `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Bug or User Story — proposes story points (user must agree) and creates pointed items in Dev Ready |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
 | `/close-orphan-tasks` | `/close-orphan-tasks [scope] [--dry-run]` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |
 

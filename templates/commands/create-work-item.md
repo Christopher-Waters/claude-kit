@@ -142,9 +142,32 @@ After presenting the draft, ask:
 Approve this draft? (yes / suggest changes / cancel)
 ```
 
-**Wait for the user.** If they suggest changes, revise the draft and present it again — repeat until they approve or cancel. Do NOT proceed to mockup or project selection until approved.
+**Wait for the user.** If they suggest changes, revise the draft and present it again — repeat until they approve or cancel. Do NOT proceed to story points, mockup, or project selection until approved.
 
-## Step 4: Offer a Mockup (User Stories only — skip for Bugs)
+## Step 4: Propose Story Points
+
+Every work item this command creates gets a story point estimate — proposed automatically, applied only with the user's agreement.
+
+Estimate using the same rubric as `/quote`: the **modified Fibonacci scale** (`1, 2, 3, 5, 8, 13, 21`), calibrated for a **senior developer working with Claude assistance** in a codebase they know. Don't pad for ramp-up, routine architectural decisions, or stack familiarity — only for things a senior cannot shortcut: genuinely novel work, unresolved open questions, cross-team coordination, external dependencies. If the work looks larger than 21 points, recommend splitting the item instead of proposing a number.
+
+Present the estimate:
+
+```
+**Proposed estimate:** {n} story points
+- {one-line rationale: scope / layers touched / test burden}
+
+Agree? (yes / different number / skip)
+```
+
+**Wait for the user.**
+
+- `yes` → the agreed points are set at creation, and the item is moved to **Dev Ready** after creation (Step 8)
+- a different number → use the user's number (their call wins); same Dev Ready behavior
+- `skip` → create the item without points; it stays in the default `New` state and can be pointed later with `/quote`
+
+Points are never written without the user's explicit agreement.
+
+## Step 5: Offer a Mockup (User Stories only — skip for Bugs)
 
 If the work item type is **User Story** and the requirements appear to involve UI (a screen, a form, a button, a workflow), ask:
 
@@ -167,7 +190,7 @@ If any step fails (mockup generation, screenshot, upload), report the failure to
 
 Continue without a mockup.
 
-## Step 5: Choose the Project
+## Step 6: Choose the Project
 
 ### Detect the default project
 
@@ -191,7 +214,7 @@ If no default is found, ask without a preselection and offer to list projects vi
 
 **Wait for the user's response.** Validate the project name by calling `mcp__azure-devops__core_list_projects` if the response is ambiguous or doesn't match a known project.
 
-## Step 6: Final Confirmation
+## Step 7: Final Confirmation
 
 Before creating anything in Azure DevOps, present a final summary and ask for one last confirmation:
 
@@ -205,6 +228,8 @@ Before creating anything in Azure DevOps, present a final summary and ask for on
 **Priority:**  {n}
 **Severity:**  {n - Label}
 {end for Bugs}
+**Story Points:** {n (agreed) | skipped}
+**Initial State:** {Dev Ready (pointed) | New (no points)}
 **Mockup:**    {Embedded | Not requested | Skipped (non-UI)}
 **Images:**    {count} user-supplied image(s) embedded in description
 **Open Questions:** {count}
@@ -213,11 +238,11 @@ Create this work item now? (yes / edit / cancel)
 ```
 
 **Wait for the user.**
-- `yes` → proceed to Step 7
-- `edit` → ask which field to revise (title, description, AC, priority, severity, project, mockup), revise it, then re-show this summary
+- `yes` → proceed to Step 8
+- `edit` → ask which field to revise (title, description, AC, priority, severity, story points, project, mockup), revise it, then re-show this summary
 - `cancel` → abort with no work item created and confirm "Cancelled — no work item created."
 
-## Step 7: Render to HTML and Create
+## Step 8: Render to HTML and Create
 
 ### Render Markdown sections to HTML
 
@@ -258,6 +283,7 @@ Call `mcp__azure-devops__wit_create_work_item` with:
 - **fields**: a JSON Patch document setting:
   - `System.Description` — the rendered HTML description (with embedded mockup `<img>` and any user-supplied images)
   - `Microsoft.VSTS.Common.AcceptanceCriteria` — the rendered HTML acceptance criteria block
+  - `Microsoft.VSTS.Scheduling.StoryPoints` — the points agreed in Step 4 (omit entirely if the user skipped)
   - For Bugs:
     - `Microsoft.VSTS.TCM.ReproSteps` — the rendered HTML repro steps (Azure DevOps puts repro steps in this field for the Bug template; if the project uses the Agile template instead, fold repro steps into Description)
     - `Microsoft.VSTS.Common.Priority` — the chosen Priority (1–4)
@@ -265,7 +291,11 @@ Call `mcp__azure-devops__wit_create_work_item` with:
 
 If the `Open Questions` section is non-empty, append it to the description as a clearly-labeled HTML block (`<h3>Open Questions</h3><ul>...</ul>`) so the assignee can address it later.
 
-## Step 8: Confirm
+### Move to Dev Ready (pointed items only)
+
+If story points were agreed in Step 4, set `System.State` to `Dev Ready` via `mcp__azure-devops__wit_update_work_item` **after** the item is created (a separate call — new items start in `New`, and some process templates reject a non-initial state in the create call). If the state transition is rejected, report the error and leave the state as-is — don't silently retry through intermediate states. Items created without points stay in `New`.
+
+## Step 9: Confirm
 
 After creation, report:
 
@@ -273,13 +303,15 @@ After creation, report:
 Created AB#{id}: {title}
   Project: {project}
   Type: {type}
+  Story Points: {n | not set}
+  State: {Dev Ready | New}
   URL: {work item URL}
   Mockup attached: {yes / no}
   Open questions: {count}
 
 Next steps:
   /explain AB#{id}     — re-read the item in plain language
-  /quote AB#{id}       — estimate story points
+  /quote AB#{id}       — {re-estimate | set story points (skipped at creation)}
   /implement AB#{id}   — start working on it
 ```
 
