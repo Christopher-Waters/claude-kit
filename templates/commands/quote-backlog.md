@@ -7,13 +7,47 @@ This command walks the **backlog** of a chosen Azure DevOps project, finds user 
 3. **Looks at the code when it makes sense** — to validate the described approach and suggest changes.
 4. **Proposes a story point estimate** — using the same senior-calibrated rubric as `/quote`.
 5. **Drafts a comment for the item's creator** when issues are found.
-6. **Suggests a rewrite** of the description/acceptance criteria when they need work — offered to the creator in the comment, or applied directly if the user chooses.
+6. **Suggests a rewrite of the description, and of existing acceptance criteria,** when they need work — offered to the creator in the comment, or applied directly if the user chooses.
+
+**Never author acceptance criteria from nothing.** The rewrite improves AC that are *already there* — it never fills an empty AC field. If the item has no acceptance criteria, the deliverable is a comment telling the creator the AC are missing and the item can't be estimated without them. Rewriting someone's AC is editing their intent; writing AC for a blank field is inventing it.
 
 **Hard batch limit: 10 items per run.** If more qualify, process the first 10 (by backlog rank) and report how many remain.
 
 **Nothing is written to Azure DevOps — no points, no comments — until the user has seen the full batch and approved.** This command never modifies code and never reassigns items. The only state change it makes: when approved points are written to an item, that item also moves to **Dev Ready** (see Step 5).
 
 Treat `$ARGUMENTS` as an optional project name (e.g. `/quote-backlog CSI Development`). If provided, skip the project prompt in Step 1.
+
+## `--help`
+
+If `$ARGUMENTS` contains `--help` or `-h`, print everything between the two rules below **as markdown — the table must render as a table, not inside a code fence** — then **stop**. Run no query, fetch no work items, write nothing.
+
+---
+
+**`/quote-backlog [project]`** — sweep a backlog for Design Approved items with no Story Points.
+
+Reviews each item for completeness and duplicate work, proposes points, and drafts feedback for the item's creator. Max 10 items per run, in backlog-rank order.
+
+Nothing is written to Azure DevOps until you approve the batch — every option below is a fully reversible choice.
+
+| You type | What happens |
+|----------|--------------|
+| `all` | Everything proposed gets applied |
+| `1,2,4` | Only those numbered items get applied; the rest are recorded as skipped |
+| `edit N` | I pause on item N so you can change my proposal, then re-show it |
+| `skip N` | Item N is dropped from the batch; I re-ask about the rest |
+| `apply rewrite N` | Item N's rewrite is written **onto the work item** instead of only suggested |
+| `cancel` | Stop with zero changes |
+
+Numbers refer to the `#` column of the summary table, not to AB# ids — so `1,2,10` acts on items 1, 2 and 10 of the batch and leaves everything else untouched.
+
+**What approval writes:**
+- **Story Points** on items that got a number — each also moves from Design Approved to **Dev Ready**
+- **Comments** to the creators of items where something was found
+- **Rewrites** — description, and a tightened version of AC that already exist — only for items you explicitly marked `apply rewrite N`
+
+**AC are never written from scratch.** Existing acceptance criteria can be rewritten to be clearer or testable, but an empty AC field is left empty — the creator is told it's missing and that the item can't be estimated without it.
+
+---
 
 ## Step 1: Choose the Azure DevOps Project
 
@@ -85,7 +119,7 @@ Score the item against this checklist:
 |-------|---------------------------|
 | **Title prefix** | Follows the project's `PREFIX - Title` convention (e.g. `COM -`, `PAY -`) |
 | **Description** | States what is being built and why — not just a one-line restatement of the title |
-| **Acceptance criteria** | Present, testable, unambiguous. Each AC could become a UAT step |
+| **Acceptance criteria** | Present, testable, unambiguous. Each AC could become a UAT step. Record whether the field is **empty** or merely **weak** — that distinction decides whether AC can be rewritten (3g) or must go back to the creator (3f) |
 | **Design artifacts** | For UI work: a mockup, screenshot, or design link is attached or referenced (the item is Design Approved — the design should be findable) |
 | **Scope** | Small enough to point (would land at ≤ 21); no hidden second feature buried in the AC |
 | **Dependencies** | External dependencies or blockers are named, not implied |
@@ -144,21 +178,27 @@ If 3b–3d surfaced anything — gaps, a duplicate, a suggested approach change 
 
 {One line per finding, concrete and actionable:}
 - Acceptance criteria don't cover {X} — what should happen when {Y}?
+- AC #{n} isn't testable as written ({why}) — what does "done" look like for it?
+- The AC are missing the steps for {flow} — {what a tester couldn't verify from them}
 - This looks already implemented in AB#{id} / PR #{n} ({file or feature}) — can you confirm it's still needed?
 - Suggested approach change: {what the code shows, what to do instead}
 
 {Closing line: what's needed to make it estimable, or "Estimated at {n} points assuming {assumption} — correct me if that's wrong."}
 ```
 
+**When the AC field is empty, report it — don't fill it.** Say the acceptance criteria are missing and that the item can't be estimated without them, and ask the creator for them. Never follow that with a drafted list, a "here's a starting point:" section, or criteria inferred from the title. Existing AC are a different case — those can be rewritten in 3g.
+
 Keep it professional and brief — findings only, no filler. Items with no issues get **no comment**; don't post "looks good" noise.
 
 ### 3g. Draft a suggested rewrite (when needed)
 
-If the completeness review found the **description or acceptance criteria** to be vague, contradictory, or structurally weak — not just missing one detail — draft a full rewrite that preserves the creator's intent:
+If the completeness review found the **description** or the **existing acceptance criteria** to be vague, contradictory, or structurally weak — not just missing one detail — draft a rewrite that preserves the creator's intent:
 
 - **Description**: what is being built, why, and for whom — written from what the item, its links, and the code reconnaissance establish. Never invent requirements; where intent is unknowable, leave an explicit `{question for creator}` placeholder instead of guessing.
-- **Acceptance criteria**: a numbered, testable list — each criterion something UAT could verify.
+- **Acceptance criteria** — **only when the item already has some.** Restructure what's there into a numbered, testable list: split compound criteria, make vague ones verifiable, drop duplicates, and flag contradictions. Every criterion must trace back to something the creator already wrote; a gap the existing AC don't address stays a `{question for creator}` placeholder, not a new criterion you supply.
 - **Title**: only if it violates the `PREFIX - Title` convention or misdescribes the work.
+
+**An empty AC field is never filled.** If the item has no acceptance criteria at all, the rewrite covers description and title only — leave AC out of the suggested text entirely and let the comment (3f) ask the creator to write them. Don't route around this by putting criteria in the description as a "should" list.
 
 The rewrite is a *suggestion*: by default it travels inside the creator comment (3f) under a "Suggested rewrite:" heading so the creator stays in control of their item. It is applied directly to the work item only if the user explicitly chooses that in Step 4. Skip this for items that are Complete or only missing a one-line answer — a rewrite should earn its place.
 
@@ -199,7 +239,7 @@ Approve? (all / numbers e.g. "1,2,4" / edit N / skip N / apply rewrite N / cance
 - `all` → apply every proposed write (points and comments) in Step 5; rewrites stay inside the comments as suggestions
 - `1,2,4` → apply only those items; the rest are recorded as skipped
 - `edit N` → ask what to change on item N (points value, comment text, or rewrite text), revise, re-show that item, ask again
-- `apply rewrite N` → write item N's rewrite directly onto the work item in Step 5 (instead of only suggesting it in the comment)
+- `apply rewrite N` → write item N's rewrite directly onto the work item in Step 5 (instead of only suggesting it in the comment). This covers the description, the title if the rewrite included one, and rewritten AC **only where the item already had AC** — an empty AC field is never populated, under this or any other option
 - `skip N` → drop item N, re-ask for the rest
 - `cancel` → stop with **zero changes** to Azure DevOps
 
@@ -209,7 +249,9 @@ Only for approved items, in batch order:
 
 1. **Set Story Points and move to Dev Ready** (items with a proposed number): in one `mcp__azure-devops__wit_update_work_item` call, set `Microsoft.VSTS.Scheduling.StoryPoints` **and** `System.State` = `Dev Ready`. The state change applies only to `User Story`, `Bug`, and `Hot Fix` types, and never moves an item backward — if an item is somehow already past Dev Ready, set the points only and note it. Touch no other field — assignee, iteration, and tags stay as they are.
 2. **Post the comment** (items with an approved draft): add it with `mcp__azure-devops__wit_add_work_item_comment` (or the server's work-item comment tool). Use the mention syntax the server supports so the creator is notified; otherwise lead with their display name as drafted.
-3. **Apply the rewrite** (only items the user marked `apply rewrite N`): update `System.Description` and/or `Microsoft.VSTS.Common.AcceptanceCriteria` via `wit_update_work_item`, and adjust the comment to say the rewrite was applied ("rewrote the description/AC per the above — please review") rather than suggesting it. Never apply a rewrite the user didn't explicitly mark.
+3. **Apply the rewrite** (only items the user marked `apply rewrite N`): update `System.Description` (and `System.Title` if the rewrite included one) via `wit_update_work_item`, and adjust the comment to say the rewrite was applied ("rewrote the description/AC per the above — please review") rather than suggesting it. Never apply a rewrite the user didn't explicitly mark.
+
+   **Guard on `Microsoft.VSTS.Common.AcceptanceCriteria`:** write it only if the item's AC field was **non-empty** when fetched in 3a. Re-check the fetched value at write time — if it was blank, drop AC from the update payload and write the other fields. Blank means no criteria at all: empty string, whitespace, or an empty HTML shell like `<div></div>` or `<p><br></p>`.
 
 If a write fails, report the failure and ask whether to continue with the remaining items or stop.
 
@@ -222,6 +264,7 @@ Items analyzed:   {n} (of {total} qualifying — {remaining} left for the next r
   ✓ Points set:   {n_pointed}  (total {sum} pts — each moved to Dev Ready)
   ✓ Comments:     {n_comments} posted to creators
   ✓ Rewrites:     {n_rewrites_applied} applied, {n_rewrites_suggested} suggested in comments
+  ⚑ AC missing:   {n_ac_missing} items sent back to the creator to write their acceptance criteria
   ⏭ Skipped:      {n_skipped} ({reasons: user skipped / blocking gaps / possible duplicate})
 
 Pointed items:
