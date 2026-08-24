@@ -232,7 +232,9 @@ Hot Fix work items follow the same automated checks (build, lint, tests, review)
 
 Running `/implement` on a **Feature** implements its child User Stories in **waves** driven by the `Custom.Order` field: stories sharing the same order value are implemented **in parallel** (one agent per story, each in an isolated git worktree), and waves run sequentially in ascending order so later stories build on earlier ones. All work merges into a single `feature/AB#<id>-...` branch; quality checks, code review, UAT, and one PR happen at the feature level, and every implemented story is linked to that PR. Stories without a `Custom.Order` value run in a final catch-all wave (flagged for confirmation first).
 
-**Work item states:** `/implement` moves the work item to `Active` when implementation starts — for a single work item (User Story, Bug, Hot Fix) right after the branch is created; for a Feature, each child story goes `Active` as its wave begins. When the PR is created, each implemented child **User Story** moves to `Code Review` — the **Feature's state is never changed**. The Feature is a parent container; it advances only as its child stories are verified/closed. When the PR merges, only child **Tasks** are closed — never the stories or the Feature.
+**Work item states:** `/implement` moves the work item to `Active` when implementation starts — for a single work item (User Story, Bug, Hot Fix) right after the branch is created; for a Feature, each child story goes `Active` as its wave begins. When the PR is created, each implemented child **User Story** moves to `Code Review` — the **Feature's state is never changed**. The Feature is a parent container; it advances only as its child stories are verified/closed. Only child **Tasks** are ever closed — never the stories or the Feature.
+
+**Hours live on the Task.** `/implement` will not implement a story that has no open child Task: if there isn't one, it proposes a title and an hour estimate (from the story's points, same mapping `/plan-backlog` uses) and creates it once the user agrees — exactly one per story, inheriting the parent's assignee, area, and iteration. When the PR is created, that Task is closed with the hours worked logged to `CompletedWork` and `RemainingWork` zeroed. Closing happens at **PR creation**, not at merge, so hours are recorded while they're still known. Never enable Azure DevOps's "Complete associated work items" when merging — it transitions the parent too.
 
 #### Slash Commands Reference
 
@@ -240,7 +242,7 @@ All deployment and release operations are available as slash commands:
 
 | Command | Usage | What It Does |
 |---|---|---|
-| `/implement` | `/implement AB#1234` | Summarize work item → approve plan → implement → PR. On a Feature: child stories in `Custom.Order` waves, same-order stories in parallel |
+| `/implement` | `/implement AB#1234` | Summarize work item → approve plan → ensure an open child Task with hours → implement → PR (closes the Task, logs hours). On a Feature: child stories in `Custom.Order` waves, same-order stories in parallel |
 | `/review` | `/review 142` | Automated code review on a PR |
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
 | `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline |

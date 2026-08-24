@@ -161,6 +161,78 @@ Once the branch is created, move the work item (User Story, Bug, Hot Fix, or oth
 
 If the work item is already `Active`, skip the update. If the project's process template does not have an `Active` state (the update call returns an invalid-state error), fall back in this order: `In Progress` → `Doing` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
 
+### Ensure an Open Child Task Exists
+
+The child **Task** is where hours live: Step 10 closes it and logs the hours worked when the PR goes up. So an implementation run must never proceed without one — if there's nothing to close, nothing gets logged.
+
+Right after moving the work item to `Active`, look at its child Tasks (relations of type `System.LinkTypes.Hierarchy-Forward` whose target's `System.WorkItemType` is `Task`). A Task counts as **open** if its state is **not** `Closed`, `Done`, or `Removed`.
+
+**Never do this for a Feature.** Features don't carry Tasks of their own — the Feature path creates them per child story in F4.
+
+#### If an open child Task already exists
+
+Use it. **Do not create a second one** — one Task per story, always. Two touch-ups, then move on:
+
+- If it's still `New`, move it to `Active` alongside the parent.
+- If `Microsoft.VSTS.Scheduling.OriginalEstimate` is empty, propose hours (below) and, once the user agrees, set both `OriginalEstimate` and `RemainingWork` to that value.
+
+If **more than one** open Task exists, don't guess — list them and ask which one this run should log against. Leave the others alone.
+
+#### If there is no open child Task, create exactly one
+
+This includes the case where child Tasks exist but every one of them is already closed — a closed Task is not somewhere to log new work.
+
+Propose the hours from the parent's Story Points (this mirrors `/plan-backlog` Step 5b — keep the two tables in sync):
+
+| Points | Hour budget |
+|--------|-------------|
+| 1  |  3 hrs  |
+| 2  |  6 hrs  |
+| 3  | 10 hrs  |
+| 5  | 16 hrs  |
+| 8  | 28 hrs  |
+| 13 | 48 hrs  |
+| 21 | 75 hrs  |
+
+Calibrated for a **senior developer** at ~6 productive hours per day — the discount is already in the numbers, so don't apply a second one. Round non-Fibonacci point values up to the nearest row. Add 20–30% for `spike` / `research` / `unknown-stack` tags.
+
+If the work item has **no Story Points**, estimate the hours from the plan just approved in Step 3 — files to create and modify, plus the unit tests listed — using the same senior calibration. Say which basis you used.
+
+Show the proposal and **wait for the user**:
+
+```
+AB#{id} has no open child Task — one is needed to log hours against.
+
+| Task title                                   | Hours |
+|----------------------------------------------|-------|
+| {PREFIX} - Implement: {short summary}        |  16   |
+
+Basis: {n} story points → {n}h  (or: no points — estimated from the approved plan)
+
+Create it? (yes / edit / skip)
+```
+
+- `yes` → create it
+- `edit` → ask what to change (title or hours), revise, re-show, ask again
+- `skip` → continue without a Task, and **warn** that Step 10 will have no Task to close and no hours will be logged for this story
+
+On `yes`, create it with `mcp__azure-devops__wit_create_work_item`:
+
+- **workItemType**: `Task`
+- **title**: `{PREFIX} - Implement: {short summary of the story}` — reuse the parent's product prefix (`COM`, `PAY`, `CDA`, …), extracted from the parent's title
+- **fields**:
+  - `Microsoft.VSTS.Scheduling.OriginalEstimate` — the agreed hours (as a number)
+  - `Microsoft.VSTS.Scheduling.RemainingWork` — the same value
+  - `System.AreaPath` and `System.IterationPath` — copy from the parent
+  - `System.AssignedTo` — copy from the parent (pass the parent's `uniqueName` / email if the value is an identity object). If the parent is unassigned, leave it unset rather than failing.
+  - `System.State` — `Active`, since implementation is starting right now (fall back to the template's in-progress equivalent, or leave it at the default and note it)
+
+Then link it as a child of the work item with `mcp__azure-devops__wit_add_child_work_items` (or `wit_work_items_link` with `System.LinkTypes.Hierarchy-Forward`, parent → task).
+
+If the create or link call fails, report it and ask whether to implement without a Task or stop. Don't silently continue — the user needs to know hours won't be tracked.
+
+Remember the Task ID. Step 10 closes it.
+
 ## Step 5: Implement
 
 1. **Implement** using backend and/or frontend agents according to the approved plan
@@ -275,11 +347,13 @@ Wait for the user's response before proceeding. Do NOT create a PR until confirm
 
    If the project's process template does not have a `Code Review` state (the update call returns an invalid-state error), fall back in this order: `Resolved` → `In Review` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
 
-> **PR completion closes the Task only.** When this PR is later completed/merged, only the child **Task** may be closed — never the parent User Story or Bug. Azure DevOps's "Complete associated work items" option transitions *every* linked work item (including the parent this PR is linked to), so do **not** enable it when completing the PR. Close the child Task explicitly instead; the parent stays in `Code Review` until QA/UAT and any sibling Tasks are done.
+> **Only the Task ever gets closed — never the parent.** The child Task is closed here, at PR creation (step 4 above). When the PR is later completed/merged, do **not** enable Azure DevOps's "Complete associated work items" option: it transitions *every* linked work item, including the parent this PR is linked to. The parent User Story or Bug stays in `Code Review` until QA/UAT and any sibling Tasks are done.
 
 ### Closing Related Tasks
 
-After the PR is created, find every child Task of this work item (relations of type `System.LinkTypes.Hierarchy-Forward` where the target's `System.WorkItemType` is `Task`). Skip this step if there are no child Tasks.
+After the PR is created, find every child Task of this work item (relations of type `System.LinkTypes.Hierarchy-Forward` where the target's `System.WorkItemType` is `Task`).
+
+There should be at least one open Task — Step 4 guarantees it. If there are **no** child Tasks at all (the user chose `skip` in Step 4, or the create call failed), create one now so the work that just shipped is recorded: same fields and prefix convention as Step 4, hours proposed the same way, then close it in the same pass. Say plainly that you're creating it after the fact.
 
 For each child Task, capture:
 - ID, title, state
@@ -330,12 +404,15 @@ For each task being processed, prompt for completed hours:
 
 **Wait for the user's response on every task.** Accept the suggested/current value (enter), a new numeric value, or `skip` to leave that one untouched.
 
-Once the user has answered, update each task via `wit_update_work_item`:
+Once the user has answered, update each task in a **single** `wit_update_work_item` call per task:
 - `Microsoft.VSTS.Scheduling.CompletedWork` → the agreed value
 - `Microsoft.VSTS.Scheduling.RemainingWork` → `0`
+- `Microsoft.VSTS.Scheduling.OriginalEstimate` → only if it is still empty; set it to the agreed completed hours so the Task isn't left with no estimate at all. Never overwrite an estimate that's already there — the gap between estimate and actual is the useful signal.
 - `System.State` → `Closed` (fall back to `Done` if the project's task template uses Agile; warn if neither is valid)
 
-Confirm with a summary line per task: `Closed AB#xxxx — {hours}h logged`.
+Confirm with a summary line per task: `Closed AB#xxxx — {hours}h logged (estimate was {n}h)`.
+
+**The Task closes now, at PR creation — not at merge.** The work is done and the hours are known; waiting until merge means the hours get logged days later, or not at all.
 
 ## Feature Workflow (ordered story waves)
 
@@ -393,6 +470,18 @@ For each wave in ascending order:
 1. **Explore & plan** each story in the wave (Step 3 rules; Ultracode fan-outs apply per story if opted in). Present **one combined plan** with a section per story — each section covering approach, files, unit tests, and agents — plus a note on any files touched by more than one story in the wave (a conflict warning). **One approval gate per wave**; wait for the user.
 2. **Implement:**
    - **Move every story in the wave to `Active`** first (same rules and fallbacks as "Move the Work Item to Active" in Step 4). The Feature's state is never changed.
+   - **Ensure each story in the wave has an open child Task** (Step 4's "Ensure an Open Child Task Exists" rules, applied per story — Tasks hang off the stories, never off the Feature). Batch the proposals into **one** table covering the whole wave and take a single approval, so parallel agents never wait on a prompt:
+
+     ```
+     Stories in this wave with no open child Task:
+
+     | Story    | Task title                              | Hours | Basis   |
+     |----------|-----------------------------------------|-------|---------|
+     | AB#1235  | COM - Implement: export endpoint        |  10   | 3 pts   |
+     | AB#1236  | COM - Implement: export screen          |  16   | 5 pts   |
+
+     Create these? (yes / edit N / skip N / skip all)
+     ```
    - **Single-story wave** → implement directly on the feature branch in the main loop (Step 5).
    - **Multi-story wave** → isolate each story in its own worktree so parallel agents never clobber each other:
 
@@ -420,6 +509,6 @@ Present **one combined UAT checklist grouped by story** (Step 9 rules). Wait for
 
 1. Push the feature branch and create **one PR**: title `AB#{feature-id}: {feature title}`, source `feature/...`, target `BASE_BRANCH`.
 2. Link the **Feature and every implemented story** to the PR.
-3. Run **Closing Related Tasks** (Step 10) once, covering the child Tasks of every implemented story — one combined table, then the usual per-task hour prompts.
+3. Run **Closing Related Tasks** (Step 10) once, covering the child Tasks of every implemented story — one combined table, then the usual per-task hour prompts. Every story that got a Task in F4 has one to close here; a story whose Task creation was skipped gets one created and closed now, as in Step 10.
 4. Move each implemented story to `Code Review` (same fallback rules as Step 10). **Do not change the Feature's state** — the Feature is a parent container; it advances only when its child stories are verified/closed, not when the PR goes up for review.
-5. The Step 10 PR-completion rule applies unchanged: when the PR merges, only child **Tasks** may be closed — never the stories or the Feature.
+5. The Step 10 closing rule applies unchanged: only child **Tasks** are ever closed — here at PR creation, never the stories and never the Feature. Don't enable "Complete associated work items" when the PR is merged; it would transition the stories and the Feature along with the Tasks.
