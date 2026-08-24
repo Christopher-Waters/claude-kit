@@ -34,6 +34,8 @@ Adjust downward for: pure config changes, mechanical refactors with good test co
 
 If the item has child items, size each child as well and present the parent's total as the sum (rounded to the nearest Fibonacci number).
 
+**If the item can't be estimated at all, don't guess a number.** An item is *not estimable* when the gap is information only its creator can close — no acceptance criteria, a description that contradicts itself, scope you can't bound, or work that looks like it may already be done under another ticket. Report it as **needs more information**, list exactly what's missing, and go to Step 5 instead of Step 4. This is different from **needs to be split**: a split candidate is understood work that's simply too big, and it keeps its current state.
+
 ## Step 3: Display the Estimate
 
 Output a compact estimate — not a quote block. Format:
@@ -64,7 +66,19 @@ If an existing `Story Points` value is already set on the work item and your est
 
 If the work looks larger than 21 points, do not assign a number — instead report `**Estimate:** needs to be split` and suggest 2–4 candidate split points based on the acceptance criteria.
 
+If the item isn't estimable, report that instead of a number:
+
+```
+**AB#{id}: {title}**
+**Estimate:** needs more information
+
+**Blocking:**
+- {what's missing, and what you'd need to know to size it}
+```
+
 ## Step 4: Offer to Persist (Points + Dev Ready)
+
+This step applies when you produced a **number**. If the item was reported as *needs more information*, skip to Step 5.
 
 After displaying the estimate, ask the user: *"Want me to set Story Points = {n} on AB#{id}? (This will also move it to Dev Ready.)"*
 
@@ -76,3 +90,23 @@ When the user agrees, in the **same** `wit_update_work_item` call:
 2. Set `System.State` to `Dev Ready` — **but only if** the work item type is `User Story`, `Bug`, or `Hot Fix` **and** the item is not already past Dev Ready in the workflow (e.g. `Active`, `Code Review`, `Ready to Deploy`). Never move an item backward — if it's already past Dev Ready, set the points only and mention the state was left alone.
 
 **Never change the state of a Feature or a Task** — if the sized item is a Feature, persist points only (or per-child points on the children, each of which does get Dev Ready if it qualifies).
+
+## Step 5: Offer to Send Unquotable Items Back (Design Review)
+
+When the item came out of Step 2 as **needs more information**, offer to move it back so it drops out of the estimating queue:
+
+> *"I can't size this until {what's missing}. Want me to move AB#{id} back to Design Review so it's out of the next `/quote-backlog` sweep until the creator responds?"*
+
+**Wait for the user.** Only update the work item if they say yes.
+
+When they agree, set `System.State` = `Design Review` with `mcp__azure-devops__wit_update_work_item`. Rules:
+
+- Only for `User Story`, `Bug`, and `Hot Fix` types — **never** a Feature or a Task.
+- **Never move an item backward past the design stage.** Only from `Design Approved`; if it's already `Dev Ready` or anything at `Active` or later (`Active`, `Code Review`, `Ready for Testing`, `Testing`, `Ready to Deploy`, …), leave the state alone and say so — someone is already working on it, and a state bounce there does real damage.
+- Already in `Design Review` → no-op; say it's already there.
+- No `Design Review` state in the process template (the update returns an invalid-state error) → fall back in this order: `In Design` → `New` → leave the state alone and **warn** that the item will keep surfacing in backlog sweeps. Don't swallow the error.
+- Set **no** story points and touch no other field — assignee, iteration, and tags stay as they are.
+
+Why it matters: `/quote-backlog` sweeps `Design Approved` items with no points. An item left in `Design Approved` while waiting on its creator gets re-analyzed in every sweep, so moving it to `Design Review` is what keeps the next run reaching new items. Re-quote it with `/quote AB#{id}` once the creator responds.
+
+**Items that only need to be split keep their state** — the work is understood, so there's nothing to send back. Same for an item where you got a number: that path ends at Step 4.

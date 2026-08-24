@@ -112,6 +112,7 @@ These rules apply to **every** command or flow that creates or estimates work it
 1. **Every work item Claude creates gets a proposed story point estimate** — User Stories and Bugs are never created unpointed by default. Estimates use the modified Fibonacci scale (`1, 2, 3, 5, 8, 13, 21`), calibrated for a **senior developer working with Claude assistance** — no ramp-up padding; pad only for what seniority + Claude can't shortcut (novel work, missing AC, cross-team coordination, external dependencies).
 2. **The user must agree before points are written.** Claude proposes the number with a one-line rationale; the user confirms, adjusts (their number wins), or skips. Points are never set silently.
 3. **Setting points moves the item to Dev Ready.** Any time story points are written to a **User Story**, **Bug**, or **Hot Fix**, `System.State` is set to `Dev Ready` in the same update. Never for Features or Tasks (a Feature's state is never touched; Tasks carry hour estimates, not points), and never backward — an item already past Dev Ready keeps its state, with a note.
+4. **An item that can't be quoted goes back to Design Review.** When `/quote` or `/quote-backlog` can't produce a number because information is missing — no acceptance criteria, contradictory description, unbounded scope, or a possible duplicate the creator has to confirm — the item moves from `Design Approved` back to `Design Review` along with the feedback comment. This keeps the next backlog sweep from re-analyzing items still waiting on their creator. Same guards as rule 3: `User Story` / `Bug` / `Hot Fix` only, and only from `Design Approved` — an item at `Dev Ready` or anything `Active` or later keeps its state. An item that merely **needs to be split** keeps its state — the work is understood, nothing is missing.
 
 ### Branching Strategy
 
@@ -252,8 +253,8 @@ All deployment and release operations are available as slash commands:
 | `/status` | `/status release 24` | Check release, pipeline, or work item status |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
-| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for Design Approved items without points → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated; approved points also move the item to Dev Ready) |
-| `/quote` | `/quote AB#1234` | Estimate story points for one work item; on approval, sets the points and moves the item to Dev Ready |
+| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for Design Approved items without points → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Pointed items move to Dev Ready; items that can't be quoted move back to **Design Review** so the next sweep skips them |
+| `/quote` | `/quote AB#1234` | Estimate story points for one work item; on approval, sets the points and moves the item to Dev Ready. If it can't be estimated, offers to move it back to **Design Review** |
 | `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Bug or User Story — proposes story points (user must agree) and creates pointed items in Dev Ready |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
 | `/close-orphan-tasks` | `/close-orphan-tasks [scope] [--dry-run]` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |

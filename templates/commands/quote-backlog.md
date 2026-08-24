@@ -13,7 +13,10 @@ This command walks the **backlog** of a chosen Azure DevOps project, finds user 
 
 **Hard batch limit: 10 items per run.** If more qualify, process the first 10 (by backlog rank) and report how many remain.
 
-**Nothing is written to Azure DevOps — no points, no comments — until the user has seen the full batch and approved.** This command never modifies code and never reassigns items. The only state change it makes: when approved points are written to an item, that item also moves to **Dev Ready** (see Step 5).
+**Nothing is written to Azure DevOps — no points, no comments — until the user has seen the full batch and approved.** This command never modifies code and never reassigns items. It makes exactly two kinds of state change, both in Step 5:
+
+- an item that **gets points** moves to **Dev Ready**;
+- an item that **can't be quoted** because information is missing moves back to **Design Review**, so the next sweep doesn't pick it up again while the creator is still working on it.
 
 Treat `$ARGUMENTS` as an optional project name (e.g. `/quote-backlog CSI Development`). If provided, skip the project prompt in Step 1.
 
@@ -34,7 +37,7 @@ Nothing is written to Azure DevOps until you approve the batch — every option 
 | `all` | Everything proposed gets applied |
 | `1,2,4` | Only those numbered items get applied; the rest are recorded as skipped |
 | `edit N` | I pause on item N so you can change my proposal, then re-show it |
-| `skip N` | Item N is dropped from the batch; I re-ask about the rest |
+| `skip N` | Item N is dropped from the batch — nothing written, so it stays in Design Approved and shows up again next sweep |
 | `apply rewrite N` | Item N's rewrite is written **onto the work item** instead of only suggested |
 | `cancel` | Stop with zero changes |
 
@@ -42,6 +45,7 @@ Numbers refer to the `#` column of the summary table, not to AB# ids — so `1,2
 
 **What approval writes:**
 - **Story Points** on items that got a number — each also moves from Design Approved to **Dev Ready**
+- **Design Review** on items that couldn't be quoted — anything blocked on missing information goes back to the creator's queue so the next sweep skips it
 - **Comments** to the creators of items where something was found
 - **Rewrites** — description, and a tightened version of AC that already exist — only for items you explicitly marked `apply rewrite N`
 
@@ -169,6 +173,13 @@ Use the **modified Fibonacci scale**: `1, 2, 3, 5, 8, 13, 21`. Anything larger t
 
 Fold in what 3d found — code reconnaissance that shrinks or grows the work changes the number. For items classified **Blocking gaps** or **appears already implemented**, propose **no points** — the comment is the deliverable for those.
 
+**An item that gets no points goes back to Design Review.** Whenever the reason for not pointing an item is *we need more information* — missing AC, contradictory description, unclear scope, or a possible duplicate the creator has to confirm — record that the item should move from `Design Approved` back to `Design Review` alongside its comment. That state is what keeps the next `/quote-backlog` run from re-analyzing an item that is still waiting on its creator; leaving it in `Design Approved` guarantees it comes back in the next batch unchanged.
+
+Two cases are the exception — no state change, because nothing is missing:
+
+- **Needs to be split** (the work is understood, it's just too big) — the item stays in `Design Approved`; the deliverable is the split proposal.
+- The user chooses to leave it alone at the Step 4 gate.
+
 ### 3f. Draft the creator comment (only if issues were found)
 
 If 3b–3d surfaced anything — gaps, a duplicate, a suggested approach change — draft a comment addressed to the item's creator (`System.CreatedBy`). Format:
@@ -183,7 +194,7 @@ If 3b–3d surfaced anything — gaps, a duplicate, a suggested approach change 
 - This looks already implemented in AB#{id} / PR #{n} ({file or feature}) — can you confirm it's still needed?
 - Suggested approach change: {what the code shows, what to do instead}
 
-{Closing line: what's needed to make it estimable, or "Estimated at {n} points assuming {assumption} — correct me if that's wrong."}
+{Closing line: what's needed to make it estimable — and, when the item is going back to Design Review, say so plainly: "Moving this back to Design Review until that's answered — ping me and I'll re-quote it." Or, when it was pointed: "Estimated at {n} points assuming {assumption} — correct me if that's wrong."}
 ```
 
 **When the AC field is empty, report it — don't fill it.** Say the acceptance criteria are missing and that the item can't be estimated without them, and ask the creator for them. Never follow that with a drafted list, a "here's a starting point:" section, or criteria inferred from the title. Existing AC are a different case — those can be rewritten in 3g.
@@ -216,17 +227,20 @@ Show the whole batch **before writing anything**. Start with the summary table:
 Quote sweep — {project} backlog, Design Approved without Story Points
 Batch: {n} of {total} qualifying items{ — run /quote-backlog again for the next 10}
 
-| #  | ID       | Title                                  | Completeness  | Points | Comment | Rewrite |
-|----|----------|----------------------------------------|---------------|--------|---------|---------|
-| 1  | AB#4611  | COM - Payment reminder emails          | Complete      |   5    | —       | —       |
-| 2  | AB#4614  | COM - Bulk close inactive accounts     | Minor gaps    |   8    | yes     | —       |
-| 3  | AB#4617  | PAY - Refund webhook handling          | Blocking gaps |   —    | yes     | yes     |
-| 4  | AB#4620  | COM - Export audit log                 | Already done? |   —    | yes     | —       |
+| #  | ID       | Title                              | Completeness  | Points | State           | Comment | Rewrite |
+|----|----------|------------------------------------|---------------|--------|-----------------|---------|---------|
+| 1  | AB#4611  | COM - Payment reminder emails      | Complete      |   5    | → Dev Ready     | —       | —       |
+| 2  | AB#4614  | COM - Bulk close inactive accounts | Minor gaps    |   8    | → Dev Ready     | yes     | —       |
+| 3  | AB#4617  | PAY - Refund webhook handling      | Blocking gaps |   —    | → Design Review | yes     | yes     |
+| 4  | AB#4620  | COM - Export audit log             | Already done? |   —    | → Design Review | yes     | —       |
+| 5  | AB#4623  | COM - Rebuild the reporting module | Too large     |  split | unchanged       | yes     | —       |
 ```
+
+The **State** column is what will actually be written: `→ Dev Ready` for pointed items, `→ Design Review` for items that can't be quoted until the creator supplies something, and `unchanged` for anything else (a split proposal, or an item already past Dev Ready).
 
 Then a detail block per item — estimate reasoning (2–3 bullets), completeness findings, duplicate evidence with links/IDs, code notes, the **full text of any draft comment**, and the **full text of any suggested rewrite**. The user must be able to read every word that would be posted.
 
-Note above the prompt: **items that get points will also move to Dev Ready** — approving the points approves the state change.
+Note above the prompt: **approving an item approves its state change too** — pointed items move to Dev Ready, and items that couldn't be quoted move back to Design Review so the next sweep skips them. Name the items in each group so the user can see exactly which ones leave `Design Approved` and in which direction.
 
 Then ask:
 
@@ -236,11 +250,11 @@ Approve? (all / numbers e.g. "1,2,4" / edit N / skip N / apply rewrite N / cance
 
 **Wait for the user.**
 
-- `all` → apply every proposed write (points and comments) in Step 5; rewrites stay inside the comments as suggestions
+- `all` → apply every proposed write (points, state changes, and comments) in Step 5; rewrites stay inside the comments as suggestions
 - `1,2,4` → apply only those items; the rest are recorded as skipped
 - `edit N` → ask what to change on item N (points value, comment text, or rewrite text), revise, re-show that item, ask again
 - `apply rewrite N` → write item N's rewrite directly onto the work item in Step 5 (instead of only suggesting it in the comment). This covers the description, the title if the rewrite included one, and rewritten AC **only where the item already had AC** — an empty AC field is never populated, under this or any other option
-- `skip N` → drop item N, re-ask for the rest
+- `skip N` → drop item N, re-ask for the rest. A skipped item gets **nothing** written — no comment, and no move to Design Review, so it stays in `Design Approved` and will reappear in the next sweep. Say that out loud when confirming a skip, so the user isn't surprised to see it again
 - `cancel` → stop with **zero changes** to Azure DevOps
 
 ## Step 5: Apply Approved Changes
@@ -248,8 +262,17 @@ Approve? (all / numbers e.g. "1,2,4" / edit N / skip N / apply rewrite N / cance
 Only for approved items, in batch order:
 
 1. **Set Story Points and move to Dev Ready** (items with a proposed number): in one `mcp__azure-devops__wit_update_work_item` call, set `Microsoft.VSTS.Scheduling.StoryPoints` **and** `System.State` = `Dev Ready`. The state change applies only to `User Story`, `Bug`, and `Hot Fix` types, and never moves an item backward — if an item is somehow already past Dev Ready, set the points only and note it. Touch no other field — assignee, iteration, and tags stay as they are.
-2. **Post the comment** (items with an approved draft): add it with `mcp__azure-devops__wit_add_work_item_comment` (or the server's work-item comment tool). Use the mention syntax the server supports so the creator is notified; otherwise lead with their display name as drafted.
-3. **Apply the rewrite** (only items the user marked `apply rewrite N`): update `System.Description` (and `System.Title` if the rewrite included one) via `wit_update_work_item`, and adjust the comment to say the rewrite was applied ("rewrote the description/AC per the above — please review") rather than suggesting it. Never apply a rewrite the user didn't explicitly mark.
+2. **Move unquotable items back to Design Review** (approved items with **no** proposed points, where the blocker is missing information): set `System.State` = `Design Review` via `mcp__azure-devops__wit_update_work_item`. Do this **before** posting the comment in step 3, so the creator's notification arrives with the item already back in their queue. Rules:
+
+   - Only for `User Story`, `Bug`, and `Hot Fix` types.
+   - Only from `Design Approved` — **never move an item backward past the design stage.** An item at `Dev Ready`, or anything at `Active` or later (`Active`, `Code Review`, `Ready for Testing`, `Testing`, `Ready to Deploy`, …), keeps its state; note it in the summary instead.
+   - Skip items whose only finding is **needs to be split** — the work is understood, so nothing is missing; leave those in `Design Approved`.
+   - If the item is already in `Design Review`, this is a no-op — post the comment and move on.
+   - If the project's process template has no `Design Review` state (the update returns an invalid-state error), fall back in this order: `In Design` → `New` → leave the state alone and **warn the user** that the item will be picked up again by the next sweep. Do not silently swallow the error.
+   - Touch no other field — points stay empty, assignee, iteration, and tags stay as they are.
+
+3. **Post the comment** (items with an approved draft): add it with `mcp__azure-devops__wit_add_work_item_comment` (or the server's work-item comment tool). Use the mention syntax the server supports so the creator is notified; otherwise lead with their display name as drafted. For an item that just moved to Design Review, the comment must say so — the creator needs to know why it left their Design Approved column.
+4. **Apply the rewrite** (only items the user marked `apply rewrite N`): update `System.Description` (and `System.Title` if the rewrite included one) via `wit_update_work_item`, and adjust the comment to say the rewrite was applied ("rewrote the description/AC per the above — please review") rather than suggesting it. Never apply a rewrite the user didn't explicitly mark.
 
    **Guard on `Microsoft.VSTS.Common.AcceptanceCriteria`:** write it only if the item's AC field was **non-empty** when fetched in 3a. Re-check the fetched value at write time — if it was blank, drop AC from the update payload and write the other fields. Blank means no criteria at all: empty string, whitespace, or an empty HTML shell like `<div></div>` or `<p><br></p>`.
 
@@ -262,23 +285,28 @@ If a write fails, report the failure and ask whether to continue with the remain
 
 Items analyzed:   {n} (of {total} qualifying — {remaining} left for the next run)
   ✓ Points set:   {n_pointed}  (total {sum} pts — each moved to Dev Ready)
+  ↩ Design Review: {n_design_review} not quoted — moved back to the creator, out of the next sweep
   ✓ Comments:     {n_comments} posted to creators
   ✓ Rewrites:     {n_rewrites_applied} applied, {n_rewrites_suggested} suggested in comments
   ⚑ AC missing:   {n_ac_missing} items sent back to the creator to write their acceptance criteria
-  ⏭ Skipped:      {n_skipped} ({reasons: user skipped / blocking gaps / possible duplicate})
+  ⏭ Skipped:      {n_skipped} left in Design Approved — will reappear next sweep ({reasons})
 
 Pointed items:
 - AB#4611: 5 pts
 - AB#4614: 8 pts (comment posted)
 - ...
 
-Flagged for the creator (no points yet):
+Moved back to Design Review (no points — waiting on the creator):
 - AB#4617: blocking gaps — AC missing failure cases
-- AB#4620: possibly already implemented in AB#4102
+- AB#4620: possibly already implemented in AB#4102 — needs confirmation
+
+Left in Design Approved:
+- AB#4623: too large to point — split proposal in the comment
+- AB#4625: you skipped it
 
 Next steps:
   /quote-backlog {project}   — process the next 10 qualifying items
   /quote AB#{id}             — re-estimate a single item after the creator responds
 ```
 
-Do not create tasks or assign items — those are downstream decisions. Pointed items are now Dev Ready, so `/plan-backlog` picks them up on its next run. Make no state change other than the points→Dev Ready move described in Step 5.
+Do not create tasks or assign items — those are downstream decisions. Pointed items are now Dev Ready, so `/plan-backlog` picks them up on its next run. Items moved to Design Review are out of the `Design Approved` query, so the next `/quote-backlog` run reaches genuinely new items instead of re-reviewing the ones still waiting on their creator — re-quote one with `/quote AB#{id}` once they respond, or let them move it back to Design Approved themselves. Make no state change other than the two described in Step 5.
