@@ -257,7 +257,8 @@ All deployment and release operations are available as slash commands:
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for Design Approved items without points → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Pointed items move to Dev Ready; items that can't be quoted move back to **Design Review** so the next sweep skips them |
 | `/quote` | `/quote AB#1234` | Estimate story points for one work item; on approval, sets the points and moves the item to Dev Ready. If it can't be estimated, offers to move it back to **Design Review** |
-| `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Bug or User Story — proposes story points (user must agree) and creates pointed items in Dev Ready |
+| `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Feature, Bug, or User Story — proposes story points (user must agree) and creates pointed items in Dev Ready; on a Feature, also drafts its child stories with `Custom.Order` waves |
+| `/edit-work-item` | `/edit-work-item AB#1234 [what to change]` | Revise an existing work item field-by-field. On a Feature, cascades the change into its child stories — updates, adds, retires, and re-sequences `Custom.Order` waves — with a safety gate on anything already past Dev Ready |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
 | `/close-orphan-tasks` | `/close-orphan-tasks [scope] [--dry-run]` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |
 

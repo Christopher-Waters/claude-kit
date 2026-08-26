@@ -1,6 +1,6 @@
 Create a new Azure DevOps work item interactively. Usage: `/create-work-item`
 
-This command walks the user through creating a Bug or User Story, develops an acceptance-criteria-ready plan, optionally embeds a UI mockup in the description, and creates the item in the chosen Azure DevOps project.
+This command walks the user through creating a Feature, Bug, or User Story, develops an acceptance-criteria-ready plan, optionally embeds a UI mockup in the description, and creates the item in the chosen Azure DevOps project. For a Feature it can also draft and create the child User Stories that make the Feature implementable.
 
 Treat `$ARGUMENTS` as an optional rough description that the user may have typed inline (e.g. `/create-work-item users should be able to export payments`). If provided, skip the initial "describe your requirements" prompt in Step 2 and use it as the starting requirements text — but still confirm with the user before proceeding.
 
@@ -11,20 +11,23 @@ Ask the user:
 ```
 What type of work item do you want to create?
 
-  1. Bug
-  2. User Story
+  1. Bug          — something deployed is behaving wrong
+  2. User Story   — one shippable slice of user-facing behavior
+  3. Feature      — a container for several related user stories
 
-Reply with 1, 2, "bug", or "user story".
+Reply with 1, 2, 3, "bug", "user story", or "feature".
 ```
 
-**Wait for the user's response.** Map the answer to either `Bug` or `User Story`. If the user types something else, ask again — do not guess.
+**Wait for the user's response.** Map the answer to `Bug`, `User Story`, or `Feature`. If the user types something else, ask again — do not guess.
+
+If the requirements clearly span several independently shippable slices, say so and recommend `Feature` — but the type is still the user's call.
 
 ## Step 2: Gather Requirements
 
 Ask the user to describe the requirements:
 
 ```
-Describe the {bug | user story} in your own words. Include:
+Describe the {feature | bug | user story} in your own words. Include:
 
 - What the user is trying to do (or what is broken)
 - Why it matters / who is affected
@@ -52,6 +55,38 @@ For each image found, plan to embed it in the final description as an `<img src=
 ## Step 3: Develop the Plan
 
 Translate the user's free-form requirements into a structured work item draft. The shape depends on the type:
+
+### For a Feature:
+
+```
+## Draft: {Prefix} - {proposed title}
+
+**Type:** Feature
+
+### Description
+{2–4 sentences describing the capability being delivered and who it serves.
+A Feature is a container — describe the outcome, not the implementation.}
+
+### Business Value
+{Why this is worth building — the problem it removes or the opportunity it opens.}
+
+### Scope
+- {each coherent, independently shippable chunk of work — these become the
+  child User Stories in Step 9}
+- ...
+
+### Out of Scope
+- {anything the user mentioned that shouldn't ride along with this feature}
+
+### Success Criteria
+1. {observable, feature-level outcome that proves the capability landed}
+2. ...
+
+### Open Questions
+- {anything ambiguous that you couldn't infer}
+```
+
+A Feature carries **no story points** and **never moves to `Dev Ready`** — sizing and state live on its child stories. Step 4 is skipped for Features.
 
 ### For a User Story:
 
@@ -146,7 +181,9 @@ Approve this draft? (yes / suggest changes / cancel)
 
 ## Step 4: Propose Story Points
 
-Every work item this command creates gets a story point estimate — proposed automatically, applied only with the user's agreement.
+**Skip this step entirely for a Feature.** A Feature's size is the sum of its child stories — the Feature itself gets no `StoryPoints` value and stays in `New`. Its stories are pointed in Step 9. Go to Step 5.
+
+For a **Bug** or **User Story**, every work item this command creates gets a story point estimate — proposed automatically, applied only with the user's agreement.
 
 Estimate using the same rubric as `/quote`: the **modified Fibonacci scale** (`1, 2, 3, 5, 8, 13, 21`), calibrated for a **senior developer working with Claude assistance** in a codebase they know. Don't pad for ramp-up, routine architectural decisions, or stack familiarity — only for things a senior cannot shortcut: genuinely novel work, unresolved open questions, cross-team coordination, external dependencies. If the work looks larger than 21 points, recommend splitting the item instead of proposing a number.
 
@@ -167,9 +204,9 @@ Agree? (yes / different number / skip)
 
 Points are never written without the user's explicit agreement.
 
-## Step 5: Offer a Mockup (User Stories only — skip for Bugs)
+## Step 5: Offer a Mockup (User Stories and Features — skip for Bugs)
 
-If the work item type is **User Story** and the requirements appear to involve UI (a screen, a form, a button, a workflow), ask:
+If the work item type is **User Story** or **Feature** and the requirements appear to involve UI (a screen, a form, a button, a workflow), ask:
 
 ```
 Want me to generate an HTML mockup and embed it in the description? (yes / no)
@@ -222,14 +259,17 @@ Before creating anything in Azure DevOps, present a final summary and ask for on
 ## Ready to Create
 
 **Title:**     {Prefix} - {title}
-**Type:**      {Bug | User Story}
+**Type:**      {Feature | Bug | User Story}
 **Project:**   {project}
 {for Bugs:}
 **Priority:**  {n}
 **Severity:**  {n - Label}
 {end for Bugs}
-**Story Points:** {n (agreed) | skipped}
-**Initial State:** {Dev Ready (pointed) | New (no points)}
+{for Features:}
+**Scope items:** {count} — offered as child stories after creation
+{end for Features}
+**Story Points:** {n (agreed) | skipped | n/a — Features aren't pointed}
+**Initial State:** {Dev Ready (pointed) | New (no points) | New (Feature)}
 **Mockup:**    {Embedded | Not requested | Skipped (non-UI)}
 **Images:**    {count} user-supplied image(s) embedded in description
 **Open Questions:** {count}
@@ -278,12 +318,16 @@ Apply this pass to every section (Description, Acceptance Criteria, Steps to Rep
 Call `mcp__azure-devops__wit_create_work_item` with:
 
 - **project**: the chosen project
-- **workItemType**: `Bug` or `User Story`
+- **workItemType**: `Feature`, `Bug`, or `User Story`
 - **title**: the approved title (with prefix)
 - **fields**: a JSON Patch document setting:
   - `System.Description` — the rendered HTML description (with embedded mockup `<img>` and any user-supplied images)
   - `Microsoft.VSTS.Common.AcceptanceCriteria` — the rendered HTML acceptance criteria block
-  - `Microsoft.VSTS.Scheduling.StoryPoints` — the points agreed in Step 4 (omit entirely if the user skipped)
+  - `Microsoft.VSTS.Scheduling.StoryPoints` — the points agreed in Step 4 (omit entirely if the user skipped, and **always** for a Feature)
+  - For Features:
+    - Render `Business Value`, `Scope`, `Out of Scope`, and `Success Criteria` into the description. Put `Success Criteria` in `Microsoft.VSTS.Common.AcceptanceCriteria` **only if** the process template exposes that field on Feature — if the create call rejects it, fold the block into the description and retry rather than dropping it.
+    - `Microsoft.VSTS.Common.BusinessValue` — only if the user supplied a number. Never invent one.
+    - Omit `Microsoft.VSTS.Scheduling.StoryPoints` entirely.
   - For Bugs:
     - `Microsoft.VSTS.TCM.ReproSteps` — the rendered HTML repro steps (Azure DevOps puts repro steps in this field for the Bug template; if the project uses the Agile template instead, fold repro steps into Description)
     - `Microsoft.VSTS.Common.Priority` — the chosen Priority (1–4)
@@ -295,7 +339,46 @@ If the `Open Questions` section is non-empty, append it to the description as a 
 
 If story points were agreed in Step 4, set `System.State` to `Dev Ready` via `mcp__azure-devops__wit_update_work_item` **after** the item is created (a separate call — new items start in `New`, and some process templates reject a non-initial state in the create call). If the state transition is rejected, report the error and leave the state as-is — don't silently retry through intermediate states. Items created without points stay in `New`.
 
-## Step 9: Confirm
+**Features are never moved.** A Feature stays in `New` and advances only as its child stories are verified and closed — the same rule `/implement` follows.
+
+## Step 9: Offer Child User Stories (Features only)
+
+Skip this step for Bugs and User Stories.
+
+A Feature is a container — `/implement AB#{id}` on a Feature implements its **child User Stories in `Custom.Order` waves**, so a Feature with no children can't be worked. After the Feature is created, ask:
+
+```
+Draft child user stories for this feature now? (yes / no — I'll add them later)
+```
+
+**Wait for the user.** On `no`, skip to Step 10 and point them at `/plan-backlog` for later.
+
+On `yes`:
+
+1. Turn each bullet from the Feature's **Scope** section into a candidate User Story using the User Story draft shape from Step 3 — plain-language description plus testable acceptance criteria. Keep each one independently shippable; if a bullet is really two stories, split it.
+2. Assign each story a **`Custom.Order`** value. Stories that can be built in parallel share the same number; a story that depends on an earlier one gets a higher number. Start at `1` and increment per wave. This field drives the wave ordering in `/implement` — a story with no value lands in a catch-all wave, so set it on every story.
+3. Propose story points for each using the Step 4 rubric.
+4. Present the whole set for approval at once:
+
+   | # | Order | Proposed Title | Points | Summary |
+   |---|-------|----------------|--------|---------|
+
+   ```
+   Approve these child stories? (yes / change N / drop N / cancel)
+   ```
+
+   **Wait for the user.** Revise and re-present until approved. Do not create anything before approval.
+5. On approval, create each story with `mcp__azure-devops__wit_create_work_item` in the same project, setting:
+   - `System.Description` and `Microsoft.VSTS.Common.AcceptanceCriteria` — rendered to HTML per the Step 8 rules
+   - `Custom.Order` — the wave number
+   - `Microsoft.VSTS.Scheduling.StoryPoints` — the agreed points
+   - `System.AssignedTo` — copied from the Feature if the Feature has an assignee; otherwise leave unset
+6. Link each story to the Feature as a child via `mcp__azure-devops__wit_work_item_link_write` (`System.LinkTypes.Hierarchy-Reverse` from the story to the Feature).
+7. Move each pointed story to `Dev Ready` in a follow-up update, per the Step 8 rule. **The Feature's state is never changed.**
+
+If a story fails to create or link, report which ones succeeded and which didn't — don't roll back the Feature.
+
+## Step 10: Confirm
 
 After creation, report:
 
@@ -303,16 +386,30 @@ After creation, report:
 Created AB#{id}: {title}
   Project: {project}
   Type: {type}
-  Story Points: {n | not set}
+  Story Points: {n | not set | n/a (Feature)}
   State: {Dev Ready | New}
   URL: {work item URL}
   Mockup attached: {yes / no}
   Open questions: {count}
+{Features only:}
+  Child stories: {n created | none — add them later with /plan-backlog}
+    AB#{id} (order {n}, {p} pts) — {title}
+    ...
+{end Features only}
 
 Next steps:
   /explain AB#{id}     — re-read the item in plain language
   /quote AB#{id}       — {re-estimate | set story points (skipped at creation)}
   /implement AB#{id}   — start working on it
+```
+
+For a **Feature**, use these next steps instead:
+
+```
+Next steps:
+  /explain AB#{id}     — re-read the feature in plain language
+  /plan-backlog        — propose child Tasks for the Dev Ready stories
+  /implement AB#{id}   — implement the child stories in Custom.Order waves
 ```
 
 Do not assign the work item, set an iteration, or add tags unless the user explicitly asks — those are downstream decisions.
