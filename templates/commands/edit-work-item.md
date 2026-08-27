@@ -44,6 +44,11 @@ Present what exists today, so the user is editing against reality and not memory
 {end for Bugs}
 ```
 
+**Two things read as "this item has acceptance criteria" when it doesn't.** Check for both before showing the item, and say plainly which one you found:
+
+- **The field holds the process template's placeholder** — tip text like `💡 Tip: Add "@serena rewrite" to Description for AI suggestions  Define acceptance criteria: - [ ]  - [ ]  - [ ]`. Treat that as **empty** and display it as `(none — placeholder text only)`.
+- **The criteria are in `System.Description`** under an "Acceptance Criteria" heading, with the real field empty or placeholder-filled. This is the misfiled case. Display the criteria where they actually live, flag it, and offer the repair described in Step 7 — moving them costs the user nothing and unblocks estimation.
+
 For a **Feature**, append the current wave layout:
 
 ```
@@ -194,6 +199,15 @@ Default the comment question to **yes** for any item past `New`, and **no** for 
 ## Step 7: Apply
 
 Render every Markdown section to HTML first — Azure DevOps description and acceptance criteria fields do not render Markdown. Use the conversion table and the **emphasis and code spans** rules from `/create-work-item` Step 8: bold the noun phrase carrying each claim, wrap identifiers in `<code>`, use lists for 2+ parallel items, keep `### Headings` as `<h3>`. Preserve existing `<img>` tags exactly.
+
+**Route each section to its own field**, per the field-routing table in `/create-work-item` Step 8. The rule that matters most here: **acceptance criteria go in `Microsoft.VSTS.Common.AcceptanceCriteria`, never in `System.Description`.** When you rewrite AC, write the criteria list alone into that field — no `<h3>Acceptance Criteria</h3>` wrapper — and make sure the description you write back carries no copy of them. Editing an item is the moment this gets silently undone: it is easy to render the whole reviewed document into the description and leave the AC field as it was.
+
+**Repair misfiled criteria when you find them.** If Step 2 found the criteria living in the description (or the AC field holding only placeholder tip text), fix it as part of this edit even when the user didn't ask — it is the same content, moved to the field Azure DevOps and every kit sweep actually read:
+
+- Write the criteria into `Microsoft.VSTS.Common.AcceptanceCriteria`, overwriting the placeholder.
+- Strip the "Acceptance Criteria" heading and its list out of `System.Description` in the same call, so the two fields don't both hold a copy.
+- Say so in the change set and in the Step 8 confirmation: `Acceptance criteria: moved from Description → AC field (3 criteria)`. Never move criteria silently; the user needs to see that the description shrank.
+- This is a **move, not a rewrite** — the criteria text is unchanged unless the user separately approved a reword.
 
 Apply writes in this order, so a failure partway through leaves the most useful state behind:
 

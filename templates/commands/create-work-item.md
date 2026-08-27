@@ -320,9 +320,27 @@ A description that is one long paragraph of plain prose is not acceptable — ev
 - **Key terms, values, and outcomes** in each sentence are wrapped in `**bold**` (renders as `<strong>...</strong>`). Bold the noun phrase that carries the claim, not the whole sentence.
 - **Code identifiers** — method names, class names, field names, file paths, route paths, JSON keys, env vars, commit hashes, IDs, literal values like `true` / `null` / numeric thresholds — are wrapped in `` `code spans` `` (renders as `<code>...</code>`).
 - **Lists** are used instead of comma-separated prose whenever the draft contains 2+ parallel items (steps, files, references, acceptance criteria).
-- **Section headings** (`### Description`, `### Acceptance Criteria`, etc.) are kept — they become `<h3>` and structure the rendered output.
+- **Section headings** *inside a field's own content* are kept — they become `<h3>` and structure the rendered output. The draft's **top-level** section headings are different: they are routing labels, not content, and the heading is dropped when its section becomes its own field (see below).
 
-Apply this pass to every section (Description, Acceptance Criteria, Steps to Reproduce, Expected/Actual Behavior, Environment/Scope, Open Questions). Apply it equally to Bugs and User Stories.
+Apply this pass to every section (Description, Acceptance Criteria, Steps to Reproduce, Expected/Actual Behavior, Environment/Scope, Open Questions). Apply it equally to Bugs, Hot Fixes, and User Stories.
+
+### Split the draft into fields — acceptance criteria never go in the description
+
+The Step 3 draft is **one document for the user to read**, not the shape of one field. Before rendering, split it section by section and route each section to its own Azure DevOps field:
+
+| Draft section | Goes to | Notes |
+|---|---|---|
+| `### Description` | `System.Description` | Plus the mockup `<img>`, user-supplied images, `Production Impact` (Hot Fix), `Out of Scope`, and `Open Questions` |
+| `### Acceptance Criteria` | `Microsoft.VSTS.Common.AcceptanceCriteria` | **Never** also in the description |
+| `### Steps to Reproduce` | `Microsoft.VSTS.TCM.ReproSteps` (Bug / Hot Fix) | Falls back to the description only if the type doesn't expose the field |
+| `### Expected Behavior`, `### Actual Behavior` | `Microsoft.VSTS.TCM.ReproSteps` | Rendered beneath the repro steps |
+| `### Out of Scope`, `### Environment / Scope`, `### Open Questions` | `System.Description` | These keep their `<h3>` headings — they have no field of their own |
+
+**The rendered `System.Description` must not contain an "Acceptance Criteria" heading or its criteria** — not as `<h3>`, not as `<strong>`, not as a bolded line, not "for readability", not "so it reads as a complete document". Azure DevOps renders the AC field as its own section on the work item form, so a copy in the description gives the reader two lists that drift apart while leaving the real field empty. It also breaks estimation: an empty AC field is exactly what `/quote`, `/quote-backlog`, and `/plan-backlog` read to decide an item can't be sized, so criteria in the wrong field make a fully-specified story look unestimable and bounce it back to its creator.
+
+**Drop the section's own heading when it becomes a field.** `Microsoft.VSTS.Common.AcceptanceCriteria` holds the criteria list alone — an `<ol>` or `<ul>`, not `<h3>Acceptance Criteria</h3>` followed by the list. Same for `ReproSteps`. The field label is already on the form.
+
+**Always write the AC field explicitly — never leave the placeholder.** Some process templates seed a new item's `Microsoft.VSTS.Common.AcceptanceCriteria` with tip text like `💡 Tip: Add "@serena rewrite" to Description for AI suggestions  Define acceptance criteria: - [ ]  - [ ]  - [ ]`. That is a **placeholder, not content**, and it reads as non-empty to every downstream sweep — an item carrying it looks like it has acceptance criteria when it has none. Include the field in the create call for every Bug, Hot Fix, and User Story; writing it is what clears the placeholder.
 
 ### Call the create API
 
@@ -333,7 +351,7 @@ Call `mcp__azure-devops__wit_create_work_item` with:
 - **title**: the approved title (with prefix)
 - **fields**: a JSON Patch document setting:
   - `System.Description` — the rendered HTML description (with embedded mockup `<img>` and any user-supplied images)
-  - `Microsoft.VSTS.Common.AcceptanceCriteria` — the rendered HTML acceptance criteria block
+  - `Microsoft.VSTS.Common.AcceptanceCriteria` — the rendered criteria list and **only** the criteria (no `<h3>Acceptance Criteria</h3>` wrapper, and no copy of it in `System.Description`). Always include this field for a Bug, Hot Fix, or User Story — writing it is what clears the process template's placeholder tip
   - `Microsoft.VSTS.Scheduling.StoryPoints` — the points agreed in Step 4 (omit entirely if the user skipped, and **always** for a Feature)
   - For Features:
     - Render `Business Value`, `Scope`, `Out of Scope`, and `Success Criteria` into the description. Put `Success Criteria` in `Microsoft.VSTS.Common.AcceptanceCriteria` **only if** the process template exposes that field on Feature — if the create call rejects it, fold the block into the description and retry rather than dropping it.
@@ -392,6 +410,13 @@ If a story fails to create or link, report which ones succeeded and which didn't
 
 ## Step 10: Confirm
 
+**Read the item back first.** Fetch it with `mcp__azure-devops__wit_work_item` (`action: get`, fields `System.Description` and `Microsoft.VSTS.Common.AcceptanceCriteria`) and check two things:
+
+1. The criteria are in `Microsoft.VSTS.Common.AcceptanceCriteria` — not the placeholder tip, not empty.
+2. `System.Description` contains no "Acceptance Criteria" heading and none of the criteria.
+
+If either check fails the write didn't take — fix it with `wit_update_work_item` before reporting success. Don't report a created item you haven't read back.
+
 After creation, report:
 
 ```
@@ -402,6 +427,7 @@ Created AB#{id}: {title}
   State: {Dev Ready | New}
   URL: {work item URL}
   Mockup attached: {yes / no}
+  Acceptance criteria: {n} criteria in the AC field (verified — none in the description)
   Open questions: {count}
 {Features only:}
   Child stories: {n created | none — add them later with /plan-backlog}
