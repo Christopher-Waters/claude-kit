@@ -652,7 +652,7 @@ Claude reviews for:
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for Design Approved items without points → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated) |
 | `/quote` | `/quote AB#1234` | Estimate a work item in story points (senior-calibrated Fibonacci rubric) |
 | `/explain` | `/explain AB#1234` | Summarize and explain a work item in plain language |
-| `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Feature, Bug, or User Story — proposes story points (user must agree), creates pointed items in Dev Ready; on a Feature, also drafts its child stories with `Custom.Order` waves |
+| `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Feature, Bug, User Story, or Hot Fix — proposes story points (user must agree), creates pointed items in Dev Ready; on a Feature, also drafts its child stories with `Custom.Order` waves |
 | `/edit-work-item` | `/edit-work-item AB#1234 [what to change]` | Revise an existing work item field-by-field. On a Feature, cascades into its child stories — updates, adds, retires, and re-sequences `Custom.Order` waves — with a safety gate on anything already past Dev Ready |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged feature/work branches |
 | `/close-orphan-tasks` | `/close-orphan-tasks --dry-run` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |

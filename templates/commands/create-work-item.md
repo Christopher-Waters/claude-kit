@@ -1,6 +1,6 @@
 Create a new Azure DevOps work item interactively. Usage: `/create-work-item`
 
-This command walks the user through creating a Feature, Bug, or User Story, develops an acceptance-criteria-ready plan, optionally embeds a UI mockup in the description, and creates the item in the chosen Azure DevOps project. For a Feature it can also draft and create the child User Stories that make the Feature implementable.
+This command walks the user through creating a Feature, Bug, User Story, or Hot Fix, develops an acceptance-criteria-ready plan, optionally embeds a UI mockup in the description, and creates the item in the chosen Azure DevOps project. For a Feature it can also draft and create the child User Stories that make the Feature implementable.
 
 Treat `$ARGUMENTS` as an optional rough description that the user may have typed inline (e.g. `/create-work-item users should be able to export payments`). If provided, skip the initial "describe your requirements" prompt in Step 2 and use it as the starting requirements text — but still confirm with the user before proceeding.
 
@@ -14,20 +14,23 @@ What type of work item do you want to create?
   1. Bug          — something deployed is behaving wrong
   2. User Story   — one shippable slice of user-facing behavior
   3. Feature      — a container for several related user stories
+  4. Hot Fix      — a production defect that can't wait for the normal queue
 
-Reply with 1, 2, 3, "bug", "user story", or "feature".
+Reply with 1, 2, 3, 4, "bug", "user story", "feature", or "hot fix".
 ```
 
-**Wait for the user's response.** Map the answer to `Bug`, `User Story`, or `Feature`. If the user types something else, ask again — do not guess.
+**Wait for the user's response.** Map the answer to `Bug`, `User Story`, `Feature`, or `Hot Fix`. The Azure DevOps type name is **`Hot Fix`** — two words, that exact casing. (The branch prefix and PR label are `hotfix`, one word — that's a `/implement` concern, not a field value.) If the user types something else, ask again — do not guess.
 
 If the requirements clearly span several independently shippable slices, say so and recommend `Feature` — but the type is still the user's call.
+
+**Bug vs. Hot Fix.** Both describe broken behavior; the difference is urgency, not shape. A Hot Fix ships out-of-band — it targets the production branch directly and skips manual UAT in `/implement`. If the user picks `Hot Fix` for something that reads as a normal-priority defect, say so once and let them decide. If they pick `Bug` for something they describe as production-down, offer `Hot Fix` once and let them decide.
 
 ## Step 2: Gather Requirements
 
 Ask the user to describe the requirements:
 
 ```
-Describe the {feature | bug | user story} in your own words. Include:
+Describe the {feature | bug | user story | hot fix} in your own words. Include:
 
 - What the user is trying to do (or what is broken)
 - Why it matters / who is affected
@@ -111,12 +114,12 @@ business or user value. Avoid implementation detail — that lives in tasks.}
 - {anything ambiguous that you couldn't infer — list as questions, not assumptions}
 ```
 
-### For a Bug:
+### For a Bug or Hot Fix:
 
 ```
 ## Draft: {Prefix} - {proposed title}
 
-**Type:** Bug
+**Type:** {Bug | Hot Fix}
 **Priority:** {1 | 2 | 3 | 4}
 **Severity:** {1 - Critical | 2 - High | 3 - Medium | 4 - Low}
 
@@ -145,7 +148,12 @@ business or user value. Avoid implementation detail — that lives in tasks.}
 - {anything you couldn't infer}
 ```
 
-**Inferring Priority and Severity for Bugs:**
+A Hot Fix uses the same draft shape as a Bug. Two differences:
+
+- **Severity and Priority are constrained.** A Hot Fix is by definition urgent — propose Priority `1` (or `2` at the loosest) and Severity `1 - Critical` or `2 - High`. If the requirements don't support that, the item is probably a Bug; say so before drafting.
+- **Add a `### Production Impact` section** naming what is broken right now, which environment, and roughly who is affected. This is the section the reviewer reads first on an out-of-band change.
+
+**Inferring Priority and Severity for Bugs and Hot Fixes:**
 
 Propose initial values based on the requirements, then let the user override during approval. Use this rubric:
 
@@ -183,7 +191,7 @@ Approve this draft? (yes / suggest changes / cancel)
 
 **Skip this step entirely for a Feature.** A Feature's size is the sum of its child stories — the Feature itself gets no `StoryPoints` value and stays in `New`. Its stories are pointed in Step 9. Go to Step 5.
 
-For a **Bug** or **User Story**, every work item this command creates gets a story point estimate — proposed automatically, applied only with the user's agreement.
+For a **Bug**, **User Story**, or **Hot Fix**, every work item this command creates gets a story point estimate — proposed automatically, applied only with the user's agreement.
 
 Estimate using the same rubric as `/quote`: the **modified Fibonacci scale** (`1, 2, 3, 5, 8, 13, 21`), calibrated for a **senior developer working with Claude assistance** in a codebase they know. Don't pad for ramp-up, routine architectural decisions, or stack familiarity — only for things a senior cannot shortcut: genuinely novel work, unresolved open questions, cross-team coordination, external dependencies. If the work looks larger than 21 points, recommend splitting the item instead of proposing a number.
 
@@ -204,7 +212,7 @@ Agree? (yes / different number / skip)
 
 Points are never written without the user's explicit agreement.
 
-## Step 5: Offer a Mockup (User Stories and Features — skip for Bugs)
+## Step 5: Offer a Mockup (User Stories and Features — skip for Bugs and Hot Fixes)
 
 If the work item type is **User Story** or **Feature** and the requirements appear to involve UI (a screen, a form, a button, a workflow), ask:
 
@@ -259,12 +267,15 @@ Before creating anything in Azure DevOps, present a final summary and ask for on
 ## Ready to Create
 
 **Title:**     {Prefix} - {title}
-**Type:**      {Feature | Bug | User Story}
+**Type:**      {Feature | Bug | User Story | Hot Fix}
 **Project:**   {project}
-{for Bugs:}
+{for Bugs and Hot Fixes:}
 **Priority:**  {n}
 **Severity:**  {n - Label}
-{end for Bugs}
+{end for Bugs and Hot Fixes}
+{for Hot Fixes:}
+**Production Impact:** {one line}
+{end for Hot Fixes}
 {for Features:}
 **Scope items:** {count} — offered as child stories after creation
 {end for Features}
@@ -318,7 +329,7 @@ Apply this pass to every section (Description, Acceptance Criteria, Steps to Rep
 Call `mcp__azure-devops__wit_create_work_item` with:
 
 - **project**: the chosen project
-- **workItemType**: `Feature`, `Bug`, or `User Story`
+- **workItemType**: `Feature`, `Bug`, `User Story`, or `Hot Fix` (two words, exact casing)
 - **title**: the approved title (with prefix)
 - **fields**: a JSON Patch document setting:
   - `System.Description` — the rendered HTML description (with embedded mockup `<img>` and any user-supplied images)
@@ -328,8 +339,9 @@ Call `mcp__azure-devops__wit_create_work_item` with:
     - Render `Business Value`, `Scope`, `Out of Scope`, and `Success Criteria` into the description. Put `Success Criteria` in `Microsoft.VSTS.Common.AcceptanceCriteria` **only if** the process template exposes that field on Feature — if the create call rejects it, fold the block into the description and retry rather than dropping it.
     - `Microsoft.VSTS.Common.BusinessValue` — only if the user supplied a number. Never invent one.
     - Omit `Microsoft.VSTS.Scheduling.StoryPoints` entirely.
-  - For Bugs:
-    - `Microsoft.VSTS.TCM.ReproSteps` — the rendered HTML repro steps (Azure DevOps puts repro steps in this field for the Bug template; if the project uses the Agile template instead, fold repro steps into Description)
+  - For Bugs and Hot Fixes:
+    - `Microsoft.VSTS.TCM.ReproSteps` — the rendered HTML repro steps (Azure DevOps puts repro steps in this field for the Bug template; if the project uses the Agile template instead, fold repro steps into Description). If the `Hot Fix` type in this process template doesn't expose `ReproSteps`, fold the repro steps into `System.Description` rather than dropping them.
+    - For Hot Fixes, render the `Production Impact` section into the description as an `<h3>` block above the repro steps.
     - `Microsoft.VSTS.Common.Priority` — the chosen Priority (1–4)
     - `Microsoft.VSTS.Common.Severity` — the chosen Severity (`1 - Critical`, `2 - High`, `3 - Medium`, `4 - Low`)
 
