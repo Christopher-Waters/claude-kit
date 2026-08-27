@@ -41,7 +41,7 @@ Ultracode is **opt-in**. It is on only when a system-reminder confirms it, when 
 |-----------|--------------|
 | `/plan-backlog` | one agent per Dev Ready story — analyze, point, and propose tasks in parallel |
 | `/plan-sprint` | one agent per sprint item — analyze and propose tasks in parallel |
-| `/quote-backlog` | one agent per Design Approved item — completeness review, duplicate check, estimate in parallel |
+| `/quote-backlog` | one agent per swept item (stories in Design Approved, bugs in New) — completeness review, duplicate check, estimate in parallel |
 | Backlog / board audits | one agent per work item — find stale, mislabeled, orphaned, or unestimated items |
 | Multi-file or cross-layer review | one agent per file/dimension, then adversarial verify before reporting |
 | Repo-wide sweeps (rename, dependency bump, pattern migration) | one agent per site, worktree-isolated |
@@ -112,7 +112,13 @@ These rules apply to **every** command or flow that creates or estimates work it
 1. **Every work item Claude creates gets a proposed story point estimate** — User Stories and Bugs are never created unpointed by default. Estimates use the modified Fibonacci scale (`1, 2, 3, 5, 8, 13, 21`), calibrated for a **senior developer working with Claude assistance** — no ramp-up padding; pad only for what seniority + Claude can't shortcut (novel work, missing AC, cross-team coordination, external dependencies).
 2. **The user must agree before points are written.** Claude proposes the number with a one-line rationale; the user confirms, adjusts (their number wins), or skips. Points are never set silently.
 3. **Setting points moves the item to Dev Ready.** Any time story points are written to a **User Story**, **Bug**, or **Hot Fix**, `System.State` is set to `Dev Ready` in the same update. Never for Features or Tasks (a Feature's state is never touched; Tasks carry hour estimates, not points), and never backward — an item already past Dev Ready keeps its state, with a note.
-4. **An item that can't be quoted goes back to Design Review.** When `/quote` or `/quote-backlog` can't produce a number because information is missing — no acceptance criteria, contradictory description, unbounded scope, or a possible duplicate the creator has to confirm — the item moves from `Design Approved` back to `Design Review` along with the feedback comment. This keeps the next backlog sweep from re-analyzing items still waiting on their creator. Same guards as rule 3: `User Story` / `Bug` / `Hot Fix` only, and only from `Design Approved` — an item at `Dev Ready` or anything `Active` or later keeps its state. An item that merely **needs to be split** keeps its state — the work is understood, nothing is missing.
+4. **An item that can't be quoted drops out of the estimating queue — by a mechanism that depends on its type.** When `/quote` or `/quote-backlog` can't produce a number because information is missing — no acceptance criteria (or, on a bug, no repro steps), contradictory description, unbounded scope, or a possible duplicate the creator has to confirm — the item drops out of the sweep along with the feedback comment, so the next run isn't re-analyzing items still waiting on their creator:
+   - **User Story** → moves from `Design Approved` back to `Design Review`. Only from `Design Approved`; an item at `Dev Ready` or anything `Active` or later keeps its state.
+   - **Bug / Hot Fix** → gets a **`needs-info` tag**, state left at `New`. **These types have no design states** in the CSI Development template — no `Design Review` and no `Design Approved` — so there is no earlier state to send them back to. Append to `System.Tags`; never overwrite the field. Removing the tag re-queues the bug.
+   - **Feature / Task** → neither; report the gap and stop.
+
+   An item that merely **needs to be split** keeps its state and gets no tag — the work is understood, nothing is missing.
+5. **Never assume two work item types share a state list.** WIQL doesn't validate state names, so a query filtering on a state the type doesn't have returns **zero rows instead of an error** — the classic symptom is a backlog sweep that silently never surfaces a single bug. Confirm with `mcp__azure-devops__wit_work_item` (`action: get_type`) before writing a state name into a query or an update. In CSI Development: `User Story` has `New → Dev Ready → In Design → Design Review → Design Approved → Active → …`; `Bug` and `Hot Fix` have `New → Dev Ready → Active → …`.
 
 ### Branching Strategy
 
@@ -255,8 +261,8 @@ All deployment and release operations are available as slash commands:
 | `/status` | `/status release 24` | Check release, pipeline, or work item status |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
-| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for Design Approved items without points → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Pointed items move to Dev Ready; items that can't be quoted move back to **Design Review** so the next sweep skips them |
-| `/quote` | `/quote AB#1234` | Estimate story points for one work item; on approval, sets the points and moves the item to Dev Ready. If it can't be estimated, offers to move it back to **Design Review** |
+| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, **bugs in `New`** (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Pointed items move to Dev Ready; stories that can't be quoted move back to **Design Review**, bugs that can't be quoted get a **`needs-info`** tag, so the next sweep skips them |
+| `/quote` | `/quote AB#1234` | Estimate story points for one work item; on approval, sets the points and moves the item to Dev Ready. If it can't be estimated, offers to send a story back to **Design Review** or tag a bug **`needs-info`** |
 | `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Feature, Bug, User Story, or Hot Fix — proposes story points (user must agree) and creates pointed items in Dev Ready; on a Feature, also drafts its child stories with `Custom.Order` waves |
 | `/edit-work-item` | `/edit-work-item AB#1234 [what to change]` | Revise an existing work item field-by-field. On a Feature, cascades the change into its child stories — updates, adds, retires, and re-sequences `Custom.Order` waves — with a safety gate on anything already past Dev Ready |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
