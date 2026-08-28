@@ -108,21 +108,23 @@ Fetch the work item again (Description and Acceptance Criteria fields) if not al
 
 ### 5b. Map Story Points → total hour budget
 
-> **Assume a senior developer is the implementer.** The hour budget below already discounts for senior-level speed — no ramp-up time, no time spent learning the stack, routine cross-layer work is fast. Do not add a separate "experience" discount on top of these numbers.
+> **Assume a senior developer working with Claude assistance is the implementer.** The hour budget below already discounts for both — no ramp-up time, no time spent learning the stack, routine cross-layer work is fast, and boilerplate/tests/mechanical refactors are assisted. Do not add a separate "experience" or "Claude" discount on top of these numbers.
+>
+> The hours that survive the assist are the human ones: understanding the requirement, the genuinely novel decisions, verification, review turnaround, and UAT. If a budget looks large only because the story touches many files, it's too large.
 
-Use this mapping (calibrated for a senior developer at ~6 productive hours per day):
+Use this mapping (calibrated for a senior developer with Claude assistance, at ~6 productive hours per day):
 
 | Points | Hour budget | Notes |
 |--------|-------------|-------|
 | 1  |  3 hrs  | trivial change |
 | 2  |  6 hrs  | small, one-layer change |
 | 3  | 10 hrs  | one feature slice, modest tests |
-| 5  | 16 hrs  | cross-layer or new component (routine for a senior) |
-| 8  | 28 hrs  | multi-area, real unknowns even for a senior |
+| 5  | 16 hrs  | cross-layer or new component (routine for an assisted senior) |
+| 8  | 28 hrs  | multi-area, real unknowns the assist doesn’t remove |
 | 13 | 48 hrs  | large feature — should probably be split |
 | 21 | 75 hrs  | very large — almost certainly split |
 
-If the points value isn't on the Fibonacci scale, round to the nearest entry above. If the story has tags like `spike`, `research`, or `unknown-stack`, add 20–30% on top — those are the cases where seniority doesn't help.
+If the points value isn't on the Fibonacci scale, round to the nearest entry above. If the story has tags like `spike`, `research`, or `unknown-stack`, add 20–30% on top — those are the cases where neither seniority nor the assist helps.
 
 ### 5c. Draft the single task
 

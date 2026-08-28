@@ -16,6 +16,29 @@ Use the **modified Fibonacci scale** for story points: `1, 2, 3, 5, 8, 13, 21`. 
 
 > **Assume a senior developer working with Claude assistance is the implementer.** Don't pad for ramp-up, routine architectural decisions, or familiarity with the stack. A senior is expected to read the codebase, find existing patterns, and resolve ordinary unknowns without help — that effort is already priced into the rubric below. Only pad for things a senior *cannot* shortcut: genuinely novel work, missing AC, cross-team coordination, or external dependencies.
 
+**Claude assistance is part of the baseline, so price these near the bottom of their range** — the rubric already assumes them, don't discount a second time:
+
+- Boilerplate and scaffolding — DTOs, mappers, interfaces, request/response models, registrations.
+- Writing tests for behavior that's already specified.
+- Mechanical refactors, renames, and applying a known pattern across many files.
+- CRUD endpoints, forms, tables, and screens that mirror something already in the repo.
+- Migrations and scripts with an obvious shape.
+
+**Volume of similar code is cheap.** A story whose size comes mostly from repetition — six more fields, four more columns, another slice of an existing pattern — should not earn points for its file count. Size it by the hardest distinct problem in it, not by how much typing it implies.
+
+**Claude assistance does not compress these — never discount them:**
+
+- Ambiguous, thin, or missing acceptance criteria (see the *not estimable* rule below).
+- Genuinely novel design decisions with no precedent in the codebase.
+- Third-party integrations, external APIs, and anything gated on another system's behavior.
+- Cross-team coordination, sign-off, or a dependency on someone else's work landing first.
+- Data migrations against production data, and anything needing a rollback plan.
+- Security, compliance, or privacy review.
+- Infrastructure, pipeline, and environment work that has to be verified by hand.
+- Human wall-time: code review turnaround, UAT, and deploy gates.
+
+These are what dominate an estimate at 8 points and above. If a big number is driven purely by code volume rather than by items on this list, the estimate is probably too high.
+
 Rough sizing rubric (calibrated for a senior developer, assisted by Claude, working in a codebase they know):
 
 | Points | Looks like |
@@ -30,7 +53,9 @@ Rough sizing rubric (calibrated for a senior developer, assisted by Claude, work
 
 Adjust upward for: unclear acceptance criteria, missing UX, data migrations, cross-team coordination, security/compliance review, or anything tagged `spike`/`research`.
 
-Adjust downward for: pure config changes, mechanical refactors with good test coverage, work that mirrors an existing implementation, or anything where the senior will recognize the pattern immediately.
+Adjust downward for: pure config changes, mechanical refactors with good test coverage, work that mirrors an existing implementation, repetition of an established pattern, or anything where the senior will recognize the pattern immediately.
+
+State the assist in the reasoning when it moved the number — e.g. "5 rather than 8: the three new endpoints follow `PaymentsController` exactly, so the volume is assisted work; the only real unknown is the reconciliation rule." That makes the estimate reviewable instead of asserted.
 
 If the item has child items, size each child as well and present the parent's total as the sum (rounded to the nearest Fibonacci number).
 

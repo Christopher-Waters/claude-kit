@@ -194,9 +194,9 @@ Propose the hours from the parent's Story Points (this mirrors `/plan-backlog` S
 | 13 | 48 hrs  |
 | 21 | 75 hrs  |
 
-Calibrated for a **senior developer** at ~6 productive hours per day — the discount is already in the numbers, so don't apply a second one. Round non-Fibonacci point values up to the nearest row. Add 20–30% for `spike` / `research` / `unknown-stack` tags.
+Calibrated for a **senior developer working with Claude assistance** at ~6 productive hours per day — both discounts are already in the numbers, so don't apply a second one. Boilerplate, tests for specified behavior, and mechanical refactors are assisted work; the hours that remain are the human ones (novel decisions, verification, review, UAT). Round non-Fibonacci point values up to the nearest row. Add 20–30% for `spike` / `research` / `unknown-stack` tags.
 
-If the work item has **no Story Points**, estimate the hours from the plan just approved in Step 3 — files to create and modify, plus the unit tests listed — using the same senior calibration. Say which basis you used.
+If the work item has **no Story Points**, estimate the hours from the plan just approved in Step 3 — files to create and modify, plus the unit tests listed — using the same senior-with-Claude calibration. Say which basis you used.
 
 Show the proposal and **wait for the user**:
 

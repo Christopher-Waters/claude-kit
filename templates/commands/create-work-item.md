@@ -195,6 +195,8 @@ For a **Bug**, **User Story**, or **Hot Fix**, every work item this command crea
 
 Estimate using the same rubric as `/quote`: the **modified Fibonacci scale** (`1, 2, 3, 5, 8, 13, 21`), calibrated for a **senior developer working with Claude assistance** in a codebase they know. Don't pad for ramp-up, routine architectural decisions, or stack familiarity — only for things a senior cannot shortcut: genuinely novel work, unresolved open questions, cross-team coordination, external dependencies. If the work looks larger than 21 points, recommend splitting the item instead of proposing a number.
 
+Repetition and boilerplate are assisted work — price them near the bottom of the range and size the item by its hardest distinct problem, not by how many files it touches. The full assisted / not-assisted breakdown lives in `/quote` Step 2; that file is the authority if the two ever drift.
+
 Present the estimate:
 
 ```

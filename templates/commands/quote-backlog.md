@@ -182,7 +182,11 @@ This is read-only reconnaissance. Skip it for non-technical items or when the co
 
 Use the **modified Fibonacci scale**: `1, 2, 3, 5, 8, 13, 21`. Anything larger than 21 is flagged as "needs to be split" rather than given a number.
 
-> **Assume a senior developer working with Claude assistance is the implementer.** Don't pad for ramp-up, routine architectural decisions, or familiarity with the stack — that's already priced into the rubric. Only pad for things a senior *cannot* shortcut: genuinely novel work, missing AC, cross-team coordination, or external dependencies. Do not apply a second seniority discount on top of the rubric.
+> **Assume a senior developer working with Claude assistance is the implementer.** Don't pad for ramp-up, routine architectural decisions, or familiarity with the stack — that's already priced into the rubric. Only pad for things a senior *cannot* shortcut: genuinely novel work, missing AC, cross-team coordination, or external dependencies. Do not apply a second seniority discount, or a second Claude-assistance discount, on top of the rubric.
+
+**Assisted work — price near the bottom of the range:** boilerplate and scaffolding, tests for already-specified behavior, mechanical refactors, applying a known pattern across many files, CRUD/forms/screens that mirror something already in the repo. Repetition is cheap — size the item by its hardest distinct problem, not by how many files it touches.
+
+**Not assisted — never discount:** thin or missing AC, novel design with no precedent, third-party integrations, cross-team dependencies, production data migrations, security/compliance review, hand-verified infra or pipeline work, and human wall-time for review/UAT/deploy gates. These are what justify 8 points and above.
 
 | Points | Looks like |
 |--------|-----------|
