@@ -15,6 +15,7 @@ Read the work item with `expand: Relations` so links and children come back. Col
 - `System.Description`, `Microsoft.VSTS.Common.AcceptanceCriteria`
 - `Microsoft.VSTS.Scheduling.StoryPoints`, `Custom.Order`
 - For Bugs / Hot Fixes: `Microsoft.VSTS.TCM.ReproSteps`, `Microsoft.VSTS.Common.Priority`, `Microsoft.VSTS.Common.Severity`
+- For Bugs: `Microsoft.VSTS.TCM.SystemInfo` — the Bug form's second rendered field, where the environment belongs
 - Parent, children, and **linked pull requests** (`ArtifactLink` relations)
 - Comments — recent discussion often explains why a field says what it says
 
@@ -200,14 +201,20 @@ Default the comment question to **yes** for any item past `New`, and **no** for 
 
 Render every Markdown section to HTML first — Azure DevOps description and acceptance criteria fields do not render Markdown. Use the conversion table and the **emphasis and code spans** rules from `/create-work-item` Step 8: bold the noun phrase carrying each claim, wrap identifiers in `<code>`, use lists for 2+ parallel items, keep `### Headings` as `<h3>`. Preserve existing `<img>` tags exactly.
 
-**Route each section to its own field**, per the field-routing table in `/create-work-item` Step 8. The rule that matters most here: **acceptance criteria go in `Microsoft.VSTS.Common.AcceptanceCriteria`, never in `System.Description`.** When you rewrite AC, write the criteria list alone into that field — no `<h3>Acceptance Criteria</h3>` wrapper — and make sure the description you write back carries no copy of them. Editing an item is the moment this gets silently undone: it is easy to render the whole reviewed document into the description and leave the AC field as it was.
+**Route each section to its own field, per work item type** — use the routing tables in `/create-work-item` Step 8. Editing is the moment routing gets silently undone: it is easy to render the whole reviewed document into the description and leave the real fields as they were. And a wrong field does not announce itself — **Azure DevOps accepts a write to a field a type does not carry**, so the value persists, reads back over the API, and renders nowhere.
 
-**Repair misfiled criteria when you find them.** If Step 2 found the criteria living in the description (or the AC field holding only placeholder tip text), fix it as part of this edit even when the user didn't ask — it is the same content, moved to the field Azure DevOps and every kit sweep actually read:
+**On a User Story:** acceptance criteria go in `Microsoft.VSTS.Common.AcceptanceCriteria`, never in `System.Description`. Write the criteria list alone into that field — no `<h3>Acceptance Criteria</h3>` wrapper — and make sure the description carries no copy of them.
 
-- Write the criteria into `Microsoft.VSTS.Common.AcceptanceCriteria`, overwriting the placeholder.
-- Strip the "Acceptance Criteria" heading and its list out of `System.Description` in the same call, so the two fields don't both hold a copy.
-- Say so in the change set and in the Step 8 confirmation: `Acceptance criteria: moved from Description → AC field (3 criteria)`. Never move criteria silently; the user needs to see that the description shrank.
-- This is a **move, not a rewrite** — the criteria text is unchanged unless the user separately approved a reword.
+**On a Bug:** there is no Acceptance Criteria field and no Description control on the form. The whole write-up — description, steps, expected, actual, criteria — belongs in `Microsoft.VSTS.TCM.ReproSteps`, the environment in `Microsoft.VSTS.TCM.SystemInfo`, and `System.Description` holds only a labelled duplicate of the body.
+
+**On a Hot Fix:** the narrative stays in `System.Description`; steps, expected, actual and environment go to `Microsoft.VSTS.TCM.ReproSteps`. There is no System Info field on this type.
+
+**Repair misfiled content when you find it.** If Step 2 found content in a field its type does not render, fix it as part of this edit even when the user didn't ask — it is the same content, moved to where a reader will actually see it:
+
+- **User Story** — criteria living in the description (or an AC field holding only placeholder tip text): write them into `Microsoft.VSTS.Common.AcceptanceCriteria` and strip the heading and list out of `System.Description` in the same call.
+- **Bug** — criteria sitting in `Microsoft.VSTS.Common.AcceptanceCriteria` (a field the type does not have, so nothing displays them) or a description that never appears on the form: fold both into the composed `ReproSteps` body. Leave the phantom AC value where it is rather than patching it — clearing a field the type lacks is one more write into a hole.
+- Say so in the change set and in the Step 8 confirmation: `Acceptance criteria: moved from the AC field → Repro Steps (3 criteria)`. Never move content silently; the user needs to see which field shrank.
+- This is a **move, not a rewrite** — the text is unchanged unless the user separately approved a reword.
 
 Apply writes in this order, so a failure partway through leaves the most useful state behind:
 

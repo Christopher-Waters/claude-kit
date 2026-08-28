@@ -330,19 +330,43 @@ Apply this pass to every section (Description, Acceptance Criteria, Steps to Rep
 
 The Step 3 draft is **one document for the user to read**, not the shape of one field. Before rendering, split it section by section and route each section to its own Azure DevOps field:
 
-| Draft section | Goes to | Notes |
-|---|---|---|
-| `### Description` | `System.Description` | Plus the mockup `<img>`, user-supplied images, `Production Impact` (Hot Fix), `Out of Scope`, and `Open Questions` |
-| `### Acceptance Criteria` | `Microsoft.VSTS.Common.AcceptanceCriteria` | **Never** also in the description |
-| `### Steps to Reproduce` | `Microsoft.VSTS.TCM.ReproSteps` (Bug / Hot Fix) | Falls back to the description only if the type doesn't expose the field |
-| `### Expected Behavior`, `### Actual Behavior` | `Microsoft.VSTS.TCM.ReproSteps` | Rendered beneath the repro steps |
-| `### Out of Scope`, `### Environment / Scope`, `### Open Questions` | `System.Description` | These keep their `<h3>` headings — they have no field of their own |
+**Routing depends on the work item type, and the types do not carry the same fields.** This matters more than it looks: **Azure DevOps accepts a write to a field a type does not have.** The value persists and reads back over the API while no form ever renders it — nothing raises, nothing logs. So a wrong field here is invisible in exactly the way a bug report should never be.
+
+Verify with `mcp__azure-devops__wit_work_item` (`action: get_type`) rather than assuming. In the CSI Development process:
+
+**User Story** — Description and Acceptance Criteria, as you would expect:
+
+| Draft section | Goes to |
+|---|---|
+| `### Description` | `System.Description` — plus the mockup `<img>`, user-supplied images, `Out of Scope`, `Open Questions` |
+| `### Acceptance Criteria` | `Microsoft.VSTS.Common.AcceptanceCriteria` — **never** also in the description |
+
+**Bug** — its form renders only **Repro Steps** and **System Info**. It has **no Acceptance Criteria field**, and `System.Description` has **no control on the Bug form**, so anything routed there is invisible to a human reader:
+
+| Draft section | Goes to |
+|---|---|
+| `### Description`, `### Steps to Reproduce`, `### Expected Behavior`, `### Actual Behavior`, `### Acceptance Criteria`, `### Open Questions` | `Microsoft.VSTS.TCM.ReproSteps` — composed into one document, each under its own `<h3>`, in that order |
+| `### Environment / Scope` | `Microsoft.VSTS.TCM.SystemInfo` |
+| (the same composed body) | `System.Description` — a labelled **duplicate**, for tools that read it without checking the type. Never unique content. |
+
+Do **not** send `Microsoft.VSTS.Common.AcceptanceCriteria` on a Bug. Still *write* acceptance criteria — they go into the composed body, so the item is still estimable — just not into a field the type does not have.
+
+**Hot Fix** — its form renders **Description** and **Repro Steps**. It has neither an Acceptance Criteria field nor a System Info field:
+
+| Draft section | Goes to |
+|---|---|
+| `### Description`, `### Production Impact`, `### Open Questions` | `System.Description` |
+| `### Steps to Reproduce`, `### Expected Behavior`, `### Actual Behavior`, `### Environment / Scope` | `Microsoft.VSTS.TCM.ReproSteps` |
+
+**Omit an empty section entirely** — never emit a bare `<h3>` with nothing under it. A heading with no body reads as content that went missing.
 
 **The rendered `System.Description` must not contain an "Acceptance Criteria" heading or its criteria** — not as `<h3>`, not as `<strong>`, not as a bolded line, not "for readability", not "so it reads as a complete document". Azure DevOps renders the AC field as its own section on the work item form, so a copy in the description gives the reader two lists that drift apart while leaving the real field empty. It also breaks estimation: an empty AC field is exactly what `/quote`, `/quote-backlog`, and `/plan-backlog` read to decide an item can't be sized, so criteria in the wrong field make a fully-specified story look unestimable and bounce it back to its creator.
 
 **Drop the section's own heading when it becomes a field.** `Microsoft.VSTS.Common.AcceptanceCriteria` holds the criteria list alone — an `<ol>` or `<ul>`, not `<h3>Acceptance Criteria</h3>` followed by the list. Same for `ReproSteps`. The field label is already on the form.
 
-**Always write the AC field explicitly — never leave the placeholder.** Some process templates seed a new item's `Microsoft.VSTS.Common.AcceptanceCriteria` with tip text like `💡 Tip: Add "@serena rewrite" to Description for AI suggestions  Define acceptance criteria: - [ ]  - [ ]  - [ ]`. That is a **placeholder, not content**, and it reads as non-empty to every downstream sweep — an item carrying it looks like it has acceptance criteria when it has none. Include the field in the create call for every Bug, Hot Fix, and User Story; writing it is what clears the placeholder.
+**On a type that HAS the AC field, always write it explicitly — never leave the placeholder.** Some process templates seed a new item's `Microsoft.VSTS.Common.AcceptanceCriteria` with tip text like `💡 Tip: Add "@serena rewrite" to Description for AI suggestions  Define acceptance criteria: - [ ]  - [ ]  - [ ]`. That is a **placeholder, not content**, and it reads as non-empty to every downstream sweep — an item carrying it looks like it has acceptance criteria when it has none. Writing the field is what clears the placeholder.
+
+This applies to **User Story**. It does **not** apply to Bug or Hot Fix: neither type carries the field, so there is no placeholder to clear and the write would go into a hole. For those two, the criteria live in `ReproSteps` per the routing above — which is also what `/quote` and `/quote-backlog` read to decide a bug is estimable.
 
 ### Call the create API
 
@@ -352,20 +376,24 @@ Call `mcp__azure-devops__wit_create_work_item` with:
 - **workItemType**: `Feature`, `Bug`, `User Story`, or `Hot Fix` (two words, exact casing)
 - **title**: the approved title (with prefix)
 - **fields**: a JSON Patch document setting:
-  - `System.Description` — the rendered HTML description (with embedded mockup `<img>` and any user-supplied images)
-  - `Microsoft.VSTS.Common.AcceptanceCriteria` — the rendered criteria list and **only** the criteria (no `<h3>Acceptance Criteria</h3>` wrapper, and no copy of it in `System.Description`). Always include this field for a Bug, Hot Fix, or User Story — writing it is what clears the process template's placeholder tip
+  - `System.Description` — the rendered HTML description (with embedded mockup `<img>` and any user-supplied images). On a **Bug** this is the labelled duplicate of the composed body, not the description alone
+  - `Microsoft.VSTS.Common.AcceptanceCriteria` — **User Story only.** The rendered criteria list and **only** the criteria (no `<h3>Acceptance Criteria</h3>` wrapper, and no copy of it in `System.Description`); writing it is what clears the process template's placeholder tip. **Do not send this field on a Bug or a Hot Fix** — neither type has it
   - `Microsoft.VSTS.Scheduling.StoryPoints` — the points agreed in Step 4 (omit entirely if the user skipped, and **always** for a Feature)
   - For Features:
     - Render `Business Value`, `Scope`, `Out of Scope`, and `Success Criteria` into the description. Put `Success Criteria` in `Microsoft.VSTS.Common.AcceptanceCriteria` **only if** the process template exposes that field on Feature — if the create call rejects it, fold the block into the description and retry rather than dropping it.
     - `Microsoft.VSTS.Common.BusinessValue` — only if the user supplied a number. Never invent one.
     - Omit `Microsoft.VSTS.Scheduling.StoryPoints` entirely.
-  - For Bugs and Hot Fixes:
-    - `Microsoft.VSTS.TCM.ReproSteps` — the rendered HTML repro steps (Azure DevOps puts repro steps in this field for the Bug template; if the project uses the Agile template instead, fold repro steps into Description). If the `Hot Fix` type in this process template doesn't expose `ReproSteps`, fold the repro steps into `System.Description` rather than dropping them.
-    - For Hot Fixes, render the `Production Impact` section into the description as an `<h3>` block above the repro steps.
+  - For Bugs:
+    - `Microsoft.VSTS.TCM.ReproSteps` — the **whole composed body**: description, steps, expected behavior, actual behavior, acceptance criteria and open questions, each under its own `<h3>`. This is the Bug's field of record; its form shows no Description control.
+    - `Microsoft.VSTS.TCM.SystemInfo` — the `Environment / Scope` section. Omit the field entirely when there is no environment to record, rather than writing an empty value that leaves a blank box on the form.
     - `Microsoft.VSTS.Common.Priority` — the chosen Priority (1–4)
     - `Microsoft.VSTS.Common.Severity` — the chosen Severity (`1 - Critical`, `2 - High`, `3 - Medium`, `4 - Low`)
+  - For Hot Fixes:
+    - `Microsoft.VSTS.TCM.ReproSteps` — steps, expected behavior, actual behavior and `Environment / Scope` (this type has no System Info field). If the `Hot Fix` type in this process template doesn't expose `ReproSteps`, fold them into `System.Description` rather than dropping them.
+    - Render the `Production Impact` section into `System.Description` as an `<h3>` block above the description body.
+    - No Priority/Severity — a Hot Fix is urgent by definition.
 
-If the `Open Questions` section is non-empty, append it to the description as a clearly-labeled HTML block (`<h3>Open Questions</h3><ul>...</ul>`) so the assignee can address it later.
+If the `Open Questions` section is non-empty, append it as a clearly-labeled HTML block (`<h3>Open Questions</h3><ul>...</ul>`) **to the field that work item type displays** — the composed `ReproSteps` body on a **Bug**, `System.Description` on a **User Story**, **Hot Fix**, or **Feature**. Putting it in the description of a Bug hides it from every reader.
 
 ### Move to Dev Ready (pointed items only)
 
@@ -412,12 +440,22 @@ If a story fails to create or link, report which ones succeeded and which didn't
 
 ## Step 10: Confirm
 
-**Read the item back first.** Fetch it with `mcp__azure-devops__wit_work_item` (`action: get`, fields `System.Description` and `Microsoft.VSTS.Common.AcceptanceCriteria`) and check two things:
+**Read the item back first**, and check the fields that type actually renders — a write to a field the type lacks *succeeds*, so reading back the wrong field proves nothing.
+
+For a **User Story**, fetch `System.Description` and `Microsoft.VSTS.Common.AcceptanceCriteria`:
 
 1. The criteria are in `Microsoft.VSTS.Common.AcceptanceCriteria` — not the placeholder tip, not empty.
 2. `System.Description` contains no "Acceptance Criteria" heading and none of the criteria.
 
-If either check fails the write didn't take — fix it with `wit_update_work_item` before reporting success. Don't report a created item you haven't read back.
+For a **Bug**, fetch `Microsoft.VSTS.TCM.ReproSteps` and `Microsoft.VSTS.TCM.SystemInfo`:
+
+1. `ReproSteps` carries every section — description, steps, expected, actual, acceptance criteria — each under its own heading.
+2. The environment is in `SystemInfo`.
+3. No section appears **only** in `System.Description`, which the Bug form does not display.
+
+For a **Hot Fix**, fetch `System.Description` and `Microsoft.VSTS.TCM.ReproSteps`, and confirm the narrative is in the former and the reproduction detail in the latter.
+
+If a check fails the write didn't take — fix it with `wit_update_work_item` before reporting success. Don't report a created item you haven't read back.
 
 After creation, report:
 
