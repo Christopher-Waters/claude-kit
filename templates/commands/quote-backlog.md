@@ -188,15 +188,17 @@ Use the **modified Fibonacci scale**: `1, 2, 3, 5, 8, 13, 21`. Anything larger t
 
 **Not assisted — never discount:** thin or missing AC, novel design with no precedent, third-party integrations, cross-team dependencies, production data migrations, security/compliance review, hand-verified infra or pipeline work, and human wall-time for review/UAT/deploy gates. These are what justify 8 points and above.
 
-| Points | Looks like |
-|--------|-----------|
-| **1** | Trivial change — copy tweak, single config value, one-line fix |
-| **2** | Small, well-understood change in one file or one layer |
-| **3** | A couple of files / one feature slice, some new tests |
-| **5** | Crosses layers, or a new component/endpoint following existing patterns |
-| **8** | Multi-area change with real new logic, migrations, or non-trivial edge cases |
-| **13** | Large feature, several moving parts — likely benefits from being split |
-| **21** | Very large / high uncertainty — should almost certainly be split |
+| Points | Effort (a day = 6 hrs) | Looks like |
+|--------|----------------------|-----------|
+| **1** | under 2 hours | Trivial change — copy tweak, single config value, one-line fix |
+| **2** | 2 hours to half a day | Small, well-understood change in one file or one layer |
+| **3** | half a day to two days | A couple of files / one feature slice, some new tests |
+| **5** | two to four days | Crosses layers, or a new component/endpoint following existing patterns |
+| **8** | around a week | Multi-area change with real new logic, migrations, or non-trivial edge cases |
+| **13** | one to two weeks | Large feature, several moving parts — likely benefits from being split |
+| **21** | two to three weeks | Very large / high uncertainty — should almost certainly be split |
+
+The **effort column is a sanity check on the number, not the way to pick it** — a point value that implies four days for something a senior finishes before lunch is wrong regardless of how the description reads. A day is **6 productive hours**; a week is 5 days (30 hours). `/plan-backlog` Step 5b turns the point value back into a Task hour band, so these two scales have to agree.
 
 Fold in what 3d found — code reconnaissance that shrinks or grows the work changes the number. For items classified **Blocking gaps** or **appears already implemented**, propose **no points** — the comment is the deliverable for those.
 

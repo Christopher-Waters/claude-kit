@@ -162,19 +162,21 @@ Every rework round gets its own Task work item, parented under the original User
 
 ### Suggest hours
 
-Estimate the rework effort from the approved plan. Use this rubric — calibrate against scope, not abstract complexity:
+Estimate the rework effort from the approved plan. The rows below are **scope** — how much there is to change. Where you land between two adjacent rows is **complexity** — how settled the change is:
+
+A day is **6 productive hours**; a week is 5 days (30 hours).
 
 | Hours | Looks like |
 |-------|-----------|
 | **0.5** | Trivial — copy tweak, single config value, one-line fix. No new tests. |
 | **1**   | One file, well-understood change. Maybe one new/updated test. |
 | **2**   | 2–3 files, one layer, follows existing patterns. Some new tests. |
-| **4**   | Multiple files across layers, or new logic in one area. Real test coverage. |
-| **8**   | Most of a day — meaningful new logic, several files, edge cases. |
-| **16**  | Two days — significant rework, multiple unknowns to resolve. |
-| **24+** | Three days or more — flag that this rework probably should have been a fresh story. |
+| **3**   | Half a day — multiple files across layers, or new logic in one area. Real test coverage. |
+| **6**   | A full day — meaningful new logic, several files, edge cases. |
+| **12**  | Two days — significant rework, multiple unknowns to resolve. |
+| **18+** | Three days or more — flag that this rework probably should have been a fresh story. |
 
-Adjust upward for: ambiguous feedback, missing UX, data migrations, regression risk in unrelated areas. Adjust downward for: pure config changes or mechanical fixes.
+Take the **lower** of two adjacent rows for low-complexity rework — mechanical fixes, pure config, a pattern already used elsewhere in the file. Take the **higher** for high-complexity rework — ambiguous feedback, missing UX, data migrations, or regression risk in unrelated areas. Don't reach for the top of the ladder just because the round touches several files.
 
 ### Prompt the user
 

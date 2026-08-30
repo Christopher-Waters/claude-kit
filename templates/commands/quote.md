@@ -41,15 +41,17 @@ These are what dominate an estimate at 8 points and above. If a big number is dr
 
 Rough sizing rubric (calibrated for a senior developer, assisted by Claude, working in a codebase they know):
 
-| Points | Looks like |
-|--------|-----------|
-| **1** | Trivial change — copy tweak, single config value, one-line fix. No new tests needed. |
-| **2** | Small, well-understood change in one file or one layer. Existing patterns cover it. |
-| **3** | Touches a couple of files / one feature slice. Some new tests. No architectural questions. |
-| **5** | Crosses layers (e.g. API + UI), or introduces a new component/endpoint following existing patterns. Real test coverage needed. |
-| **8** | Multi-area change with meaningful new logic, migrations, or non-trivial edge cases. Unknowns a senior can resolve but that still take real wall-time. |
-| **13** | Large feature, several moving parts, or significant unknowns even for a senior. Likely benefits from being split. |
-| **21** | Very large / high uncertainty. Should almost certainly be split into multiple stories. |
+| Points | Effort (a day = 6 hrs) | How much is known | Looks like |
+|--------|----------------------|-------------------|-----------|
+| **1** | under 2 hours | everything | Trivial change — copy tweak, single config value, one-line fix. No new tests needed. |
+| **2** | 2 hours to half a day | almost everything | Small, well-understood change in one file or one layer. Existing patterns cover it. |
+| **3** | half a day to two days | most of it | Touches a couple of files / one feature slice. Some new tests. No architectural questions. |
+| **5** | two to four days | some open questions | Crosses layers (e.g. API + UI), or introduces a new component/endpoint following existing patterns. Real test coverage needed. |
+| **8** | around a week | little — real unknowns | Multi-area change with meaningful new logic, migrations, or non-trivial edge cases. Unknowns a senior can resolve but that still take real wall-time. |
+| **13** | one to two weeks | not much | Large feature, several moving parts, or significant unknowns even for a senior. Likely benefits from being split. |
+| **21** | two to three weeks | almost nothing | Very large / high uncertainty. Should almost certainly be split into multiple stories. |
+
+The **effort column is a sanity check on the number, not the way to pick it** — a point value that implies four days for something a senior finishes before lunch is wrong regardless of how the description reads. A day is **6 productive hours**; a week is 5 days (30 hours). `/plan-backlog` Step 5b turns the point value back into a Task hour band, so these two scales have to agree.
 
 Adjust upward for: unclear acceptance criteria, missing UX, data migrations, cross-team coordination, security/compliance review, or anything tagged `spike`/`research`.
 

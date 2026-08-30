@@ -182,21 +182,35 @@ If **more than one** open Task exists, don't guess — list them and ask which o
 
 This includes the case where child Tasks exist but every one of them is already closed — a closed Task is not somewhere to log new work.
 
-Propose the hours from the parent's Story Points (this mirrors `/plan-backlog` Step 5b — keep the two tables in sync):
+The parent's Story Points give the **band**; the complexity of the work picks the number **inside** it (this mirrors `/plan-backlog` Step 5b — keep the two tables in sync). Never take the top of the band by default.
 
-| Points | Hour budget |
-|--------|-------------|
-| 1  |  3 hrs  |
-| 2  |  6 hrs  |
-| 3  | 10 hrs  |
-| 5  | 16 hrs  |
-| 8  | 28 hrs  |
-| 13 | 48 hrs  |
-| 21 | 75 hrs  |
+| Points | Low | Medium | High | Band in days (a day = 6 hrs) |
+|--------|-----|--------|------|------------------------------|
+| 1  |   1 |  1.5 |   2 | under 2 hours |
+| 2  |   2 |  2.5 |   3 | 2 hours to half a day |
+| 3  |   3 |    6 |  12 | half a day to two days |
+| 5  |  12 |   18 |  24 | two to four days |
+| 8  |  24 |   30 |  36 | around a week |
+| 13 |  36 |   48 |  60 | one to two weeks |
+| 21 |  60 |   75 |  90 | two to three weeks |
 
-Calibrated for a **senior developer working with Claude assistance** at ~6 productive hours per day — both discounts are already in the numbers, so don't apply a second one. Boilerplate, tests for specified behavior, and mechanical refactors are assisted work; the hours that remain are the human ones (novel decisions, verification, review, UAT). Round non-Fibonacci point values up to the nearest row. Add 20–30% for `spike` / `research` / `unknown-stack` tags.
+The bands are **contiguous**: each starts where the one below it ends, so a 1-pointer never costs more than a 2-pointer's floor. A day is **6 productive hours**, a week is **5 days (30 hours)**.
 
-If the work item has **no Story Points**, estimate the hours from the plan just approved in Step 3 — files to create and modify, plus the unit tests listed — using the same senior-with-Claude calibration. Say which basis you used.
+Calibrated for a **senior developer working with Claude assistance** at ~6 productive hours per day — both discounts are already in the numbers, so don't apply a second one. Boilerplate, tests for specified behavior, and mechanical refactors are assisted work; the hours that remain are the human ones (novel decisions, verification, review, UAT). Round non-Fibonacci point values up to the nearest row. Hours are rounded to the nearest half hour at 1–2 points and to a whole hour from 3 points up.
+
+**Complexity is not size.** Points already carry the size — how much work there is. Complexity is how *hard* that work is: how many decisions are still open, how novel the shape is, how costly it is to get wrong. A large-but-boring story is high points at **low** complexity. Never default to the High column just because the points are high.
+
+- **Low** — the shape is known before starting. One layer, or an existing pattern in the codebase to copy. AC is unambiguous. No new integration, no migration, no state or permission logic. Tests are mechanical.
+- **Medium** — crosses layers, or touches an area with no exact precedent. A few real decisions, some edge cases to reason through, existing tests need reworking. This is the default when nothing pushes the item either way.
+- **High** — novel design with nothing to copy; external or third-party contract; data migration or backfill; concurrency, state machines, permissions, money, or PII; ambiguous or self-contradicting AC; wide blast radius; behavior that is hard to verify.
+
+Pick **one** band and hold a one-phrase reason for it — that phrase is shown with the proposal. When an item sits between two bands, take the **lower** one unless a High signal above is actually present.
+
+Tags like `spike`, `research`, or `unknown-stack` are High-complexity signals on their own — use the High column for them rather than adding a separate percentage.
+
+By Step 4 you have the approved Step 3 plan in hand — judge complexity from that plan, not from the points. A plan that is mostly "add a field, thread it through, follow the existing pattern" is Low even at 8 points; a plan with an open design question or a migration in it is High even at 3.
+
+If the work item has **no Story Points**, estimate the hours from the plan just approved in Step 3 — files to create and modify, plus the unit tests listed — judging size and complexity the same way. Say which basis you used.
 
 Show the proposal and **wait for the user**:
 
@@ -205,9 +219,10 @@ AB#{id} has no open child Task — one is needed to log hours against.
 
 | Task title                                   | Hours |
 |----------------------------------------------|-------|
-| {PREFIX} - Implement: {short summary}        |  16   |
+| {PREFIX} - Implement: {short summary}        |  18   |
 
-Basis: {n} story points → {n}h  (or: no points — estimated from the approved plan)
+Basis: {n} story points ({low}/{mid}/{high} band), {complexity} complexity — {one-phrase reason} → {n}h
+       (or: no points — estimated from the approved plan, {complexity} complexity)
 
 Create it? (yes / edit / skip)
 ```
@@ -475,10 +490,10 @@ For each wave in ascending order:
      ```
      Stories in this wave with no open child Task:
 
-     | Story    | Task title                              | Hours | Basis   |
-     |----------|-----------------------------------------|-------|---------|
-     | AB#1235  | COM - Implement: export endpoint        |  10   | 3 pts   |
-     | AB#1236  | COM - Implement: export screen          |  16   | 5 pts   |
+     | Story    | Task title                              | Hours | Basis                  |
+     |----------|-----------------------------------------|-------|------------------------|
+     | AB#1235  | COM - Implement: export endpoint        |   3   | 3 pts, low cx          |
+     | AB#1236  | COM - Implement: export screen          |  18   | 5 pts, medium cx       |
 
      Create these? (yes / edit N / skip N / skip all)
      ```

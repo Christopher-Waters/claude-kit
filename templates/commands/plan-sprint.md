@@ -1,6 +1,6 @@
 Sweep the **current sprint** for user stories and bugs without child tasks and propose a single implementation task per item with an hour estimate. Usage: `/plan-sprint [project]`
 
-This command finds every **User Story** and **Bug** in the current sprint of a chosen Azure DevOps project that **has no child tasks yet**, and — item by item — proposes **one child Task** with an hour estimate for the user to approve before any work items are created. Exactly one task per work item — never a multi-task breakdown.
+This command finds every **User Story** and **Bug** in the current sprint of a chosen Azure DevOps project that **has no child tasks yet**, and — item by item — proposes **one child Task** with an hour estimate (points set the band, complexity sets where in the band it lands) for the user to approve before any work items are created. Exactly one task per work item — never a multi-task breakdown.
 
 This is the sprint-planning counterpart of `/plan-backlog`. Use `/plan-backlog` to groom the unscheduled backlog; use `/plan-sprint` after items are pulled into the sprint to make sure each has its implementation task and hours.
 
@@ -110,7 +110,7 @@ Continue? (yes / cancel)
 
 Only when **ultracode is on** (a system-reminder confirms it, or the user typed `ultracode`): the analysis in 6a–6c is independent per item, so pre-compute all proposals in parallel with the `Workflow` tool instead of analyzing one item at a time.
 
-- Fan out **one agent per item** that does 6a–6c — re-read the item, derive the hour budget, draft the single task — and returns a structured proposal (item id, points, budget, and one `{title, hours}` task). Use a `schema` so each agent returns validated JSON.
+- Fan out **one agent per item** that does 6a–6c — re-read the item, map points → band, judge complexity, pick within the band, draft the single task — and returns a structured proposal (item id, points, complexity, one-phrase complexity reason, band, and one `{title, hours}` task). Use a `schema` so each agent returns validated JSON, with `complexity` constrained to `low | medium | high`.
 - Then run Step 6's loop **using the pre-computed proposals** — but keep 6d (approval) and 6e (creation) exactly as written: present each proposal, wait for `yes / edit / skip / cancel-all`, and create the task only after approval. **Never fan out the approval or the work-item creation** — those stay sequential and interactive.
 
 If ultracode is off, ignore this and run Step 6 the normal sequential way. The output is identical either way; ultracode only makes the analysis faster for large sprints.
@@ -125,50 +125,67 @@ Fetch the work item again (Description and Acceptance Criteria fields — Repro 
 
 ### 6b. Derive the hour budget
 
-> **Assume a senior developer working with Claude assistance is the implementer.** The hour budget below already discounts for both — no ramp-up time, no time spent learning the stack, routine cross-layer work is fast, and boilerplate/tests/mechanical refactors are assisted. Do not add a separate "experience" or "Claude" discount on top of these numbers.
+> **Assume a senior developer working with Claude assistance is the implementer.** The hour bands below already discount for both — no ramp-up time, no time spent learning the stack, routine cross-layer work is fast, and boilerplate/tests/mechanical refactors are assisted. Do not add a separate "experience" or "Claude" discount on top of these numbers.
 >
 > The hours that survive the assist are the human ones: understanding the requirement, the genuinely novel decisions, verification, review turnaround, and UAT. If a budget looks large only because the story touches many files, it's too large.
 
-**If the item has Story Points**, use this mapping (calibrated for a senior developer with Claude assistance, at ~6 productive hours per day):
+**Points give the band. Complexity picks the number inside it.** Never take the top of the band by default — that is what makes every estimate max out. Low complexity → the low end, medium → the middle, high → the high end.
 
-| Points | Hour budget | Notes |
-|--------|-------------|-------|
-| 1  |  3 hrs  | trivial change |
-| 2  |  6 hrs  | small, one-layer change |
-| 3  | 10 hrs  | one feature slice, modest tests |
-| 5  | 16 hrs  | cross-layer or new component (routine for an assisted senior) |
-| 8  | 28 hrs  | multi-area, real unknowns the assist doesn’t remove |
-| 13 | 48 hrs  | large feature — should probably be split |
-| 21 | 75 hrs  | very large — almost certainly split |
+**If the item has Story Points**, use these bands (calibrated for a senior developer with Claude assistance, at ~6 productive hours per day):
 
-If the points value isn't on the Fibonacci scale, round to the nearest entry above. If the item has tags like `spike`, `research`, or `unknown-stack`, add 20–30% on top — those are the cases where neither seniority nor the assist helps.
+| Points | Low | Medium | High | Band in days (a day = 6 hrs) |
+|--------|-----|--------|------|------------------------------|
+| 1  |   1 |  1.5 |   2 | under 2 hours |
+| 2  |   2 |  2.5 |   3 | 2 hours to half a day |
+| 3  |   3 |    6 |  12 | half a day to two days |
+| 5  |  12 |   18 |  24 | two to four days |
+| 8  |  24 |   30 |  36 | around a week |
+| 13 |  36 |   48 |  60 | one to two weeks — likely needs splitting |
+| 21 |  60 |   75 |  90 | two to three weeks — almost certainly split |
 
-**If the item has no Story Points**, estimate the hours directly from the description, acceptance criteria, and repro steps — judge which row of the table the work most resembles and use that hour budget. Mark the proposal `(no points — estimated from description)` and suggest `/quote AB#{id}` in the final summary. Do **not** set Story Points on the item — that's the user's call.
+The bands are **contiguous**: each one starts where the one below it ends, so a 1-pointer never costs more than a 2-pointer's floor. A day is **6 productive hours** and a week is **5 days (30 hours)** — every row above is a whole number of days once you leave the 1–2 point rows.
+
+If the points value isn't on the Fibonacci scale, round to the nearest row above. Hours are rounded to the nearest half hour at 1–2 points and to a whole hour from 3 points up.
+
+**Complexity is not size.** Points already carry the size — how much work there is. Complexity is how *hard* that work is: how many decisions are still open, how novel the shape is, how costly it is to get wrong. A large-but-boring story is high points at **low** complexity. Never default to the High column just because the points are high.
+
+- **Low** — the shape is known before starting. One layer, or an existing pattern in the codebase to copy. AC is unambiguous. No new integration, no migration, no state or permission logic. Tests are mechanical.
+- **Medium** — crosses layers, or touches an area with no exact precedent. A few real decisions, some edge cases to reason through, existing tests need reworking. This is the default when nothing pushes the item either way.
+- **High** — novel design with nothing to copy; external or third-party contract; data migration or backfill; concurrency, state machines, permissions, money, or PII; ambiguous or self-contradicting AC; wide blast radius; behavior that is hard to verify.
+
+Pick **one** band and hold a one-phrase reason for it — that phrase is shown with the proposal. When an item sits between two bands, take the **lower** one unless a High signal above is actually present.
+
+Tags like `spike`, `research`, or `unknown-stack` are High-complexity signals on their own — use the High column for them rather than adding a separate percentage.
+
+**If the item has no Story Points**, judge both axes from the description, acceptance criteria, and repro steps: which row the *size* of the work most resembles, then which column its *complexity* falls in. Mark the proposal `(no points — estimated from description)` and suggest `/quote AB#{id}` in the final summary. Do **not** set Story Points on the item — that's the user's call.
 
 ### 6c. Draft the single task
 
 Create **exactly one task** covering all the work for the item — implementation, tests, code review revisions, and UAT support are all rolled into it. Do not split the item into design/backend/frontend/test tasks.
 
 - **Title**: `{Prefix} - Implement: {short summary of the item}` — use the same product prefix as the parent (e.g. `COM`, `PAY`, `CDA`), extracted from the parent's title. For Bugs, `{Prefix} - Fix: {short summary}` reads better.
-- **Hours**: the full hour budget from 6b, rounded to a whole hour.
+- **Hours**: the number picked in 6b — band from points, position in the band from complexity — rounded to a whole hour.
 
 ### 6d. Show the proposal
 
 ```
 ─────────────────────────────────────────────────────────────
-AB#{id}: {title}      ({points} pts → {budget} hrs)
+AB#{id}: {title}      ({points} pts, {complexity} complexity → {budget} hrs)
 ─────────────────────────────────────────────────────────────
 
 Proposed child task:
 
 | Task title                                     | Hours |
 |------------------------------------------------|-------|
-| {Prefix} - Implement: payments CSV export      |  24   |
+| {Prefix} - Implement: payments CSV export      |  18   |
+
+Complexity: medium — crosses API and client, follows the existing export pattern
+Band for 5 pts: 12 / 18 / 24  (two to four days)
 
 Approve? (yes / edit / skip / cancel-all)
 ```
 
-For unpointed items, the header line reads `(no points — estimated from description → {budget} hrs)`.
+For unpointed items, the header line reads `(no points — estimated from description, {complexity} complexity → {budget} hrs)`.
 
 **Wait for the user.**
 
