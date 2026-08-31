@@ -79,6 +79,17 @@ links; they'll be preserved.
 
 Scan the response for images and links and preserve them exactly as `/create-work-item` Step 2 describes — an edit must never silently strip an image, attachment URL, or reference link that is already in the description.
 
+### Check for prior art — on newly added scope only
+
+If the change request **adds** scope — a new behavior, a new entity, a new screen, a new role — run the prior-art search from `/create-work-item` Step 2 against **the added part**, and carry the finding into the change set. That file is the authority on how to search and what counts; the short version is three passes (codebase, work items, commits) looking for the same *process* already solved for a different entity, which the item should reuse rather than rebuild.
+
+Two things are different here:
+
+- **Scope the search to the delta, not the item.** An edit that tightens AC 3, fixes a typo, or bumps severity gets no prior-art pass — there is no new work to have precedent. Re-auditing the whole item on every edit is noise, and it buries the one finding that matters when there is one.
+- **Widening scope is exactly when prior art gets missed.** The original draft was searched against the original requirement. "It should also cover CDA trainers" is a *new* requirement that has never been searched, and it arrives as an amendment rather than a new item — so nothing re-runs the check unless this step does.
+
+Fold the result into Step 4's diff as an edit to the description's `### Prior Art` section — **adding that section if the item doesn't have one**, since items created before this rule existed won't. Keep any prior-art lines already there; append rather than replace, the same way every other field on an edit is preserved rather than regenerated.
+
 ## Step 4: Draft the Change Set
 
 Produce a **field-level diff**, not a rewritten item. For every field you propose to touch, show before and after. Fields not listed are not touched.
@@ -108,6 +119,7 @@ Rules for the draft:
 
 - **Preserve, don't regenerate.** Keep existing wording that the change request doesn't touch. Never drop existing `<img>` tags, attachment URLs, or reference links.
 - **Points follow the `/quote` rubric** — modified Fibonacci (`1, 2, 3, 5, 8, 13, 21`), calibrated for a senior developer working with Claude assistance. Only propose a change if the scope actually moved. If the revised item now looks bigger than 21 points, recommend splitting it into a Feature instead of writing the number.
+- **Prior art moves the number too, and it can move it *down*.** Added scope normally raises points, but scope that turns out to be a second or third consumer of something already built often costs less than the first one did — sometimes less than the raise it would otherwise earn. If the Step 3 search found precedent, say so in the points rationale rather than pricing the addition as new work.
 - **Never point a Feature** and never change a Feature's `System.State`.
 - **Prefix rule holds** — if the title changes, it keeps its `PREFIX - ` prefix from the project's CLAUDE.md table.
 
@@ -205,9 +217,9 @@ Render every Markdown section to HTML first — Azure DevOps description and acc
 
 **On a User Story:** acceptance criteria go in `Microsoft.VSTS.Common.AcceptanceCriteria`, never in `System.Description`. Write the criteria list alone into that field — no `<h3>Acceptance Criteria</h3>` wrapper — and make sure the description carries no copy of them.
 
-**On a Bug:** there is no Acceptance Criteria field and no Description control on the form. The whole write-up — description, steps, expected, actual, criteria — belongs in `Microsoft.VSTS.TCM.ReproSteps`, the environment in `Microsoft.VSTS.TCM.SystemInfo`, and `System.Description` holds only a labelled duplicate of the body.
+**On a Bug:** there is no Acceptance Criteria field and no Description control on the form. The whole write-up — description, steps, expected, actual, criteria, prior art — belongs in `Microsoft.VSTS.TCM.ReproSteps`, the environment in `Microsoft.VSTS.TCM.SystemInfo`, and `System.Description` holds only a labelled duplicate of the body.
 
-**On a Hot Fix:** the narrative stays in `System.Description`; steps, expected, actual and environment go to `Microsoft.VSTS.TCM.ReproSteps`. There is no System Info field on this type.
+**On a Hot Fix:** the narrative and prior art stay in `System.Description`; steps, expected, actual and environment go to `Microsoft.VSTS.TCM.ReproSteps`. There is no System Info field on this type.
 
 **Repair misfiled content when you find it.** If Step 2 found content in a field its type does not render, fix it as part of this edit even when the user didn't ask — it is the same content, moved to where a reader will actually see it:
 

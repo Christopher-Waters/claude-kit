@@ -55,6 +55,24 @@ Scan the user's response for:
 
 For each image found, plan to embed it in the final description as an `<img src="{url}">` tag, with the user's surrounding text preserved as context. For non-image links (docs, PRs, related work items), preserve them as `<a href="{url}">{url}</a>` in the relevant section of the draft. Do not strip these — they are often the only ground truth for the requirement.
 
+### Check for prior art (required — do this before drafting)
+
+**Before writing the draft, look for the same process already built somewhere else in the product.** This is not the duplicate check — a duplicate is *the same work already ticketed*. Prior art is *the same process already solved for a different entity, role, or screen*, which the new item should reuse rather than rebuild. The classic shape is "we built X for A; now we want X for B":
+
+> The digital W-9 was built for the **Facility Owner** (AB#3888 → AB#3860), then reused for the **Applicant** (AB#4189) through a shared component set at `Client/src/components/w9/` with a `mode` prop. A later story to give **CDA Trainers** a fillable W-9 (AB#5424) said only "similar process to the facility W-9 process" — naming no work item, no component, no endpoint. That story is a third consumer of an existing wizard whose `W9EntityType` enum already lists `Trainer` on both sides of the stack, but nothing in the item says so, so it reads like a build-from-scratch.
+
+Do all three passes — each finds things the others miss:
+
+1. **The codebase** — search for the noun and the verb in the requirement (`W-9`, `notes`, `export`, `bulk assign`). A `components/` or `shared/` directory, a `mode`/`variant` prop, or an enum listing the new entity alongside existing ones all mean the pattern is already generalized. Say so.
+2. **Work items** — `mcp__azure-devops__search_workitem` for the same process against the other entity. Closed items are the useful ones; they name the components and the decisions.
+3. **Commits** — `repo_search_commits` for the feature name, to find the PR that landed the original.
+
+Record what you find and carry it into the draft's **Prior Art** section (Step 3). Be specific — work item id, file path, component or endpoint name. "Similar to the facility process" is the failure mode this step exists to prevent; it tells the implementer nothing they can act on.
+
+If you find nothing, say so in one line rather than omitting the section — "no prior art found; this is the first {process} in the product" is itself useful, and it tells the reader the search was actually run.
+
+**Prior art also changes the estimate.** A third consumer of a shared component is a fraction of the first one. Carry the finding into Step 4 and say it in the rationale.
+
 ## Step 3: Develop the Plan
 
 Translate the user's free-form requirements into a structured work item draft. The shape depends on the type:
@@ -85,6 +103,11 @@ A Feature is a container — describe the outcome, not the implementation.}
 1. {observable, feature-level outcome that proves the capability landed}
 2. ...
 
+### Prior Art
+- {the same process already built elsewhere — work item id, component/file path,
+  endpoint — and what should be reused vs. built new. One line of "none found"
+  if the Step 2 search came up empty.}
+
 ### Open Questions
 - {anything ambiguous that you couldn't infer}
 ```
@@ -109,6 +132,11 @@ business or user value. Avoid implementation detail — that lives in tasks.}
 
 ### Out of Scope
 - {anything the user mentioned but that shouldn't block this story}
+
+### Prior Art
+- {the same process already built elsewhere — work item id, component/file path,
+  endpoint — and what should be reused vs. built new. One line of "none found"
+  if the Step 2 search came up empty.}
 
 ### Open Questions
 - {anything ambiguous that you couldn't infer — list as questions, not assumptions}
@@ -143,6 +171,12 @@ business or user value. Avoid implementation detail — that lives in tasks.}
 
 ### Environment / Scope
 - {where the bug occurs — browser, environment, role, data condition}
+
+### Prior Art
+- {the same defect already fixed elsewhere, or the same process working correctly
+  for another entity — work item id, component/file path. On a bug this is often
+  the fix itself: "the equivalent path for X was fixed in AB#nnnn." One line of
+  "none found" if the Step 2 search came up empty.}
 
 ### Open Questions
 - {anything you couldn't infer}
@@ -338,14 +372,14 @@ Verify with `mcp__azure-devops__wit_work_item` (`action: get_type`) rather than 
 
 | Draft section | Goes to |
 |---|---|
-| `### Description` | `System.Description` — plus the mockup `<img>`, user-supplied images, `Out of Scope`, `Open Questions` |
+| `### Description` | `System.Description` — plus the mockup `<img>`, user-supplied images, `Out of Scope`, `Prior Art`, `Open Questions` |
 | `### Acceptance Criteria` | `Microsoft.VSTS.Common.AcceptanceCriteria` — **never** also in the description |
 
 **Bug** — its form renders only **Repro Steps** and **System Info**. It has **no Acceptance Criteria field**, and `System.Description` has **no control on the Bug form**, so anything routed there is invisible to a human reader:
 
 | Draft section | Goes to |
 |---|---|
-| `### Description`, `### Steps to Reproduce`, `### Expected Behavior`, `### Actual Behavior`, `### Acceptance Criteria`, `### Open Questions` | `Microsoft.VSTS.TCM.ReproSteps` — composed into one document, each under its own `<h3>`, in that order |
+| `### Description`, `### Steps to Reproduce`, `### Expected Behavior`, `### Actual Behavior`, `### Acceptance Criteria`, `### Prior Art`, `### Open Questions` | `Microsoft.VSTS.TCM.ReproSteps` — composed into one document, each under its own `<h3>`, in that order |
 | `### Environment / Scope` | `Microsoft.VSTS.TCM.SystemInfo` |
 | (the same composed body) | `System.Description` — a labelled **duplicate**, for tools that read it without checking the type. Never unique content. |
 
@@ -355,7 +389,7 @@ Do **not** send `Microsoft.VSTS.Common.AcceptanceCriteria` on a Bug. Still *writ
 
 | Draft section | Goes to |
 |---|---|
-| `### Description`, `### Production Impact`, `### Open Questions` | `System.Description` |
+| `### Description`, `### Production Impact`, `### Prior Art`, `### Open Questions` | `System.Description` |
 | `### Steps to Reproduce`, `### Expected Behavior`, `### Actual Behavior`, `### Environment / Scope` | `Microsoft.VSTS.TCM.ReproSteps` |
 
 **Omit an empty section entirely** — never emit a bare `<h3>` with nothing under it. A heading with no body reads as content that went missing.
