@@ -144,7 +144,7 @@ In the CSI Development process template, `Bug` and `Hot Fix` have **no design st
 
 ### 5b. Bug / Hot Fix → `needs-info` tag
 
-> *"I can't size this until {what's missing} — and a Bug has no design state to send it back to. Want me to tag AB#{id} `needs-info` so it drops out of the next `/quote-backlog` sweep? Removing the tag re-queues it."*
+> *"I can't size this until {what's missing} — and a Bug has no design state to send it back to. Want me to tag AB#{id} `needs-info` so it drops out of the next `/quote-backlog` sweep? Removing the tag is what re-queues it — a reply alone leaves it excluded, though `/quote-backlog`'s stale-tag audit will surface it."*
 
 **Wait for the user.** Only update the work item if they say yes. Then add the tag with `mcp__azure-devops__wit_update_work_item`. Rules:
 

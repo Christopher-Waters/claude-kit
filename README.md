@@ -649,7 +649,7 @@ Claude reviews for:
 | `/status` | `/status release 24` | Check status of a release, pipeline, work item, or environment |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose one child task with hours per story |
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
-| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, bugs in `New` (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated) |
+| `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, bugs in `New` (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Also audits the drop-out queue — tagged bugs and stories bounced to Design Review — for items whose creator answered but which nobody returned to the sweep |
 | `/quote` | `/quote AB#1234` | Estimate a work item in story points (senior-calibrated Fibonacci rubric) |
 | `/explain` | `/explain AB#1234` | Summarize and explain a work item in plain language |
 | `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Feature, Bug, User Story, or Hot Fix — proposes story points (user must agree), creates pointed items in Dev Ready; on a Feature, also drafts its child stories with `Custom.Order` waves |

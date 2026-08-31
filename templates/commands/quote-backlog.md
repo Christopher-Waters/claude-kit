@@ -28,6 +28,8 @@ For each qualifying item:
 - a **User Story** that **can't be quoted** because information is missing moves back to **Design Review**, so the next sweep doesn't pick it up again while the creator is still working on it;
 - a **Bug** that can't be quoted gets a **`needs-info` tag** instead — its state stays `New`. `New` is the bottom of the Bug workflow, so there is no earlier state to send it back to; the tag is what drops it out of the next sweep. The Step 2 query excludes tagged items, and removing the tag re-queues the bug.
 
+Both drop-out mechanisms are **one-way and never expire** — only a human undoing them returns an item to the sweep. **Step 2b** therefore audits the drop-out queue on every run and reports items whose creator has answered but which nobody returned, so answered work can't sit invisible forever. That audit is read-only: it never clears a tag and never moves a story.
+
 Treat `$ARGUMENTS` as an optional project name (e.g. `/quote-backlog CSI Development`). If provided, skip the project prompt in Step 1.
 
 ## `--help`
@@ -39,6 +41,8 @@ If `$ARGUMENTS` contains `--help` or `-h`, print everything between the two rule
 **`/quote-backlog [project]`** — sweep a backlog for unpointed items that are ready to estimate: User Stories in `Design Approved`, Bugs in `New` (Bugs have no design states).
 
 Reviews each item for completeness and duplicate work, proposes points, and drafts feedback for the item's creator. Max 10 items per run, in backlog-rank order.
+
+Every run also audits the drop-out queue — bugs tagged `needs-info` and stories bounced to `Design Review` — and reports any whose creator has since answered but which nobody returned to the sweep. Neither mechanism expires on its own, so those items are otherwise invisible forever.
 
 Nothing is written to Azure DevOps until you approve the batch — every option below is a fully reversible choice.
 
@@ -108,7 +112,7 @@ ORDER BY [Microsoft.VSTS.Common.StackRank] ASC
 
 > **The state predicate is per-type on purpose — do not collapse it.** `[System.WorkItemType] IN ('User Story', 'Bug') AND [System.State] = 'Design Approved'` is the tempting one-liner and it is **silently wrong**: `Bug` has no `Design Approved` state, so that form returns User Stories only and never surfaces a single bug. It produces no error, just a short result set.
 >
-> The `[System.Tags] NOT CONTAINS 'needs-info'` clause excludes bugs that a previous run sent back to their creator (Step 5.3). Removing the tag re-queues the bug.
+> The `[System.Tags] NOT CONTAINS 'needs-info'` clause excludes bugs that a previous run sent back to their creator (Step 5.3). Removing the tag re-queues the bug — and **removing it is the only thing that does**, which is why Step 2b exists. Nothing expires the tag, so a creator who supplies the missing information and forgets to untag makes the bug invisible to every future sweep.
 >
 > The `[System.IterationPath] = '{project}'` clause restricts results to the **root** iteration — items not yet placed in a sprint. If a project uses a different convention (e.g. an explicit "Backlog" iteration), ask the user to confirm before proceeding.
 >
@@ -128,6 +132,70 @@ Nothing to quote on the backlog of {project}.
 ```
 
 and stop. **If the user expected items to be there**, confirm the state names with `get_type` before concluding the backlog is clean — an empty result is what a wrong state name looks like.
+
+## Step 2b: Audit the drop-out queue for stale items
+
+Both drop-out mechanisms from Step 5 are **one-way and have no expiry**: a bug leaves the sweep via the `needs-info` tag, a story leaves via `Design Review`, and the *only* thing that brings either back is a human undoing it. If a creator supplies the missing information but leaves the tag on — or answers in a comment without touching the field, or adds the missing AC without moving the story forward — the item goes invisible to every future sweep, permanently.
+
+That is silent starvation, and it is the most likely way this command loses work, because **the failure is indistinguishable from a clean backlog.** Both halves need auditing; fixing only the bug side leaves the same hole open for stories.
+
+Run this **regardless of what Step 2 returned** — including when Step 2 returned zero items, which is exactly when starvation is easiest to miss:
+
+```sql
+SELECT [System.Id], [System.Title], [System.WorkItemType],
+       [System.ChangedDate], [System.ChangedBy], [System.CommentCount]
+FROM WorkItems
+WHERE [System.TeamProject] = '{project}'
+  AND [System.Tags] CONTAINS 'needs-info'
+ORDER BY [System.ChangedDate] DESC
+```
+
+Then two passes — cheap first, precise only where the cheap pass raises a flag:
+
+1. **Cheap filter (one batch call).** Fetch `System.ChangedBy` / `System.ChangedDate` for the tagged ids. If an item's most recent change is still the person who applied the tag, nobody has responded — leave it alone.
+2. **Precise check, only for the remainder.** Call `mcp__azure-devops__wit_work_item` (`action: list_revisions`), find the revision where `needs-info` **first appeared**, then scan every **later** revision for one authored by somebody other than the tagger that changed `System.Title`, `Microsoft.VSTS.TCM.ReproSteps`, `System.Description`, `Microsoft.VSTS.Common.AcceptanceCriteria`, or raised `System.CommentCount`. Any such revision means the creator answered and the tag is stale.
+
+**Three traps in that check:**
+
+- **Bot revisions are noise.** A process automation (an AI work-item reviewer, a quality-score bot) bumps a revision after nearly every human write, so the *latest* revision author is frequently a bot even when a human just acted. Never conclude from the latest author alone — scan the whole range after the tag revision.
+- **A comment counts as a response.** A creator who answers in a comment without editing the field has still supplied the information. Treat a `System.CommentCount` increase after the tag revision as creator activity.
+- **The fix and the untag often land in one revision.** A tidy creator corrects the field *and* drops the tag in a single save, which is the healthy path and needs no report. Only a live tag with later activity behind it is stale.
+
+### The story side of the same hole
+
+Stories bounced to `Design Review` starve identically, but they **cannot be swept wholesale** — unlike the `needs-info` tag, `Design Review` is a legitimate working state, and most stories sitting in it arrived through the normal design process and are exactly where they belong. Auditing every story in `Design Review` would bury the real signal in noise.
+
+Narrow it to the ones *this command* bounced:
+
+```sql
+SELECT [System.Id], [System.Title], [System.ChangedDate], [System.ChangedBy]
+FROM WorkItems
+WHERE [System.TeamProject] = '{project}'
+  AND [System.WorkItemType] = 'User Story'
+  AND [System.State] = 'Design Review'
+  AND [Microsoft.VSTS.Scheduling.StoryPoints] = ''
+ORDER BY [System.ChangedDate] DESC
+```
+
+Then keep only those that reached `Design Review` **from `Design Approved`** (a bounce, not forward design progress) and carry a quote-sweep comment. `System.Reason` on the bouncing revision reads `Moved out of state Design Approved` — check the revision history rather than the current `System.Reason`, which reflects whatever happened last. A story that has had creator activity since that bounce is stale, on the same test as the bug side.
+
+If a project's stories routinely round-trip `Design Approved → Design Review` for reasons unrelated to estimating, say so and skip this half rather than reporting noise — the bug-side audit still stands on its own.
+
+### Reporting
+
+Report stale items **above** the batch, and do not quote them in this run:
+
+```
+⚑ Stale drop-outs — answered since they left the sweep, still excluded:
+   AB#6440 (Bug)   — Mackenzie Luke edited Repro Steps 2026-09-02, needs-info still on
+   AB#6443 (Bug)   — Mackenzie Luke commented 2026-09-01, needs-info still on
+   AB#6461 (Story) — Donna Chen added AC 2026-09-02, still in Design Review
+
+   Re-quote one with /quote AB#{id}, or return it to the sweep: drop the bug's
+   tag / move the story back to Design Approved.
+```
+
+**Never undo the drop-out yourself** — don't clear the tag, don't move the story forward. Both are the creator's signal that the item is ready, and asserting it for them claims knowledge you don't have; the creator may have answered one gap while another remains. Surfacing it is the whole job — a drop-out nobody reverses is work nobody sees. If nothing is stale, say so in one line (`✓ drop-out queue clean — {n} tagged bugs, {m} bounced stories, none updated since`) and move on.
 
 ## Step 3: Analyze Each Item (max 10)
 
@@ -231,7 +299,7 @@ If 3b–3d surfaced anything — gaps, a duplicate, a suggested approach change 
 
 {Closing line: what's needed to make it estimable — and say plainly what just happened to the item, matched to its type:
  - User Story going back: "Moving this back to Design Review until that's answered — ping me and I'll re-quote it."
- - Bug being tagged: "Tagging this needs-info so it's out of the estimating sweep — a Bug has no Design Review state to move it to. Remove the tag (or reply here) once there are repro steps and I'll re-quote it."
+ - Bug being tagged: "Tagging this needs-info so it's out of the estimating sweep — a Bug has no Design Review state to move it to. **Remove the tag** once there are repro steps and the next sweep picks it up automatically. Replying here alone leaves the tag on and the sweep still skips it — I'll catch it in the stale-tag audit, but dropping the tag is the reliable route."
  - Either type, pointed: "Estimated at {n} points assuming {assumption} — correct me if that's wrong."}
 ```
 
@@ -340,6 +408,7 @@ Items analyzed:    {n} (of {total} qualifying — {remaining} left for the next 
   ✓ Rewrites:      {n_rewrites_applied} applied, {n_rewrites_suggested} suggested in comments
   ⚑ Info missing:  {n_info_missing} items sent back to the creator (AC on stories, repro steps on bugs)
   ⏭ Skipped:       {n_skipped} left exactly as they were — will reappear next sweep ({reasons})
+  ⚑ Stale drop-outs: {n_stale} answered since leaving the sweep — still excluded ({n_stale_bugs} tagged bugs, {n_stale_stories} bounced stories)
 
 Pointed items:
 - AB#4611: 5 pts
@@ -358,9 +427,14 @@ Left exactly as they were:
 - AB#4623: too large to point — split proposal in the comment (Design Approved)
 - AB#4625: you skipped it (New)
 
+Stale drop-outs (answered since leaving the sweep — invisible until returned):
+- AB#4630 (Bug): creator edited Repro Steps 2026-09-02, needs-info still on
+- AB#4631 (Bug): creator commented 2026-09-01, needs-info still on
+- AB#4632 (Story): creator added AC 2026-09-02, still in Design Review
+
 Next steps:
   /quote-backlog {project}   — process the next 10 qualifying items
   /quote AB#{id}             — re-estimate a single item after the creator responds
 ```
 
-Do not create tasks or assign items — those are downstream decisions. Pointed items are now Dev Ready, so `/plan-backlog` picks them up on its next run. Stories moved to Design Review and bugs tagged `needs-info` are both out of the Step 2 query, so the next `/quote-backlog` run reaches genuinely new items instead of re-reviewing the ones still waiting on their creator — re-quote one with `/quote AB#{id}` once they respond, or let them move the story back to Design Approved / drop the bug's tag themselves. Make no change other than the three described in Step 5.
+Do not create tasks or assign items — those are downstream decisions. Pointed items are now Dev Ready, so `/plan-backlog` picks them up on its next run. Stories moved to Design Review and bugs tagged `needs-info` are both out of the Step 2 query, so the next `/quote-backlog` run reaches genuinely new items instead of re-reviewing the ones still waiting on their creator — re-quote one with `/quote AB#{id}` once they respond, or let them move the story back to Design Approved / drop the bug's tag themselves. Make no change other than the three described in Step 5 — **Step 2b's audit is read-only**, and it never clears a tag on the creator's behalf.
