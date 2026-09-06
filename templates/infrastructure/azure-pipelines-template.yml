@@ -6,20 +6,28 @@
 # Usage:
 # 1. Copy this file to your project root as azure-pipelines.yml
 # 2. Replace all {{PLACEHOLDER}} values with your project-specific values
-# 3. Remove stages you don't need (e.g., QA if your project doesn't have it)
+# 3. Remove stages you don't need (e.g., Test if your project doesn't have it)
 # 4. Create a new pipeline in Azure DevOps pointing to this file
 #
 # Branch-to-environment mapping:
-#   develop  → Dev
+#   main     → (compare branch — NOT a trigger; merging a PR into main deploys nothing)
+#   dev      → Dev
+#   test     → Test
 #   staging  → Staging
-#   main     → Production
+#   prod     → Production
+#
+# Code moves main → dev → test → staging → prod by PR; each merge below main
+# triggers this pipeline for that one environment.
 
 trigger:
   branches:
     include:
-      - develop
+      - dev
+      - test
       - staging
-      - main
+      - prod
+    exclude:
+      - main                       # compare branch — never deploys
   paths:
     include:
       - "{{PROJECT_PATH}}/**"    # e.g., Api/**, Client/**, src/**
@@ -36,6 +44,10 @@ variables:
   # Dev environment
   devWebsiteName: "{{DEV_WEBSITE_NAME}}"                   # e.g., dev.api.compass.caresolutions.com
   devAppPoolName: "{{DEV_APP_POOL}}"                       # e.g., dev.api.compass.com
+
+  # Test environment
+  testWebsiteName: "{{TEST_WEBSITE_NAME}}"                 # e.g., test.api.compass.caresolutions.com
+  testAppPoolName: "{{TEST_APP_POOL}}"                     # e.g., test.api.compass.com
 
   # Staging environment
   stagingWebsiteName: "{{STAGING_WEBSITE_NAME}}"           # e.g., staging.api.compass.caresolutions.com
@@ -73,7 +85,7 @@ stages:
   - stage: Dev
     displayName: "Deploy to Dev"
     dependsOn: "Build"
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
     jobs:
       - deployment: DeployDev
         displayName: "Deploy to Dev"
@@ -108,6 +120,49 @@ stages:
                   displayName: "Deploy to IIS"
                   inputs:
                     WebsiteName: "$(devWebsiteName)"
+                    Package: "$(Build.ArtifactStagingDirectory)/$(projectName).zip"
+                    TakeAppOfflineFlag: true
+                    XmlVariableSubstitution: true
+
+  # ── Test ───────────────────────────────────────────────
+  - stage: Test
+    displayName: "Deploy to Test"
+    dependsOn: "Build"
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/test'))
+    jobs:
+      - deployment: DeployTest
+        displayName: "Deploy to Test"
+        environment:
+          name: "{{TEST_ENVIRONMENT_NAME}}"                # e.g., Test
+          resourceType: VirtualMachine
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    artifact: "drop"
+                    path: "$(Build.ArtifactStagingDirectory)"
+
+                - task: IISWebAppManagementOnMachineGroup@0
+                  displayName: "Configure IIS"
+                  inputs:
+                    IISDeploymentType: "IISWebsite"
+                    ActionIISWebsite: "CreateOrUpdateWebsite"
+                    WebsiteName: "$(testWebsiteName)"
+                    WebsitePhysicalPath: "$(WebsitePhysicalPath)"
+                    WebsitePhysicalPathAuth: "WebsiteUserPassThrough"
+                    AddBinding: false
+                    CreateOrUpdateAppPoolForWebsite: true
+                    AppPoolNameForWebsite: "$(testAppPoolName)"
+                    DotNetVersionForWebsite: "No Managed Code"
+                    PipeLineModeForWebsite: "Integrated"
+                    AppPoolIdentityForWebsite: "ApplicationPoolIdentity"
+
+                - task: IISWebAppDeploymentOnMachineGroup@0
+                  displayName: "Deploy to IIS"
+                  inputs:
+                    WebsiteName: "$(testWebsiteName)"
                     Package: "$(Build.ArtifactStagingDirectory)/$(projectName).zip"
                     TakeAppOfflineFlag: true
                     XmlVariableSubstitution: true
@@ -159,7 +214,7 @@ stages:
   - stage: Production
     displayName: "Deploy to Production"
     dependsOn: "Build"
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/prod'))
     jobs:
       - deployment: DeployProd
         displayName: "Deploy to Production"

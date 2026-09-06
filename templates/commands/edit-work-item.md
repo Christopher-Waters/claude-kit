@@ -168,7 +168,7 @@ Show the field-level diff for every story marked **Update**, and the full draft 
 
 ## Step 5: Safety Gate — In-Flight Work
 
-Before asking for approval, check the state of everything you propose to write and flag anything that is **past `Dev Ready`** in the workflow (`Active`, `Code Review`, `Ready for Testing`, `Testing`, `Ready to Deploy`, `Deployed`, `Closed`) or has a **linked pull request**.
+Before asking for approval, check the state of everything you propose to write and flag anything that is **past `Dev Ready`** in the workflow (`Active`, `Code Review`, `Ready for Testing`, `Testing`, `Ready for Staging`, `Staging`, `Ready to Deploy`, `Deployed`, `Closed`) or has a **linked pull request**.
 
 Editing the acceptance criteria of a story that is already implemented silently invalidates a PR that was reviewed against the old criteria. So for each such item, call it out explicitly:
 

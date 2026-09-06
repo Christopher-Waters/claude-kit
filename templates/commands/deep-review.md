@@ -111,7 +111,7 @@ Verify the change is safe beyond the lines it touched.
 Specifically check:
 - **Changed shared code** — for every public method/class/interface/DTO the diff modifies, find its other callers and confirm the change is backward-compatible or all callers were updated.
 - **Test fallout** — any failing test from Step 4 in an area this PR didn't intend to change is a regression; surface it as **critical**.
-- **Environment configuration parity** — if the diff adds or changes any key in `appsettings.*.json` or `.env*`, every parallel environment file (Development/Staging/QA/Production for backend; `.env.development`/`.env.staging`/`.env.production`/`.env.example` for React) must have a corresponding entry, or the omission must be called out. Build a (key × environment) table and flag any missing cell as **critical**. A pipeline variable group, Key Vault, or App Configuration counts as a valid source for an environment — verify it exists rather than assume it.
+- **Environment configuration parity** — if the diff adds or changes any key in `appsettings.*.json` or `.env*`, every parallel environment file (Development/Test/QA/Staging/Production for backend; `.env.development`/`.env.test`/`.env.staging`/`.env.production`/`.env.example` for React) must have a corresponding entry, or the omission must be called out. Build a (key × environment) table and flag any missing cell as **critical**. A pipeline variable group, Key Vault, or App Configuration counts as a valid source for an environment — verify it exists rather than assume it.
 
 ## Step 7: Detect Unwanted / Out-of-Scope Changes — and Confirm With the User
 

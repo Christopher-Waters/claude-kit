@@ -23,8 +23,8 @@ You deploy code changes to Azure environments. Follow the standard sequence for 
 
    | File family | Parallel files to check |
    |-------------|------------------------|
-   | `appsettings.json` | `appsettings.Development.json`, `appsettings.Staging.json`, `appsettings.QA.json`, `appsettings.Production.json` |
-   | `.env` | `.env.development`, `.env.staging`, `.env.qa`, `.env.production`, `.env.local`, `.env.example` |
+   | `appsettings.json` | `appsettings.Development.json`, `appsettings.Test.json`, `appsettings.QA.json`, `appsettings.Staging.json`, `appsettings.Production.json` |
+   | `.env` | `.env.development`, `.env.test`, `.env.qa`, `.env.staging`, `.env.production`, `.env.local`, `.env.example` |
 
    Present a (key × environment) table to the user. For any missing cell, prompt the user to supply a value (real, placeholder, or empty) before pushing, or to confirm the omission is intentional because the key is wired through a pipeline variable group, Key Vault, or App Configuration for that environment. Do NOT push until every missing entry is either filled in or explicitly skipped by the user.
 
@@ -47,10 +47,11 @@ Push only the current branch. Do NOT cross-push to other branches — deployment
 
 ### Step 4: Trigger Pipeline (Conditional)
 
-Only trigger the CD pipeline if you are pushing directly to an environment branch (the branch a CD pipeline watches). Check the project's CLAUDE.md or pipeline configuration for which branches map to which environments.
+Only trigger the CD pipeline if you are pushing directly to an environment branch (the branch a CD pipeline watches). Check the project's CLAUDE.md **Pipeline Configuration** table for which branches map to which environments. The standard layout is `main` (compare branch — **no pipeline, merging into it deploys nothing**) followed by the environment branches `dev → test → staging → prod`, each deploying when a PR merges into it.
 
-- **On an environment branch** (e.g., `develop`, `staging`, `main`): Trigger the appropriate CD pipeline using the Azure DevOps MCP server.
-- **On a feature/hotfix/bugfix/story/work branch**: Do NOT trigger the pipeline. It will trigger automatically when the PR is merged into the target branch.
+- **On an environment branch** (`dev`, `test`, `staging`, `prod` — a row with pipeline IDs): Trigger the listed CD pipeline(s) using the Azure DevOps MCP server.
+- **On `main`**: Do NOT trigger anything. Report that the change will deploy when `main` is promoted to `dev`.
+- **On a feature/hotfix/bugfix/story/work branch**: Do NOT trigger the pipeline. The work deploys when it is promoted after the PR merges into `main`.
 
 ### Step 5: Monitor
 
@@ -69,9 +70,10 @@ These operations are performed when the user explicitly requests promotions, che
 
 When asked to promote code from one environment to the next:
 
-1. Create a PR from the source branch to the target branch (e.g., `develop` → `staging`, or `staging` → `main`)
-2. Include a summary of all changes being promoted
+1. Create a PR from the source branch to the next branch in the chain (`main` → `dev`, `dev` → `test`, `test` → `staging`, `staging` → `prod`)
+2. Include a summary of all changes being promoted and the work items they carry
 3. After PR is merged, the CD pipeline for the target environment triggers automatically
+4. Once the user confirms the merge, advance the carried User Stories / Bugs / Hot Fixes to the environment's state (`dev` → `Ready for Testing`, `test` → `Testing`, `staging` → `Staging`, `prod` → `Deployed`) — never backward, never a Feature or Task. The `/promote` command documents the full gate-check and state rules
 
 ### Deploy Release
 
@@ -86,6 +88,7 @@ When asked to deploy a release (e.g., "deploy release #23 to staging"):
 7. Push the release branch and create a PR to the target environment branch
 8. Link all work items to the PR
 9. After merge, the CD pipeline triggers automatically
+10. Once the user confirms the merge, advance the carried work items to the environment's state (see Promote to Environment, item 4)
 
 ### Cherry-Pick Deployment (Ad-Hoc)
 
@@ -97,6 +100,7 @@ When asked to deploy specific stories/commits outside of a formal release:
 4. If conflicts arise, STOP and report them — do not resolve automatically
 5. Push the cherry-pick branch and create a PR to the target environment branch
 6. After merge, the CD pipeline triggers automatically
+7. Once the user confirms the merge, advance the carried work items to the environment's state (see Promote to Environment, item 4)
 
 ### Rollback
 
@@ -108,6 +112,8 @@ When asked to roll back a deployment:
 4. Run pre-flight checks (Step 1) on the reverted code
 5. Push and create a PR to the environment branch
 6. For production rollbacks, treat as urgent — flag to the user immediately
+7. Do not change work item states on a rollback — tell the user which items were reverted and let them decide
+8. If the reverted commits are also on `main`, warn that the next promotion brings them back unless the revert is applied to `main` too
 
 ---
 

@@ -209,9 +209,9 @@ your-project/                      ← Project-specific
 │   │   ├── deploy.md              # /deploy "commit message"
 │   │   ├── create-release.md      # /create-release 23
 │   │   ├── deploy-release.md      # /deploy-release 23 staging
-│   │   ├── cherry-pick.md         # /cherry-pick AB#1234 production
-│   │   ├── promote.md             # /promote staging production
-│   │   ├── rollback.md            # /rollback AB#1234 production
+│   │   ├── cherry-pick.md         # /cherry-pick AB#1234 prod
+│   │   ├── promote.md             # /promote main dev
+│   │   ├── rollback.md            # /rollback AB#1234 prod
 │   │   ├── add-to-release.md      # /add-to-release 24 AB#4599
 │   │   ├── status.md              # /status release 24
 │   │   ├── cleanup-branches.md    # /cleanup-branches
@@ -305,7 +305,7 @@ Claude automatically:
 1. Runs pre-flight checks (dotnet build, tsc)
 2. Stages and commits with the provided message
 3. Pushes the current branch
-4. Triggers the CD pipeline if on an environment branch
+4. Triggers the CD pipeline if on an environment branch (`dev`, `test`, `staging`, `prod`) — never on `main`, which has no pipeline
 
 ### Create a Release
 
@@ -325,31 +325,36 @@ Claude automatically:
 ```
 
 Claude automatically:
-1. Finds all work items in Release #23
+1. Finds all work items in Release #23 and checks each against the environment's gate state (`Ready for Staging` here)
 2. Cherry-picks their commits into `release/23-to-staging`
-3. Creates a PR targeting the staging branch
+3. Creates a PR targeting the `staging` branch — merging it triggers the Staging pipeline
 4. Links all work items to the PR
+5. After you reply `merged`, moves the work items to `Staging`
+
+The same command walks a release through `test` → `staging` → `prod`; with no environment given it picks the next one.
 
 ### Cherry-Pick Work Items
 
 ```
-/cherry-pick AB#1234 AB#1235 production
+/cherry-pick AB#1234 AB#1235 prod
 ```
 
-Cherry-picks specific work items to an environment without a formal release.
+Cherry-picks specific work items to an environment without a formal release. Same gate check and post-merge state advance as `/deploy-release`. `main` is also a valid target — that's how a hot fix that went straight to `prod` is brought back into the compare branch.
 
 ### Promote an Environment
 
 ```
-/promote staging production
+/promote main dev
+/promote staging prod
+/promote                  ← auto-detects from the current branch
 ```
 
-Creates a PR to promote all code from staging to production. Shows a summary of all included commits before confirming.
+Creates a PR to promote all code from one branch to the next in the chain (`main → dev → test → staging → prod`). Shows every commit and work item before confirming, gate-checks the work items, and advances their states after you reply `merged`. `main → dev` is the usual first hop after feature PRs merge — nothing has deployed before that.
 
 ### Rollback a Deployment
 
 ```
-/rollback AB#1234 production
+/rollback AB#1234 prod
 /rollback last staging
 ```
 
@@ -411,15 +416,30 @@ Finds and deletes branches that have been fully merged. Protects environment bra
 
 ### Target State (All Projects)
 
-Every project should converge to this standard. Each long-lived branch maps to an Azure subscription and environment:
+`main` is the **compare branch** — the default branch, the one feature PRs target, and the one every environment is compared against. **Merging into `main` deploys nothing.** Each environment has its own branch, and a PR merging into that branch is what triggers its CD pipeline:
 
-| Branch | Azure Subscription | Environment | Deploys When |
-|--------|-------------------|-------------|-------------|
-| `develop` | Dev | Development | PR merged into `develop` |
-| `staging` | Staging | Staging | PR merged into `staging` |
-| `main` | Production | Production | PR merged into `main` (with approval gate) |
+| Branch | Environment | Deploys When |
+|--------|-------------|-------------|
+| `main` | — (compare / integration) | **Never** — a PR merging into `main` does not deploy |
+| `dev` | Development | PR merged into `dev` |
+| `test` | Test (QA) | PR merged into `test` |
+| `staging` | Staging | PR merged into `staging` |
+| `prod` | Production | PR merged into `prod` |
 
-> **Note:** Some projects are not yet in sync — they may use `master` instead of `main`, or lack a `staging` branch. All commands work dynamically with whatever branch you're on. No branch names are hardcoded.
+> **Note:** A project that hasn't migrated yet (e.g. one that still has only `main` and `develop`) keeps working — every command reads the project's Pipeline Configuration table and uses the branch you're on. No branch names are hardcoded.
+
+### Work Item States Follow the Environments
+
+Every environment has a work item state, and the promotion commands keep them in sync. The "Ready for …" states are human sign-offs; the commands never set them.
+
+| Promotion | Gate (item should already be…) | State after the PR merges |
+|-----------|-------------------------------|---------------------------|
+| `main → dev` | `Code Review` | `Ready for Testing` |
+| `dev → test` | `Ready for Testing` | `Testing` |
+| `test → staging` | `Ready for Staging` (QA sign-off) | `Staging` |
+| `staging → prod` | `Ready to Deploy` (stakeholder sign-off) | `Deployed` |
+
+`/deploy-release`, `/cherry-pick`, and `/promote` check the gate before creating the PR, then ask you to reply `merged` once the PR completes and advance the states. `/status` flags anything whose state lags the branch it's on.
 
 ### Branch Naming
 
@@ -439,11 +459,12 @@ The branch is always created off the **current branch** — no assumptions are m
 
 ### Code Promotion Flow
 
-Code flows through environments via PRs, never by direct push:
+Code flows through environments via PRs, never by direct push. Every merge **after** `main` deploys:
 
 ```
-feature/AB#1234-... ──PR──▸ develop ──PR──▸ staging ──PR──▸ main
-   (work branch)            (Dev)          (Staging)      (Production)
+feature/AB#1234-... ──PR──▸ main ──PR──▸ dev ──PR──▸ test ──PR──▸ staging ──PR──▸ prod
+   (work branch)          (compare,     (Dev)       (Test)        (Staging)      (Production)
+                          no deploy)
 ```
 
 ---
@@ -462,8 +483,8 @@ claude
 ```
 
 ```
-# Switch to the develop branch first
-git checkout develop
+# Start from the compare branch
+git checkout main
 
 # Implement the work item
 /implement AB#1234
@@ -478,9 +499,15 @@ Claude will:
 6. Implement using backend and/or frontend agents
 7. Run all quality checks (build, lint, tests, review)
 8. Generate a UAT checklist and **pause for you to manually test**
-9. After you confirm "testing passed", create a PR targeting `develop`
+9. After you confirm "testing passed", create a PR targeting `main`, close the child Task with its hours, and move the work item to `Code Review`
 
-The PR merges into `develop`, which triggers the Dev environment CD pipeline.
+The PR merges into `main`. **That merge deploys nothing** — `main` is the compare branch. The work reaches Dev when `main` is promoted:
+
+```
+/promote main dev
+```
+
+Merge that PR, reply `merged`, and the work items move to `Ready for Testing`.
 
 ### Step 2: Deploy Changes (Quick Commits)
 
@@ -490,11 +517,11 @@ For smaller changes that don't need the full `/implement` workflow:
 /deploy "Fix typo in dashboard header"
 ```
 
-This commits, pushes, and triggers the pipeline if you're on an environment branch. If you're on a feature branch, it just pushes — the pipeline triggers on PR merge.
+This commits, pushes, and triggers the pipeline if you're on an environment branch (`dev`, `test`, `staging`, `prod`). On `main` or a feature branch it just pushes — nothing deploys until the work is promoted.
 
 ### Step 3: Group Work Items into a Release
 
-Once multiple work items are merged to `develop` and tested in Dev, group them into a release:
+Once multiple work items are merged to `main` and smoke-tested on Dev, group them into a release:
 
 ```
 /create-release 23
@@ -508,23 +535,24 @@ Claude will:
 2. Show you the list and ask for confirmation
 3. Create a `Release #23` iteration in Azure DevOps
 4. Assign all work items to the iteration and tag them with `release-23`
-5. Tell you how to deploy: `/deploy-release 23 staging` or `/deploy-release 23 production`
+5. Tell you how to deploy: `/deploy-release 23 test`, then `staging`, then `prod`
 
-### Step 4: Deploy a Release to Staging
+### Step 4: Deploy a Release to Test, then Staging
 
 ```
-/deploy-release 23 staging
+/deploy-release 23 test
 ```
 
 Claude will:
-1. Find all work items tagged `release-23`
-2. Find their associated commits on the `develop` branch
-3. Create a release branch: `release/23-to-staging`
+1. Find all work items tagged `release-23` and check each is at the gate for Test (`Ready for Testing`)
+2. Find their associated commits on `dev`
+3. Create a release branch: `release/23-to-test`
 4. Cherry-pick all commits for each work item
-5. Create a PR from `release/23-to-staging` → `staging`
+5. Create a PR from `release/23-to-test` → `test`
 6. Link all work items to the PR
+7. After you reply `merged`, move the work items to `Testing`
 
-After the PR is reviewed and merged, the Staging CD pipeline triggers automatically.
+After the PR is reviewed and merged, the Test CD pipeline triggers automatically. QA tests there and sets each passing item to `Ready for Staging`; then `/deploy-release 23 staging` repeats the process (gate `Ready for Staging`, state after merge `Staging`).
 
 ### Step 5: Test on Staging
 
@@ -532,45 +560,46 @@ QA and stakeholders test on the Staging environment. If issues are found, fix th
 
 ### Step 6: Deploy a Release to Production
 
-When staging testing passes:
+When stakeholders have verified on Staging and set the items to `Ready to Deploy`:
 
 ```
-/deploy-release 23 production
+/deploy-release 23 prod
 ```
 
-Same process — cherry-picks the release's commits to a PR targeting the production branch. After merge, the Production CD pipeline triggers (with approval gate).
+Same process — gate `Ready to Deploy`, cherry-picks from `staging` into a PR targeting `prod`. After merge, the Production CD pipeline triggers; reply `merged` and the items move to `Deployed`.
 
 ### Selective Deployment
 
-If staging has 5 user stories but only 3 are ready for production:
+If staging has 5 user stories but only 3 are `Ready to Deploy`:
 
 **Option A: Create a smaller release**
 ```
 /create-release 24
 ```
-Include only the 3 ready stories, then `/deploy-release 24 production`.
+Include only the 3 ready stories, then `/deploy-release 24 prod`.
 
 **Option B: Cherry-pick specific items**
 ```
-/cherry-pick AB#1234 AB#1235 AB#1236 production
+/cherry-pick AB#1234 AB#1235 AB#1236 prod
 ```
 This cherry-picks just those 3 work items without creating a formal release.
 
 ### Promoting Without a Release
 
-To promote **all** code from one environment to the next (no cherry-picking):
+To promote **all** code from one branch to the next (no cherry-picking):
 
 ```
-/promote staging production
+/promote main dev
+/promote staging prod
 ```
 
-This creates a PR from `staging` → production branch containing everything. Use this when all staging code is ready for production.
+This creates a PR from the source branch to the next one in the chain containing everything. `main → dev` is the everyday first hop; `staging → prod` is for when everything on staging is approved.
 
 You can also auto-detect the next environment:
 ```
 /promote
 ```
-If you're on the `staging` branch, it auto-detects `staging → production`.
+If you're on `main`, it auto-detects `main → dev`; on `staging`, `staging → prod`.
 
 ### Hot Fix Workflow
 
@@ -578,7 +607,7 @@ For critical production issues:
 
 1. Switch to the production branch:
    ```
-   git checkout main
+   git checkout prod
    ```
 2. Run `/implement` with the Hot Fix work item:
    ```
@@ -587,7 +616,8 @@ For critical production issues:
 3. Claude creates a `hotfix/AB#9999-fix-crash-on-submit` branch
 4. Automated checks still run (build, lint, tests, review)
 5. **Manual UAT is skipped** — you get an abbreviated confirmation instead
-6. PR targets the production branch directly with a `hotfix` label
+6. PR targets `prod` directly with a `hotfix` label — merging it deploys straight to production
+7. Then bring the fix back to `main` (a second PR from the same branch, or `/cherry-pick AB#9999 main`) so the next `main → dev` promotion doesn't overwrite it
 
 ### Rollback a Deployment
 
@@ -595,7 +625,7 @@ If a deployment causes issues:
 
 **Revert specific work items:**
 ```
-/rollback AB#1234 production
+/rollback AB#1234 prod
 ```
 
 **Revert the most recent deployment:**
@@ -605,12 +635,12 @@ If a deployment causes issues:
 
 Claude will:
 1. Find the commits to revert
-2. Create a revert branch (e.g., `revert/2026-03-21-on-production`)
+2. Create a revert branch (e.g., `revert/2026-09-06-on-prod`)
 3. Run `git revert` on each commit
 4. Run pre-flight checks on the reverted code
 5. Create a PR targeting the environment branch
 
-Merge the PR to deploy the rollback.
+Merge the PR to deploy the rollback. Work item states are left alone — Claude tells you which items were reverted so you can decide. If the reverted commits are also on `main`, the next promotion brings them back unless the revert is applied there too.
 
 ### Code Review
 
@@ -639,14 +669,14 @@ Claude reviews for:
 | `/deep-review` | `/deep-review 142` | Deep, Ultracode-orchestrated review: checks out the branch, builds/tests it, verifies every requirement, checks for regressions, flags out-of-scope changes, then comments + votes |
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
 | `/fix-review` | `/fix-review 142` | Fix everything flagged on a PR — human reviewer comments and automated `/review` findings alike: implement in severity order, validate, push, resolve threads |
-| `/deploy` | `/deploy "message"` | Commit, push, trigger pipeline if on environment branch |
+| `/deploy` | `/deploy "message"` | Commit, push, trigger pipeline if on an environment branch (`dev`/`test`/`staging`/`prod`) — never on `main` |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 iteration with tags |
-| `/deploy-release` | `/deploy-release 23 staging` | Cherry-pick release work items to environment via PR |
+| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → cherry-pick release work items to environment via PR → advance states after `merged` |
 | `/add-to-release` | `/add-to-release 24 AB#4599` | Add work items to an existing release |
-| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 production` | Cherry-pick specific work items to environment via PR |
-| `/promote` | `/promote staging production` | PR to promote all code between environments |
-| `/rollback` | `/rollback AB#1234 production` | Revert specific commits on an environment via PR |
-| `/status` | `/status release 24` | Check status of a release, pipeline, work item, or environment |
+| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items to environment via PR → advance states after `merged` |
+| `/promote` | `/promote main dev` | PR to promote all code to the next branch in the chain (`main → dev → test → staging → prod`) → advance states after `merged` |
+| `/rollback` | `/rollback AB#1234 prod` | Revert specific commits on an environment via PR |
+| `/status` | `/status release 24` | Check status of a release, pipeline, work item, or environment; flags work items whose state lags their environment |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose one child task with hours per story |
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, bugs in `New` (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Also audits the drop-out queue — tagged bugs and stories bounced to Design Review — for items whose creator answered but which nobody returned to the sweep |
@@ -725,7 +755,7 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 | Memory Type | Purpose | Example |
 |-------------|---------|---------|
 | **user** | Who you are, preferences, expertise | "Senior .NET dev, prefers terse responses" |
-| **feedback** | What to do / avoid (self-improving) | "Always push to both main and develop" |
+| **feedback** | What to do / avoid (self-improving) | "Never enable 'Complete associated work items' when merging a PR" |
 | **project** | Decisions, priorities, blockers | "Using Stripe instead of Dwolla because..." |
 | **reference** | URLs, credentials, external resources | "Staging URL: https://..." |
 

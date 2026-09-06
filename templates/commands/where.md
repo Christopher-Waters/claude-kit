@@ -12,14 +12,16 @@ Capture: id, title, type, state, and any linked Pull Request artifacts from `rel
 
 ## Step 2: Resolve the Environment Chain
 
-Read the **Pipeline Configuration** table from the current repo's `CLAUDE.md`. The table rows define the environment branches in promotion order (top → bottom). Example:
+Read the **Pipeline Configuration** table from the current repo's `CLAUDE.md`. The table rows define the branches in promotion order (top → bottom). The **first row is the compare branch** (`main`) — feature PRs merge there, but nothing deploys from it; the rows below are the environment branches. Example:
 
 ```
 | Branch | Environment | Pipeline(s) |
 |--------|------------|-------------|
-| develop | Dev | ... |
+| main | — (compare branch, no deployment) | — |
+| dev | Dev | ... |
+| test | Test | ... |
 | staging | Staging | ... |
-| main | Production | ... |
+| prod | Production | ... |
 ```
 
 If the table is missing, report that the project has no pipeline configuration in `CLAUDE.md` and stop.
@@ -62,19 +64,21 @@ AB#<id>: <title>
 This work item is in <env list joined with " and ">.
 ```
 
-Where `<env list>` is the environments where the work item is present, in promotion order. If none, say "not deployed to any environment yet."
+Where `<env list>` is the environments where the work item is present, in promotion order. The compare branch is not an environment: if the commits are on `main` only, say "merged to main, not deployed to any environment yet." If not even on `main`, say "not merged yet."
 
 Then a details table:
 
 ```
-| Environment | Branch  | Deployed | Commits |
-|-------------|---------|----------|---------|
-| Dev         | develop | Yes      | 2 of 2  |
-| Staging     | staging | Yes      | 2 of 2  |
-| Production  | main    | No       | 0 of 2  |
+| Environment | Branch  | Present | Commits |
+|-------------|---------|---------|---------|
+| — (compare) | main    | Yes     | 2 of 2  |
+| Dev         | dev     | Yes     | 2 of 2  |
+| Test        | test    | Yes     | 2 of 2  |
+| Staging     | staging | Yes     | 1 of 2  |
+| Production  | prod    | No      | 0 of 2  |
 ```
 
-- **Deployed**: Yes if at least one commit is reachable from the branch tip; No otherwise.
+- **Present**: Yes if at least one commit is reachable from the branch tip; No otherwise. For the compare branch this means "merged", not "deployed".
 - **Commits**: how many of the work item's commits are present on that branch (e.g. `1 of 2` flags a partial cherry-pick).
 
 If any linked PRs are still open (not merged), append:
@@ -84,4 +88,6 @@ Open PRs:
 - PR #<n> → <target branch> (<status>)
 ```
 
-That's it — read-only. Do not modify branches, push, or create PRs.
+Finally, compare the work item's state with its furthest environment (`dev` → `Ready for Testing`, `test` → `Testing`, `staging` → `Staging`, `prod` → `Deployed`). If the state lags — e.g. commits on `staging` but the item is still `Testing` — add one line: `⚠ State lags environment: Testing, expected at least Staging — /status AB#<id> can catch it up.`
+
+That's it — read-only. Do not modify branches, push, create PRs, or change states.

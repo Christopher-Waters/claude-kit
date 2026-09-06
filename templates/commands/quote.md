@@ -114,7 +114,7 @@ Only update the work item if the user explicitly says yes. Do not modify anythin
 When the user agrees, in the **same** `wit_update_work_item` call:
 
 1. Set `Microsoft.VSTS.Scheduling.StoryPoints` to the agreed value (the user's number wins if they adjusted it).
-2. Set `System.State` to `Dev Ready` — **but only if** the work item type is `User Story`, `Bug`, or `Hot Fix` **and** the item is not already past Dev Ready in the workflow (e.g. `Active`, `Code Review`, `Ready to Deploy`). Never move an item backward — if it's already past Dev Ready, set the points only and mention the state was left alone.
+2. Set `System.State` to `Dev Ready` — **but only if** the work item type is `User Story`, `Bug`, or `Hot Fix` **and** the item is not already past Dev Ready in the workflow (e.g. `Active`, `Code Review`, `Testing`, `Staging`, `Ready to Deploy`). Never move an item backward — if it's already past Dev Ready, set the points only and mention the state was left alone.
 
 **Never change the state of a Feature or a Task** — if the sized item is a Feature, persist points only (or per-child points on the children, each of which does get Dev Ready if it qualifies).
 
@@ -128,7 +128,7 @@ When the item came out of Step 2 as **needs more information**, offer to drop it
 | `Bug`, `Hot Fix` | Add a **`needs-info` tag**; leave the state at `New` | 5b |
 | `Feature`, `Task` | Neither — report the gap and stop | — |
 
-In the CSI Development process template, `Bug` and `Hot Fix` have **no design states at all** — the workflow is `New` → `Dev Ready` → `Active` → `Code Review` → …, with neither `Design Review` nor `Design Approved`. `New` is the bottom of that workflow, so there is nowhere to send a bug back to; the tag is what keeps `/quote-backlog` from re-analyzing it. On an unfamiliar project, confirm the type's real states with `mcp__azure-devops__wit_work_item` (`action: get_type`, `workItemType: Bug`) and read the `states` array — don't infer a state name from what the workflow "should" have. A bad state name is accepted by a query (zero rows, no error) and rejected only at write time.
+In the CSI Development process template, `Bug` and `Hot Fix` have **no design states at all** — the workflow is `New` → `Dev Ready` → `Active` → `Code Review` → `Ready for Testing` → `Testing` → `Ready for Staging` → `Staging` → `Ready to Deploy` → `Deployed` → `Closed`, with neither `Design Review` nor `Design Approved`. `New` is the bottom of that workflow, so there is nowhere to send a bug back to; the tag is what keeps `/quote-backlog` from re-analyzing it. On an unfamiliar project, confirm the type's real states with `mcp__azure-devops__wit_work_item` (`action: get_type`, `workItemType: Bug`) and read the `states` array — don't infer a state name from what the workflow "should" have. A bad state name is accepted by a query (zero rows, no error) and rejected only at write time.
 
 ### 5a. User Story → Design Review
 
@@ -137,7 +137,7 @@ In the CSI Development process template, `Bug` and `Hot Fix` have **no design st
 **Wait for the user.** Only update the work item if they say yes. Then set `System.State` = `Design Review` with `mcp__azure-devops__wit_update_work_item`. Rules:
 
 - **`User Story` only** — never a Bug, Hot Fix, Feature, or Task. A Bug takes 5b; the update would fail on it anyway.
-- **Never move an item backward past the design stage.** Only from `Design Approved`; if it's already `Dev Ready` or anything at `Active` or later (`Active`, `Code Review`, `Ready for Testing`, `Testing`, `Ready to Deploy`, …), leave the state alone and say so — someone is already working on it, and a state bounce there does real damage.
+- **Never move an item backward past the design stage.** Only from `Design Approved`; if it's already `Dev Ready` or anything at `Active` or later (`Active`, `Code Review`, `Ready for Testing`, `Testing`, `Ready for Staging`, `Staging`, `Ready to Deploy`, …), leave the state alone and say so — someone is already working on it, and a state bounce there does real damage.
 - Already in `Design Review` → no-op; say it's already there.
 - No `Design Review` state for `User Story` in this process template (the update returns an invalid-state error) → fall back in this order: `In Design` → the `needs-info` tag from 5b → leave the state alone and **warn** that the item will keep surfacing in backlog sweeps. Don't swallow the error.
 - Set **no** story points and touch no other field — assignee, iteration, and tags stay as they are.

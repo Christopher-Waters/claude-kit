@@ -269,8 +269,8 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
    | File family | Parallel files to check |
    |-------------|------------------------|
-   | `appsettings.json` | `appsettings.Development.json`, `appsettings.Staging.json`, `appsettings.QA.json`, `appsettings.Production.json` |
-   | `.env` | `.env.development`, `.env.staging`, `.env.qa`, `.env.production`, `.env.local`, `.env.example` |
+   | `appsettings.json` | `appsettings.Development.json`, `appsettings.Test.json`, `appsettings.QA.json`, `appsettings.Staging.json`, `appsettings.Production.json` |
+   | `.env` | `.env.development`, `.env.test`, `.env.qa`, `.env.staging`, `.env.production`, `.env.local`, `.env.example` |
 
    Present a (key × environment) table. For every missing cell, prompt the user for a value (real, placeholder, or empty) **before creating the PR**. The PR should not be opened until every environment file is accounted for, or the user explicitly confirms the omission is intentional (e.g., the key is supplied via a pipeline variable group, Key Vault, or App Configuration for that environment).
 
@@ -362,7 +362,7 @@ Wait for the user's response before proceeding. Do NOT create a PR until confirm
 
    If the project's process template does not have a `Code Review` state (the update call returns an invalid-state error), fall back in this order: `Resolved` → `In Review` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
 
-> **Only the Task ever gets closed — never the parent.** The child Task is closed here, at PR creation (step 4 above). When the PR is later completed/merged, do **not** enable Azure DevOps's "Complete associated work items" option: it transitions *every* linked work item, including the parent this PR is linked to. The parent User Story or Bug stays in `Code Review` until QA/UAT and any sibling Tasks are done.
+> **Only the Task ever gets closed — never the parent.** The child Task is closed here, at PR creation (step 4 above). When the PR is later completed/merged, do **not** enable Azure DevOps's "Complete associated work items" option: it transitions *every* linked work item, including the parent this PR is linked to. The parent User Story or Bug stays in `Code Review` until it is promoted: merging this PR into `main` deploys nothing, and the item advances to `Ready for Testing` → `Testing` → `Staging` → `Deployed` as `/promote` and `/deploy-release` carry it through `dev → test → staging → prod` (see **Work Item States ↔ Environments** in CLAUDE.md).
 
 ### Closing Related Tasks
 

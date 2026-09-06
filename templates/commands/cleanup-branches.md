@@ -12,9 +12,9 @@ git branch -r --merged
 ```
 
 Exclude protected branches — never delete these:
-- `main`, `master`, `develop`, `development`
-- `staging`, `Staging`
-- `Dev`, `QA`
+- The compare branch: `main`, `master`
+- The environment branches: `dev`, `test`, `staging`, `prod` (any casing — `Dev`, `Test`, `Staging`, `Prod`)
+- Legacy names still in use on unmigrated projects: `develop`, `development`, `QA`
 - Any branch listed in the project's CLAUDE.md Pipeline Configuration table
 
 ## Step 2: Identify Candidates
@@ -33,13 +33,13 @@ Present the list:
 ### Branches to delete ({count}):
 | Branch | Last Commit | Merged Into |
 |--------|-------------|-------------|
-| story/AB#4521-admin-export | 2026-03-18 | develop |
-| bugfix/AB#4589-login-plus-sign | 2026-03-19 | develop |
-| release/24-to-staging | 2026-03-21 | staging |
-| cherry-pick/2026-03-22-to-production | 2026-03-22 | main |
+| story/AB#4521-admin-export | 2026-09-01 | main |
+| bugfix/AB#4589-login-plus-sign | 2026-09-02 | main |
+| release/24-to-staging | 2026-09-05 | staging |
+| cherry-pick/2026-09-06-to-prod | 2026-09-06 | prod |
 
 ### Protected (will NOT be deleted):
-- main, develop, staging
+- main, dev, test, staging, prod
 
 Delete {count} merged branches? (yes/no)
 ```
@@ -69,5 +69,5 @@ Deleted:
 - story/AB#4521-admin-export (local + remote)
 - bugfix/AB#4589-login-plus-sign (local + remote)
 - release/24-to-staging (remote only)
-- cherry-pick/2026-03-22-to-production (remote only)
+- cherry-pick/2026-09-06-to-prod (remote only)
 ```

@@ -11,16 +11,16 @@ Commit, push, and deploy the current changes. Usage: `/deploy [message]`
 
    | File family | Parallel files to check |
    |-------------|------------------------|
-   | `appsettings.json` | `appsettings.Development.json`, `appsettings.Staging.json`, `appsettings.QA.json`, `appsettings.Production.json` |
-   | `.env` | `.env.development`, `.env.staging`, `.env.qa`, `.env.production`, `.env.local`, `.env.example` |
+   | `appsettings.json` | `appsettings.Development.json`, `appsettings.Test.json`, `appsettings.QA.json`, `appsettings.Staging.json`, `appsettings.Production.json` |
+   | `.env` | `.env.development`, `.env.test`, `.env.qa`, `.env.staging`, `.env.production`, `.env.local`, `.env.example` |
 
    Present a table of new/changed keys and which environment files contain them. If any are missing, STOP and prompt:
 
    ```
    ⚠ The following keys are missing from one or more environment files:
 
-   | Key | Dev | Staging | QA | Prod |
-   |-----|-----|---------|----|----- |
+   | Key | Dev | Test | Staging | Prod |
+   |-----|-----|------|---------|------|
    | Foo:Bar | ✅ | ❌ | ❌ | ❌ |
 
    Add values (real, placeholder, or empty) for the missing environments before pushing?
@@ -70,10 +70,11 @@ Push only the current branch. Do NOT cross-push to other branches.
 
 ## Step 5: Pipeline (Conditional)
 
-Check if the current branch is an environment branch (a branch that a CD pipeline watches):
+Look the current branch up in the project's `CLAUDE.md` **Pipeline Configuration** table:
 
-- **On an environment branch**: Trigger the appropriate CD pipeline via Azure DevOps MCP. Monitor the build and report status.
-- **On a feature/work branch**: Do NOT trigger. Report that the pipeline will trigger on PR merge.
+- **On an environment branch** (`dev`, `test`, `staging`, `prod` — a row with pipeline IDs): Trigger the listed CD pipeline(s) via Azure DevOps MCP. Monitor the build and report status.
+- **On `main`** (the compare branch — its pipeline cell is `—`): Do NOT trigger anything. **Merging or pushing to `main` never deploys.** Report that the change is on `main` and will deploy when `main` is promoted to `dev` (`/promote main dev`).
+- **On a feature/work branch**: Do NOT trigger. Report that the pipeline will trigger when the work is promoted after the PR merges.
 
 ## Step 6: Report
 
@@ -82,5 +83,5 @@ Deployed successfully.
 
 Branch: {branch}
 Commit: {hash} - {message}
-Pipeline: {triggered | will trigger on PR merge}
+Pipeline: {triggered | none — main deploys nothing; promote to dev | will trigger when promoted after PR merge}
 ```

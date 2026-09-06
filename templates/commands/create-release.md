@@ -11,7 +11,7 @@ If `$ARGUMENTS` is provided, use it as the release name (e.g., `$ARGUMENTS` = "2
 Ask the user which work items to include. They may provide:
 - A list of work item IDs (e.g., "AB#1234, AB#1235, AB#1236")
 - A query (e.g., "all completed user stories in the current sprint")
-- A state filter (e.g., "all items in Ready for Testing")
+- A state filter (e.g., "all items in Ready for Testing" for a release heading to Test, "all items in Ready for Staging" for one heading to Staging)
 
 Use the Azure DevOps MCP to search/query for the specified work items. Present the list for confirmation:
 
@@ -60,6 +60,9 @@ Work items assigned:
 - AB#1235: Fix login redirect
 - AB#1236: View history
 
-To deploy this release to staging:  /deploy-release {N} staging
-To deploy this release to production: /deploy-release {N} production
+Deploy it one environment at a time — each merge deploys, and the command advances the work items' states after you confirm the merge:
+  /deploy-release {N} test      → items go to Testing
+  /deploy-release {N} staging   → items go to Staging   (after QA sets Ready for Staging)
+  /deploy-release {N} prod      → items go to Deployed  (after stakeholders set Ready to Deploy)
+`/deploy-release {N}` with no environment picks the next one automatically.
 ```

@@ -111,7 +111,7 @@ Did manual testing pass?
 testing passed
 ```
 
-Claude creates the PR targeting `develop`, links AB#4521, and updates the work item state.
+Claude creates the PR targeting `main`, links AB#4521, closes the child Task with its hours, and moves the story to `Code Review`. Merging that PR deploys nothing — the story reaches Dev when `main` is promoted (`/promote main dev`).
 
 ---
 
@@ -155,7 +155,7 @@ AB#4601: "Production: Payment processing fails for organizations with special ch
 You're on the production branch:
 
 ```
-git checkout main
+git checkout prod
 /implement AB#4601
 ```
 
@@ -172,7 +172,7 @@ Create PR? (yes/no)
 yes
 ```
 
-PR is created targeting `main` with a `hotfix` label. No manual UAT required.
+PR is created targeting `prod` with a `hotfix` label. No manual UAT required. Merging it deploys straight to production. Then open a second PR from the same `hotfix/` branch into `main` (or `/cherry-pick AB#4601 main`) so the fix survives the next `main → dev` promotion.
 
 ---
 
@@ -191,9 +191,9 @@ Claude:
 4. Pushes the branch
 5. Reports: "Pipeline will trigger on PR merge" (since you're on a feature branch)
 
-### Example: Direct push to develop
+### Example: Direct push to dev
 
-You're on `develop` and made a config change:
+You're on `dev` and made a config change:
 
 ```
 /deploy "Update appsettings for new Redis cache endpoint"
@@ -204,7 +204,7 @@ Claude commits, pushes, and triggers the Dev CD pipeline. It monitors the build 
 ```
 Deployed successfully.
 
-Branch: develop
+Branch: dev
 Commit: a1b2c3d - Update appsettings for new Redis cache endpoint
 Pipeline: CD - Development (Build #3265) — succeeded
 ```
@@ -215,7 +215,7 @@ Pipeline: CD - Development (Build #3265) — succeeded
 
 ### Example: Creating a sprint release
 
-You've completed 4 user stories and 2 bug fixes on `develop`. Time to bundle them for staging.
+You've merged 4 user stories and 2 bug fixes into `main` and promoted them to Dev. Time to bundle them for Test.
 
 ```
 /create-release 24
@@ -263,8 +263,10 @@ Release #24 created with 6 work items.
 
 Work items assigned to Release #24 iteration and tagged with release-24.
 
-To deploy this release to staging:  /deploy-release 24 staging
-To deploy this release to production: /deploy-release 24 production
+Deploy it one environment at a time:
+  /deploy-release 24 test      → items go to Testing
+  /deploy-release 24 staging   → items go to Staging   (after QA sets Ready for Staging)
+  /deploy-release 24 prod      → items go to Deployed  (after stakeholders set Ready to Deploy)
 ```
 
 ---
@@ -273,11 +275,13 @@ To deploy this release to production: /deploy-release 24 production
 
 ### Example: Deploying Release #24 to Staging
 
+QA has finished on Test and set the items to `Ready for Staging`.
+
 ```
 /deploy-release 24 staging
 ```
 
-**Claude presents the release contents:**
+**Claude presents the release contents and checks the gate:**
 ```
 ## Release #24 — Deploy to staging
 
@@ -295,7 +299,8 @@ Deploy Release #24 (6 work items) to staging?
 This will:
 1. Create a release branch: release/24-to-staging
 2. Cherry-pick all commits for the 6 work items
-3. Create a PR targeting the staging branch
+3. Create a PR targeting `staging` — merging it triggers the Staging pipeline
+4. After you confirm the merge, move the work items to `Staging`
 
 Proceed? (yes/no)
 ```
@@ -335,17 +340,35 @@ Work items included:
 
 Next steps:
 - Review and approve the PR
-- Merge triggers the CD pipeline for staging
-- Update work item states in Azure DevOps after merge
+- Merging it triggers the CD pipeline for staging
+- Reply `merged` once the PR is complete and the pipeline is green — I'll move these 6 work items to `Staging`.
+```
+
+**After the merge you reply:**
+```
+merged
+```
+
+**Claude confirms the PR completed and advances the states:**
+```
+Release #24 is on staging.
+
+| ID | Was | Now |
+|----|-----|-----|
+| AB#4521 | Ready for Staging | Staging |
+| AB#4522 | Ready for Staging | Staging |
+| ... | ... | ... |
+
+Next: stakeholders verify on Staging and set each item to Ready to Deploy.
 ```
 
 ### Example: Deploying the same release to production after staging passes
 
 ```
-/deploy-release 24 production
+/deploy-release 24 prod
 ```
 
-Same process — cherry-picks from staging to a PR targeting the production branch.
+Same process — the gate is `Ready to Deploy`, the cherry-picks come from `staging` into a PR targeting `prod`, and after you reply `merged` the items move to `Deployed`.
 
 ---
 
@@ -356,19 +379,19 @@ Same process — cherry-picks from staging to a PR targeting the production bran
 Staging has Release #24 with 6 work items, but only the bug fixes (AB#4589, AB#4590) are urgent and need to go to production now. The user stories need more testing.
 
 ```
-/cherry-pick AB#4589 AB#4590 production
+/cherry-pick AB#4589 AB#4590 prod
 ```
 
 **Claude presents:**
 ```
-## Cherry-Pick to production
+## Cherry-Pick to prod
 
 | ID | Type | Title | State |
 |----|------|-------|-------|
 | AB#4589 | Bug | Login 500 error with plus sign in email | Ready for Testing |
 | AB#4590 | Bug | Pagination resets when changing filters | Ready for Testing |
 
-Cherry-pick 2 work items to production? (yes/no)
+Cherry-pick 2 work items to prod? Gate is `Ready to Deploy` — both bugs are there. (yes/no)
 ```
 
 **You respond:**
@@ -378,25 +401,26 @@ yes
 
 **Claude creates the PR:**
 ```
-Cherry-pick PR created for production.
+Cherry-pick PR created for prod.
 
 PR: https://github.com/<owner>/<repo>/pull/289
-Branch: cherry-pick/2026-03-22-to-production → main
+Branch: cherry-pick/2026-09-06-to-prod → prod
 
 Work items:
 - AB#4589: Login 500 error with plus sign in email
 - AB#4590: Pagination resets when changing filters
 
-Merge the PR to trigger the CD pipeline for production.
+Merging the PR triggers the CD pipeline for prod.
+Reply `merged` once it's complete — I'll move AB#4589 and AB#4590 to `Deployed`.
 ```
 
-### Example: Cherry-picking a single feature to staging for early testing
+### Example: Cherry-picking a single feature to test for early QA
 
 ```
-/cherry-pick AB#4521 staging
+/cherry-pick AB#4521 test
 ```
 
-This lets QA start testing the payment export feature on staging while other features are still being developed on `develop`.
+This lets QA start testing the payment export feature on Test while other features are still being finished on `main`.
 
 ---
 
@@ -407,12 +431,12 @@ This lets QA start testing the payment export feature on staging while other fea
 Everything on staging has been tested and approved. No need to cherry-pick — promote it all.
 
 ```
-/promote staging production
+/promote staging prod
 ```
 
 **Claude shows what will be promoted:**
 ```
-## Promote staging → production
+## Promote staging → prod
 
 Commits to promote:
 | Commit | Message | Work Item |
@@ -422,7 +446,7 @@ Commits to promote:
 | b7c8d9e | Implement bulk approval workflow | AB#4522 |
 | ... | ... | ... |
 
-14 commits will be promoted from staging to production.
+14 commits will be promoted from staging to prod.
 Promote? (yes/no)
 ```
 
@@ -431,17 +455,17 @@ Promote? (yes/no)
 yes
 ```
 
-Claude creates a PR from `staging` → production branch. Merge triggers the production pipeline.
+Claude gate-checks the work items (`Ready to Deploy`) and creates a PR from `staging` → `prod`. Merging it triggers the production pipeline; reply `merged` afterwards and the work items move to `Deployed`.
 
 ### Example: Auto-detect the next environment
 
-You're on the `develop` branch and want to promote to staging:
+You're on `main` after a week of merged feature PRs and want everything on Dev:
 
 ```
 /promote
 ```
 
-Claude auto-detects: "You're on `develop`, the next environment is `staging`." Then shows the same confirmation flow.
+Claude auto-detects: "You're on `main`, the next environment is `dev`." Then shows the same confirmation flow. Nothing has deployed yet — the merge of this PR is the first deployment.
 
 ---
 
@@ -452,12 +476,12 @@ Claude auto-detects: "You're on `develop`, the next environment is `staging`." T
 AB#4522 (bulk payment approval) is causing errors in production. You need to revert it immediately.
 
 ```
-/rollback AB#4522 production
+/rollback AB#4522 prod
 ```
 
 **Claude finds the commits and presents:**
 ```
-## Rollback on production
+## Rollback on prod
 
 Commits to revert:
 | Commit | Message | Work Item |
@@ -466,7 +490,7 @@ Commits to revert:
 | c9d0e1f | Add approval notification emails | AB#4522 |
 | d1e2f3a | Update payment status on approval | AB#4522 |
 
-This will revert 3 commit(s) on production. Proceed? (yes/no)
+This will revert 3 commit(s) on prod. Proceed? (yes/no)
 ```
 
 **You respond:**
@@ -477,15 +501,18 @@ yes
 Claude reverts, runs pre-flight checks, creates the PR:
 
 ```
-Rollback PR created for production.
+Rollback PR created for prod.
 
 PR: https://github.com/<owner>/<repo>/pull/291
-Branch: revert/2026-03-22-on-production → main
+Branch: revert/2026-09-06-on-prod → prod
 
 Reverted:
 - AB#4522: Bulk payment approval workflow (3 commits)
 
 Merge the PR to trigger the CD pipeline and deploy the rollback.
+
+Work items reverted from prod: AB#4522 — still in `Deployed`. Move it back to `Active` for the fix, or open a new Bug — your call.
+These commits are also on `main`; the next promotion brings them back unless the revert goes to `main` too.
 ```
 
 ### Example: Revert the last deployment on staging
@@ -595,15 +622,21 @@ Release #24 now contains 4 work items.
 
 | ID | Type | Title | State |
 |----|------|-------|-------|
-| AB#4521 | User Story | Add payment export | Closed |
-| AB#4522 | User Story | Bulk approval workflow | Ready for Testing |
-| AB#4530 | User Story | Dashboard trends | Ready for Testing |
+| AB#4521 | User Story | Add payment export | Deployed |
+| AB#4522 | User Story | Bulk approval workflow | Staging |
+| AB#4530 | User Story | Dashboard trends | Testing |
 | AB#4589 | Bug | Login plus sign fix | Closed |
 
 Deployed to:
 - Dev: All 4 items
+- Test: All 4 items
 - Staging: All 4 items
 - Production: 2 of 4 items
+
+⚠ State lag:
+- AB#4530 is on `staging` but still in `Testing` — expected at least `Staging`.
+
+Catch these up? (yes/no)
 ```
 
 ### Example: Check pipeline status
@@ -617,9 +650,9 @@ Deployed to:
 
 | Pipeline | Branch | Status | Time |
 |----------|--------|--------|------|
-| Compass API | main | Succeeded | 2026-03-22 14:26 |
-| Compass Client | main | Succeeded | 2026-03-22 14:27 |
-| Compass API | develop | Failed | 2026-03-22 10:15 |
+| Compass API (YAML) | prod | Succeeded | 2026-09-06 14:26 |
+| Compass Client (YAML) | prod | Succeeded | 2026-09-06 14:27 |
+| Compass API (YAML) | test | Failed | 2026-09-05 10:15 |
 ```
 
 ### Example: Check a work item
@@ -655,16 +688,16 @@ Shows active releases, recent pipeline runs, and open PRs at a glance.
 ### Branches to delete (7):
 | Branch | Last Commit | Merged Into |
 |--------|-------------|-------------|
-| story/AB#4521-admin-export | 2026-03-18 | develop |
-| story/AB#4522-bulk-approval | 2026-03-19 | develop |
-| bugfix/AB#4589-login-plus-sign | 2026-03-19 | develop |
-| release/24-to-staging | 2026-03-21 | staging |
-| cherry-pick/2026-03-22-to-production | 2026-03-22 | main |
+| story/AB#4521-admin-export | 2026-09-01 | main |
+| story/AB#4522-bulk-approval | 2026-09-02 | main |
+| bugfix/AB#4589-login-plus-sign | 2026-09-02 | main |
+| release/24-to-staging | 2026-09-05 | staging |
+| cherry-pick/2026-09-06-to-prod | 2026-09-06 | prod |
 | T3796 | 2026-03-10 | main |
 | U3297 | 2026-03-05 | main |
 
 ### Protected (will NOT be deleted):
-- main, develop, staging
+- main, dev, test, staging, prod
 
 Delete 7 merged branches? (yes/no)
 ```
@@ -728,7 +761,7 @@ Here's a complete real-world scenario tying all commands together:
 /implement AB#4589    → Fix login plus sign bug (Bug)
 ```
 
-Each one: summarize → confirm → plan → approve → implement → test → PR → merge to `develop`.
+Each one: summarize → confirm → plan → approve → implement → test → PR → merge to `main`. Nothing deploys yet; the stories sit in `Code Review`.
 
 ### Wednesday: Review a teammate's PR
 
@@ -736,65 +769,74 @@ Each one: summarize → confirm → plan → approve → implement → test → 
 /review 285           → Review PR for AB#4530 (Dashboard trends)
 ```
 
-### Thursday: Bundle into a release and deploy to staging
+### Thursday: Promote to Dev, bundle into a release, deploy to Test
 
 ```
-/create-release 24    → Group AB#4521, 4522, 4530, 4535, 4589, 4590
-/deploy-release 24 staging  → Cherry-pick to staging, create PR
+/promote main dev         → Everything merged this week goes to Dev; reply `merged` → items go to Ready for Testing
+/create-release 24        → Group AB#4521, 4522, 4530, 4535, 4589, 4590
+/deploy-release 24 test   → Cherry-pick to test, create PR; reply `merged` → items go to Testing
 ```
 
-Merge the PR. QA tests on staging.
+QA tests on Test and sets each passing item to `Ready for Staging`.
 
 ### Friday: QA finds an issue with AB#4522
 
 The bulk approval feature has a bug. Fix it:
 
 ```
-git checkout develop
+git checkout main
 /implement AB#4601    → Fix the bulk approval issue
 ```
 
-After the fix merges to `develop`, cherry-pick it to staging:
+After the fix merges to `main`, cherry-pick it to test:
 
 ```
-/cherry-pick AB#4601 staging
+/cherry-pick AB#4601 test
 ```
 
-### Following Monday: Deploy to production
+### Following Monday: Staging, then production
 
-QA approved everything on staging. But AB#4535 (email notifications) needs more work — only deploy the other 5.
+QA has set everything to `Ready for Staging`:
 
 ```
-/cherry-pick AB#4521 AB#4522 AB#4530 AB#4589 AB#4590 production
+/deploy-release 24 staging   → reply `merged` → items go to Staging
+```
+
+Stakeholders verify on Staging and set `Ready to Deploy` — except AB#4535 (email notifications), which needs more work. Only deploy the other 5:
+
+```
+/cherry-pick AB#4521 AB#4522 AB#4530 AB#4589 AB#4590 prod
 ```
 
 Or create a new release with just those 5:
 
 ```
 /create-release 25
-/deploy-release 25 production
+/deploy-release 25 prod
 ```
+
+Either way, reply `merged` after the PR completes and the 5 items move to `Deployed`.
 
 ### Tuesday: Production issue discovered
 
 AB#4522 is causing intermittent errors in production:
 
 ```
-/rollback AB#4522 production
+/rollback AB#4522 prod
 ```
 
 Revert PR created, merged, production is stable again. Fix the root cause:
 
 ```
-git checkout develop
+git checkout main
 /implement AB#4610    → Root cause fix for bulk approval
 ```
 
-After fix is verified on develop and staging, add it to the release and cherry-pick to production:
+After the fix is verified through test and staging, add it to the release and cherry-pick to prod:
 
 ```
 /add-to-release 25 AB#4610
-/cherry-pick AB#4610 production
+/cherry-pick AB#4610 prod
 ```
 
 ### Wednesday: Check status and clean up
@@ -815,11 +857,14 @@ After fix is verified on develop and staging, add it to the release and cherry-p
 | Quick commit and push | `/deploy "message"` |
 | Group work items for deployment | `/create-release 24` |
 | Add a forgotten item to a release | `/add-to-release 24 AB#4599` |
+| Promote everything on main to Dev | `/promote main dev` |
+| Deploy a release to test | `/deploy-release 24 test` |
 | Deploy a release to staging | `/deploy-release 24 staging` |
-| Deploy a release to production | `/deploy-release 24 production` |
-| Send just 2 bug fixes to production | `/cherry-pick AB#1234 AB#1235 production` |
-| Promote all staging code to production | `/promote staging production` |
-| Revert a bad deploy | `/rollback AB#1234 production` |
+| Deploy a release to production | `/deploy-release 24 prod` |
+| Send just 2 bug fixes to production | `/cherry-pick AB#1234 AB#1235 prod` |
+| Promote all staging code to production | `/promote staging prod` |
+| Revert a bad deploy | `/rollback AB#1234 prod` |
+| See where a work item is deployed | `/where AB#4521` |
 | Revert the last deploy | `/rollback last staging` |
 | Review a PR | `/review 142` |
 | Check what's in a release | `/status release 24` |

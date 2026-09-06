@@ -98,9 +98,9 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 1. **Pick a work item** from Azure DevOps (or describe what you need)
 2. **Claude implements** using `/implement AB#<id>` (auto-creates branch)
 3. **Hooks guard** against secrets and bad patterns automatically
-4. **PR merges** into `develop` → deploys to Dev environment
-5. **Create a release** using `/create-release <N>` to group work items
-6. **Deploy the release** using `/deploy-release 23 staging` then `/deploy-release 23 production`
+4. **PR merges** into `main` — the compare branch. **Nothing deploys yet.** The work item stays in `Code Review` until it is promoted
+5. **Promote or release** — `/promote main dev` carries everything on `main` to Dev; `/create-release <N>` groups work items so `/deploy-release <N> test` → `staging` → `prod` can carry just those
+6. **Merge each promotion PR** — that merge is what triggers the environment's CD pipeline. Reply `merged` and the command advances the work items to `Testing`, `Staging`, or `Deployed`
 7. **Test** using Playwright MCP for browser testing
 8. **Track** work items via the Azure DevOps MCP server
 9. **Learn** — Claude saves what worked for next time
@@ -121,33 +121,61 @@ These rules apply to **every** command or flow that creates or estimates work it
    An item that merely **needs to be split** keeps its state and gets no tag — the work is understood, nothing is missing.
 
    **The drop-out mechanism has no expiry, so every sweep must audit it.** Removing the `needs-info` tag is the *only* thing that re-queues a bug, and moving a story back to `Design Approved` is the only thing that re-queues a story. A creator who supplies the missing information but leaves the tag on — or answers in a comment instead of editing the field — makes the item invisible to every future sweep, permanently. That failure looks exactly like a clean backlog. `/quote-backlog` Step 2b therefore audits tagged items for activity after the tag was applied and reports the stale ones; it never clears a tag on the creator's behalf. Two traps when writing such a check: automation bots bump a revision after nearly every human write, so the *latest* revision author is unreliable — scan the whole range after the tag revision; and a `System.CommentCount` increase counts as a creator response.
-6. **Never assume two work item types share a state list.** WIQL doesn't validate state names, so a query filtering on a state the type doesn't have returns **zero rows instead of an error** — the classic symptom is a backlog sweep that silently never surfaces a single bug. Confirm with `mcp__azure-devops__wit_work_item` (`action: get_type`) before writing a state name into a query or an update. In CSI Development: `User Story` has `New → Dev Ready → In Design → Design Review → Design Approved → Active → …`; `Bug` and `Hot Fix` have `New → Dev Ready → Active → …`.
+6. **Never assume two work item types share a state list.** WIQL doesn't validate state names, so a query filtering on a state the type doesn't have returns **zero rows instead of an error** — the classic symptom is a backlog sweep that silently never surfaces a single bug. Confirm with `mcp__azure-devops__wit_work_item` (`action: get_type`) before writing a state name into a query or an update. In CSI Development (verified 2026-09-06): `User Story` has `New → Dev Ready → In Design → Design Review → Design Approved → Active → Code Review → Ready for Testing → Testing → Ready for Staging → Staging → Ready to Deploy → Deployed → Closed`; `Bug` and `Hot Fix` have the same list minus the three design states (`New → Dev Ready → Active → Code Review → …`). `Ready for Staging` and `Staging` were added on 2026-09-06 so every environment has a state — see **Work Item States ↔ Environments** below.
 
 ### Branching Strategy
 
 #### Target Branch-to-Environment Mapping
 
-All projects should converge to this standard. Each long-lived branch maps to an Azure subscription and environment:
+All projects converge to this standard. `main` is the **compare branch** — the default branch, the one feature PRs target, and the one every environment branch is compared against. **Merging into `main` deploys nothing.** Each environment has its own long-lived branch, and a PR merging into that branch is what triggers its CD pipeline:
 
-| Branch | Azure Subscription | Environment | CD Pipeline Trigger |
-|---|---|---|---|
-| `develop` | Dev | Development | Auto on merge |
-| `staging` | Staging | Staging | Auto on merge |
-| `main` | Production | Production | Auto on merge (with approval gate) |
+| Branch | Environment | CD Pipeline Trigger |
+|---|---|---|
+| `main` | — (compare / integration branch) | **None** — merging a PR into `main` does not deploy |
+| `dev` | Development | Auto when a PR merges into `dev` |
+| `test` | Test (QA) | Auto when a PR merges into `test` |
+| `staging` | Staging | Auto when a PR merges into `staging` |
+| `prod` | Production | Auto when a PR merges into `prod` |
 
-> **Note:** Some projects are not yet in sync — they may use `master` instead of `main`, or lack a `staging` branch. Until a project is migrated, the deployer and `/implement` use the **current branch** dynamically and do not assume branch names.
+Branch names are lowercase. COMPASS and CSIPay are on this layout (CSIPay renamed its branches on 2026-09-04; `test` replaced `QA`).
+
+> **Note:** A project that hasn't migrated yet (e.g. one that still has only `main` and `develop`) keeps working — the deployer and every slash command read the project's **Pipeline Configuration** table and use the **current branch** dynamically; no branch names are hardcoded.
 
 #### Promotion Flow
 
-Code flows through environments via PRs — never by direct push:
+Code flows through environments via PRs — never by direct push. Every arrow below is a PR, and every merge **after** `main` deploys:
 
 ```
-feature/AB#1234-...  ──PR──▸  develop  ──PR──▸  staging  ──PR──▸  main
-   (work branch)              (Dev)            (Staging)        (Production)
+feature/AB#1234-...  ──PR──▸  main  ──PR──▸  dev  ──PR──▸  test  ──PR──▸  staging  ──PR──▸  prod
+   (work branch)            (compare,      (Dev)         (Test)         (Staging)        (Production)
+                            no deploy)
 ```
 
-- **develop → staging**: PR to promote all work ready for QA/stakeholder review
-- **staging → main**: PR to promote to production. May cherry-pick individual commits if only some stories are ready (see Cherry-Pick Deployments below)
+- **feature → main**: the `/implement` PR. Code review happens here. Merging it deploys nothing.
+- **main → dev**: `/promote main dev` — usually everything on `main`, so developers can smoke-test on Dev.
+- **dev → test**: `/promote dev test` or `/deploy-release <N> test` — hands the work to QA.
+- **test → staging**: `/deploy-release <N> staging` — only what QA passed (`Ready for Staging`).
+- **staging → prod**: `/deploy-release <N> prod` — only what stakeholders approved (`Ready to Deploy`). Cherry-pick a subset when only some stories are ready (see Cherry-Pick Deployments below).
+
+#### Work Item States ↔ Environments
+
+Every environment in the chain has a work item state, so the board shows where each story physically is. The **"Ready for …" states are human gates** — QA or stakeholders set them when something passes; the slash commands never do. The **environment states** (`Testing`, `Staging`, `Deployed`) are set by the promotion commands once the PR into that branch has merged.
+
+| Branch | Environment | Gate — items should already be in… | Set once the PR into this branch merges |
+|---|---|---|---|
+| `main` | — | `Code Review` (the `/implement` PR is open) | *(no change — nothing deployed)* |
+| `dev` | Dev | `Code Review` (merged to `main`) | `Ready for Testing` |
+| `test` | Test | `Ready for Testing` | `Testing` |
+| `staging` | Staging | `Ready for Staging` | `Staging` |
+| `prod` | Production | `Ready to Deploy` | `Deployed` |
+
+Human-only transitions — no slash command ever makes these: `Testing → Ready for Staging` (QA sign-off), `Staging → Ready to Deploy` (stakeholder / UAT sign-off), `Deployed → Closed` (verified in production).
+
+How the commands use this table:
+
+- **Gate check before the PR.** `/deploy-release`, `/cherry-pick`, and `/promote` compare each carried work item's state against the gate for the target environment. Anything behind the gate (e.g. still `Testing` when deploying to `staging`) is flagged and the user decides whether to include it. Items *ahead* of the gate (e.g. already `Deployed` on a cherry-pick to `prod`) are reported and left alone.
+- **Advance after the merge, not before.** The commands can't see the PR merge, so they finish by asking you to reply `merged` once the PR has completed and the pipeline is green; only then do they write the new state — for every carried User Story, Bug, and Hot Fix, never a Feature or Task, and never backward. `/status` reports items whose state lags the branch their commits are on and offers to catch them up.
+- **Never assume the state list.** Confirm with `mcp__azure-devops__wit_work_item` (`action: get_type`) on an unfamiliar project before writing a state name — a bad name is accepted silently by a query and rejected only at write time.
 
 #### Release Management
 
@@ -161,43 +189,47 @@ This creates a `Release #23` iteration, assigns the selected work items to it, a
 
 **Deploying a release to an environment:**
 ```
+/deploy-release 23 test
 /deploy-release 23 staging
-/deploy-release 23 production
+/deploy-release 23 prod
 ```
-This finds all work items in Release #23, cherry-picks their commits into a release branch (`release/23-to-staging`), creates a PR targeting the environment branch, and links all work items.
+This finds all work items in Release #23, checks each one against the target environment's gate state, cherry-picks their commits into a release branch (`release/23-to-staging`), creates a PR targeting the environment branch, links all work items, and — once you reply `merged` — advances them to the environment's state (`Testing`, `Staging`, `Deployed`).
 
-**Selective deployment:** Since releases are deployed via cherry-pick, you can deploy a full release or a subset. If staging has 5 user stories but only 3 should go to production, create a release with just those 3 and deploy it.
+**Selective deployment:** Since releases are deployed via cherry-pick, you can deploy a full release or a subset. If staging has 5 user stories but only 3 are `Ready to Deploy`, create a release with just those 3 and deploy it.
 
 **Release flow:**
 ```
 /create-release 23          → Groups work items into Release #23
-/deploy-release 23 staging  → Cherry-picks Release #23 to staging
-  (QA/testing on staging)
-/deploy-release 23           → Auto-detects next env (production), deploys
+/deploy-release 23 test     → Cherry-picks Release #23 to test → items go to Testing
+  (QA passes → sets Ready for Staging)
+/deploy-release 23          → Auto-detects next env (staging) → items go to Staging
+  (stakeholders approve → set Ready to Deploy)
+/deploy-release 23          → Auto-detects next env (prod) → items go to Deployed
 ```
 
 #### Cherry-Pick Deployments
 
 Cherry-pick specific work items to an environment without a formal release:
 ```
-/cherry-pick AB#1234 AB#1235 production
+/cherry-pick AB#1234 AB#1235 prod
 ```
-This finds commits for the specified work items, cherry-picks them into a branch (`cherry-pick/<date>-to-<environment>`), and creates a PR.
+This finds commits for the specified work items, checks them against the target's gate state, cherry-picks them into a branch (`cherry-pick/<date>-to-<environment>`), creates a PR, and advances the work items once you confirm the merge.
 
 #### Promoting Environments
 
 Promote all code from one environment to the next:
 ```
-/promote staging production
+/promote main dev
+/promote staging prod
 /promote                      ← auto-detects source and target from current branch
 ```
-This creates a PR from the source branch to the target branch with a summary of all included commits.
+This creates a PR from the source branch to the target branch with a summary of all included commits and their work items, checks the work items against the target's gate state, and advances them once you confirm the merge. `main → dev` is the usual first hop after feature PRs merge.
 
 #### Rollbacks
 
 Roll back a deployment on any environment:
 ```
-/rollback AB#1234 production   ← revert specific work items
+/rollback AB#1234 prod         ← revert specific work items
 /rollback last staging         ← revert the most recent deployment
 ```
 This creates a revert branch, reverts the specified commits, runs pre-flight checks, and creates a PR.
@@ -211,7 +243,7 @@ Commit, push, and deploy the current changes:
 /deploy "Add payment export feature"
 /deploy                       ← auto-generates commit message
 ```
-This runs pre-flight checks, commits, pushes the current branch, and triggers the CD pipeline if on an environment branch.
+This runs pre-flight checks, commits, pushes the current branch, and triggers the CD pipeline if on an environment branch (`dev`, `test`, `staging`, `prod`). On `main` or a work branch nothing is triggered — `main` has no pipeline.
 
 #### Branch Naming Convention
 
@@ -235,13 +267,13 @@ PRs always target the branch you were on when `/implement` was invoked. The base
 
 #### Hot Fix Workflow
 
-Hot Fix work items follow the same automated checks (build, lint, tests, review) but skip manual UAT. An abbreviated confirmation is shown instead. Hot Fix PRs get a `hotfix` label. Hot Fixes target the current branch (which should be the project's production branch for production hot fixes).
+Hot Fix work items follow the same automated checks (build, lint, tests, review) but skip manual UAT. An abbreviated confirmation is shown instead. Hot Fix PRs get a `hotfix` label. Hot Fixes target the current branch — for a production hot fix, start on `prod` so the PR merges (and deploys) straight there. **Then bring the fix back to `main`:** open a second PR from the same hotfix branch into `main` (or `/cherry-pick AB#<id> main`) so the next `main → dev` promotion doesn't overwrite it. A hot fix that lives only on `prod` is lost on the next release.
 
 #### Feature Workflow (ordered story waves)
 
 Running `/implement` on a **Feature** implements its child User Stories in **waves** driven by the `Custom.Order` field: stories sharing the same order value are implemented **in parallel** (one agent per story, each in an isolated git worktree), and waves run sequentially in ascending order so later stories build on earlier ones. All work merges into a single `feature/AB#<id>-...` branch; quality checks, code review, UAT, and one PR happen at the feature level, and every implemented story is linked to that PR. Stories without a `Custom.Order` value run in a final catch-all wave (flagged for confirmation first).
 
-**Work item states:** `/implement` moves the work item to `Active` when implementation starts — for a single work item (User Story, Bug, Hot Fix) right after the branch is created; for a Feature, each child story goes `Active` as its wave begins. When the PR is created, each implemented child **User Story** moves to `Code Review` — the **Feature's state is never changed**. The Feature is a parent container; it advances only as its child stories are verified/closed. Only child **Tasks** are ever closed — never the stories or the Feature.
+**Work item states:** `/implement` moves the work item to `Active` when implementation starts — for a single work item (User Story, Bug, Hot Fix) right after the branch is created; for a Feature, each child story goes `Active` as its wave begins. When the PR is created, each implemented child **User Story** moves to `Code Review` — the **Feature's state is never changed**. The Feature is a parent container; it advances only as its child stories are verified/closed. Only child **Tasks** are ever closed — never the stories or the Feature. From `Code Review` onward the stories follow the **Work Item States ↔ Environments** table above as they are promoted.
 
 **Hours live on the Task.** `/implement` will not implement a story that has no open child Task: if there isn't one, it proposes a title and an hour estimate (from the story's points, same mapping `/plan-backlog` uses — points set the hour band, complexity picks where in the band it lands) and creates it once the user agrees — exactly one per story, inheriting the parent's assignee, area, and iteration. When the PR is created, that Task is closed with the hours worked logged to `CompletedWork` and `RemainingWork` zeroed. Closing happens at **PR creation**, not at merge, so hours are recorded while they're still known. Never enable Azure DevOps's "Complete associated work items" when merging — it transitions the parent too.
 
@@ -254,14 +286,15 @@ All deployment and release operations are available as slash commands:
 | `/implement` | `/implement AB#1234` | Summarize work item → approve plan → ensure an open child Task with hours → implement → PR (closes the Task, logs hours). On a Feature: child stories in `Custom.Order` waves, same-order stories in parallel |
 | `/review` | `/review 142` | Automated code review on a PR |
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
-| `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline |
+| `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline (only on `dev`/`test`/`staging`/`prod` — never on `main`) |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 |
-| `/deploy-release` | `/deploy-release 23 staging` | Cherry-pick release to environment |
+| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → cherry-pick release to environment → PR → advance states after merge |
 | `/add-to-release` | `/add-to-release 24 AB#4599` | Add work items to existing release |
-| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 production` | Cherry-pick specific work items |
-| `/promote` | `/promote staging production` | Promote all code between environments |
-| `/rollback` | `/rollback AB#1234 production` | Revert commits on an environment |
-| `/status` | `/status release 24` | Check release, pipeline, or work item status |
+| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items → PR → advance states after merge |
+| `/promote` | `/promote main dev` | Promote all code between environments (`main → dev → test → staging → prod`) → advance states after merge |
+| `/rollback` | `/rollback AB#1234 prod` | Revert commits on an environment |
+| `/status` | `/status release 24` | Check release, pipeline, environment, or work item status; flags work items whose state lags their environment |
+| `/where` | `/where AB#1234` | Show which environment branches contain a work item's commits |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, **bugs in `New`** (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Pointed items move to Dev Ready; stories that can't be quoted move back to **Design Review**, bugs that can't be quoted get a **`needs-info`** tag, so the next sweep skips them. Every run also audits the drop-out queue (tagged bugs **and** stories bounced to Design Review) and reports any whose creator answered but which nobody returned to the sweep — neither mechanism expires, so those are otherwise invisible forever |
@@ -271,11 +304,11 @@ All deployment and release operations are available as slash commands:
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
 | `/close-orphan-tasks` | `/close-orphan-tasks [scope] [--dry-run]` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |
 
-The CD pipeline is only triggered manually when pushing directly to an environment branch. For feature/work branches, the pipeline triggers on PR merge.
+The CD pipeline is only triggered manually when pushing directly to an environment branch (`dev`, `test`, `staging`, `prod`). For feature/work branches and for `main`, nothing is triggered — a feature PR merging into `main` deploys nothing; the first deployment happens when `main` is promoted to `dev`.
 
 ### Pipeline Configuration
 
-Each project must define its environment chain and pipeline IDs so the slash commands (`/deploy`, `/promote`, `/deploy-release`) know which pipelines to trigger and what the promotion order is.
+Each project must define its compare branch, its environment chain, and its pipeline IDs so the slash commands (`/deploy`, `/promote`, `/deploy-release`, `/cherry-pick`, `/where`, `/status`) know which pipelines to trigger and what the promotion order is.
 
 Add this section to your project's `CLAUDE.md`:
 
@@ -284,33 +317,50 @@ Add this section to your project's `CLAUDE.md`:
 
 | Branch | Environment | Pipeline(s) |
 |--------|------------|-------------|
-| develop | Dev | My API (ID), My Client (ID) |
+| main | — (compare branch, no deployment) | — |
+| dev | Dev | My API (ID), My Client (ID) |
+| test | Test | My API (ID), My Client (ID) |
 | staging | Staging | My API (ID), My Client (ID) |
-| main | Production | My API (ID), My Client (ID) |
+| prod | Production | My API (ID), My Client (ID) |
 ```
 
 **Rules for slash commands:**
-- `/deploy` triggers the pipeline(s) listed for the current branch. If the current branch is not in this table, no pipeline is triggered.
-- `/promote` uses this table to determine the next environment (e.g., `develop` → `staging` → `main`).
-- `/deploy-release` and `/cherry-pick` create PRs targeting environment branches listed here.
-- The **order of rows** defines the promotion flow (top to bottom).
+- The **first row is the compare branch**. Feature PRs target it. It has no pipeline — merging into it deploys nothing. A row whose Pipeline(s) cell is `—` is never triggered.
+- The **order of rows** defines the promotion flow (top to bottom): `main → dev → test → staging → prod`.
+- `/deploy` triggers the pipeline(s) listed for the current branch. If the current branch is not in this table, or its pipeline cell is `—`, no pipeline is triggered.
+- `/promote` uses this table to determine the next environment (the next row down).
+- `/deploy-release` and `/cherry-pick` create PRs targeting environment branches listed here, and use the **Work Item States ↔ Environments** table to gate-check and advance work items.
+- `/where` and `/status` check every row; the compare branch reports as "merged to main", not as a deployment.
 
 **Examples from actual projects:**
 
-CSIPay (4 environments):
+COMPASS:
 ```markdown
 | Branch | Environment | Pipeline(s) |
 |--------|------------|-------------|
-| Dev | Dev | CSIPay API (12), CSIPay Client (13) |
-| QA | QA | CSIPay API (12), CSIPay Client (13) |
-| Staging | Staging | CSIPay API (12), CSIPay Client (13) |
-| master | Production | CSIPay API (12), CSIPay Client (13) |
+| main | — (compare branch, no deployment) | — |
+| dev | Dev | Compass API (YAML) (32), Compass Client (YAML) (33) |
+| test | Test | Compass API (YAML) (32), Compass Client (YAML) (33) |
+| staging | Staging | Compass API (YAML) (32), Compass Client (YAML) (33) |
+| prod | Production | Compass API (YAML) (32), Compass Client (YAML) (33) |
 ```
 
-Glasswing and Monarch (1 environment currently):
+CSIPay:
 ```markdown
 | Branch | Environment | Pipeline(s) |
 |--------|------------|-------------|
+| main | — (compare branch, no deployment) | — |
+| dev | Dev | CSIPay API (12), CSIPay Client (13) |
+| test | Test | CSIPay API (12), CSIPay Client (13) |
+| staging | Staging | CSIPay API (12), CSIPay Client (13) |
+| prod | Production | CSIPay API (12), CSIPay Client (13) |
+```
+
+Glasswing and Monarch (not yet migrated — 1 environment):
+```markdown
+| Branch | Environment | Pipeline(s) |
+|--------|------------|-------------|
+| main | — (compare branch, no deployment) | — |
 | develop | Dev | CD - Development (28) |
 ```
 

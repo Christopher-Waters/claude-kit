@@ -2,11 +2,11 @@ Roll back a deployment in an environment. Usage: `/rollback <work-item-ids-or-co
 
 Parse `$ARGUMENTS` to extract:
 - **What to revert**: work item IDs (e.g., "AB#1234") or commit hashes, or "last" for the most recent deployment
-- **Target environment**: the environment to roll back (e.g., "staging", "production")
+- **Target environment**: the environment to roll back (`dev`, `test`, `staging`, `prod`/`production`)
 
 ## Step 1: Identify What to Revert
 
-Determine the target environment branch. Do NOT hardcode branch names.
+Determine the target environment branch from the project's `CLAUDE.md` **Pipeline Configuration** table (`dev`, `test`, `staging`, `prod`). Do NOT hardcode branch names. `main` is the compare branch, not an environment — reverting there deploys nothing; if the user asks to roll back `main`, explain that and ask which environment they actually mean (or confirm they want the code removed from `main` too, so it doesn't come back on the next promotion).
 
 If the user specified:
 - **Work item IDs**: Find the associated commits on the environment branch using `repo_search_commits` with `includeWorkItems: true`
@@ -86,9 +86,13 @@ Reverted:
 - AB#1235: Fix login redirect
 
 Merge the PR to trigger the CD pipeline and deploy the rollback.
+
+Work items reverted from {environment}: AB#1234, AB#1235 — their state still says `{current state}`.
+The fix will need to go through main → dev → test → staging → prod again, so move them back to `Active`
+(or leave them and open a new Bug) — your call; I won't change states on a rollback.
 ```
 
-For production rollbacks, flag urgency to the user.
+For production rollbacks, flag urgency to the user. If the reverted commits are also on `main` (they usually are), remind the user that the next `/promote` will bring them back unless the revert is also applied to `main` — offer `/cherry-pick` of the revert commit to `main`.
 
 ## Step 7: Notify Team (if Teams MCP is configured)
 

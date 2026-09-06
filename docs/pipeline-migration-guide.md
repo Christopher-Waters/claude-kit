@@ -2,21 +2,25 @@
 
 > This document covers the current state of pipelines and branching across your projects, the target state, and the migration steps for each project.
 
+> **Status 2026-09-06.** The target changed from the original 3-branch plan (`develop`/`staging`/`main`) to the 5-branch layout below, in which `main` is a pure compare branch and each environment has its own lowercase branch. **COMPASS and CSIPay are on the new layout** (CSIPay renamed its branches on 2026-09-04; `test` replaced `QA`). **Glasswing and Monarch is not yet migrated** — it still has only `main` and `develop`. The phase-by-phase steps further down were written against the old plan; read them with the table below in mind (`develop` → `dev`, production is `prod`, and `main` never deploys). See `docs/todo-pipeline-migration.md` for what's verified done.
+
 ---
 
 ## Target State (All Projects)
 
 ### Branch-to-Environment Mapping
 
-Every project should converge to this standard:
+`main` is the **compare branch** — the default branch, the one feature PRs target, and the one every environment is compared against. **Merging a PR into `main` deploys nothing.** Each environment has its own branch, and a PR merging into that branch is what triggers its CD pipeline:
 
-| Branch | Azure Subscription | Environment | Deploys When |
-|--------|-------------------|-------------|-------------|
-| `develop` | Dev | Development | PR merged into `develop` |
-| `staging` | Staging | Staging | PR merged into `staging` |
-| `main` | Production | Production | PR merged into `main` (with approval gate) |
+| Branch | Environment | Deploys When |
+|--------|-------------|-------------|
+| `main` | — (compare / integration) | **Never** |
+| `dev` | Development | PR merged into `dev` |
+| `test` | Test (QA) | PR merged into `test` |
+| `staging` | Staging | PR merged into `staging` |
+| `prod` | Production | PR merged into `prod` |
 
-> **Note:** The `test` / `QA` environments will be removed in the coming months to align with the 3 Azure subscriptions. Until then, projects that have QA keep it as-is.
+Work item states mirror the chain: `Code Review` (PR open to `main`) → `Ready for Testing` (on `dev`) → `Testing` (on `test`) → `Ready for Staging` (QA sign-off) → `Staging` (on `staging`) → `Ready to Deploy` (stakeholder sign-off) → `Deployed` (on `prod`) → `Closed`. `Ready for Staging` and `Staging` were added to the CSI Development process on 2026-09-06. The promotion slash commands gate-check against the "Ready for …" states and advance items after the merge.
 
 ### Pipeline Standard
 
@@ -45,11 +49,12 @@ Feature branches created by `/implement` follow this convention:
 Code flows through environments via PRs and releases — never by direct push:
 
 ```
-feature/AB#1234-...  ──PR──▸  develop  ──PR──▸  staging  ──PR──▸  main
-   (work branch)              (Dev)            (Staging)        (Production)
+feature/AB#1234-...  ──PR──▸  main  ──PR──▸  dev  ──PR──▸  test  ──PR──▸  staging  ──PR──▸  prod
+   (work branch)            (compare,      (Dev)         (Test)         (Staging)        (Production)
+                            no deploy)
 ```
 
-Releases group work items for coordinated promotion using `/create-release` and `/deploy-release`.
+Releases group work items for coordinated promotion using `/create-release` and `/deploy-release`; `/promote main dev` is the usual first hop.
 
 ---
 
@@ -128,9 +133,10 @@ Use the standard pipeline template included in the AI infrastructure package at 
 trigger:
   branches:
     include:
-      - develop
+      - dev
+      - test
       - staging
-      - main
+      - prod
   paths:
     include:
       - Api/**
@@ -177,7 +183,7 @@ stages:
   - stage: Dev
     displayName: "Dev"
     dependsOn: "Build"
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
     jobs:
       - deployment: DeployDev
         environment:
@@ -230,7 +236,7 @@ stages:
   - stage: Production
     displayName: "Production"
     dependsOn: "Build"
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/prod'))
     jobs:
       - deployment: DeployProd
         environment:
@@ -340,9 +346,10 @@ trigger:
 trigger:
   branches:
     include:
-      - develop
+      - dev
+      - test
       - staging
-      - main
+      - prod
 ```
 
 ```yaml
@@ -351,8 +358,8 @@ condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/Dev'
 condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
 
 # After
-condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
-condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
+condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/prod'))
 ```
 
 ---
@@ -388,10 +395,10 @@ The 8 slash commands available after installing the AI infrastructure:
 | `/implement AB#1234` | Create branch, implement, quality checks, PR | No pipeline trigger — pipeline triggers on PR merge |
 | `/deploy "message"` | Commit, push, trigger pipeline | Triggers pipeline if on an environment branch |
 | `/create-release 23` | Group work items into Release #23 | No pipeline interaction |
-| `/deploy-release 23 staging` | Cherry-pick release to environment, create PR | No pipeline trigger — pipeline triggers on PR merge |
-| `/cherry-pick AB#1234 production` | Cherry-pick specific work items, create PR | No pipeline trigger — pipeline triggers on PR merge |
-| `/promote staging production` | Create PR to promote between environments | No pipeline trigger — pipeline triggers on PR merge |
-| `/rollback AB#1234 production` | Revert commits, create PR | No pipeline trigger — pipeline triggers on PR merge |
+| `/deploy-release 23 staging` | Gate-check, cherry-pick release to environment, create PR, advance states after merge | No pipeline trigger — pipeline triggers on PR merge |
+| `/cherry-pick AB#1234 prod` | Gate-check, cherry-pick specific work items, create PR, advance states after merge | No pipeline trigger — pipeline triggers on PR merge |
+| `/promote main dev` | Create PR to promote between environments, advance states after merge | No pipeline trigger — pipeline triggers on PR merge (never on `main`) |
+| `/rollback AB#1234 prod` | Revert commits, create PR | No pipeline trigger — pipeline triggers on PR merge |
 | `/review 142` | Code review a PR | No pipeline interaction |
 
 ### CLAUDE.md Pipeline Configuration
@@ -401,15 +408,17 @@ Each project should add a pipeline configuration section to its `CLAUDE.md` so t
 ```markdown
 ## Pipeline Configuration
 
-| Branch | Environment | Pipelines |
-|--------|------------|-----------|
-| develop | Dev | Compass API (2), Compass Client (3) |
-| staging | Staging | Compass API (2), Compass Client (3) |
-| main | Production | Compass API (2), Compass Client (3) |
+| Branch | Environment | Pipeline(s) |
+|--------|------------|-------------|
+| main | — (compare branch, no deployment) | — |
+| dev | Dev | Compass API (YAML) (32), Compass Client (YAML) (33) |
+| test | Test | Compass API (YAML) (32), Compass Client (YAML) (33) |
+| staging | Staging | Compass API (YAML) (32), Compass Client (YAML) (33) |
+| prod | Production | Compass API (YAML) (32), Compass Client (YAML) (33) |
 ```
 
 This is read by the `/deploy` command and the deployer agent to determine:
-- Whether to trigger a pipeline (only on environment branches)
+- Whether to trigger a pipeline (only on environment branches — never on `main`, whose pipeline cell is `—`)
 - Which pipeline ID(s) to trigger
 - Which environment the branch maps to
 
@@ -419,11 +428,12 @@ This is read by the `/deploy` command and the deployer agent to determine:
 
 | Phase | What | When |
 |-------|------|------|
-| **Now** | Update AI infrastructure slash commands and docs (done) | Complete |
-| **Next** | Migrate COMPASS to YAML pipelines + add `develop`/`staging` branches | Next available sprint |
-| **Next** | Add staging/production stages to Glasswing pipeline | Next available sprint |
-| **Later** | Rename CSIPay branches (`Dev` → `develop`, `master` → `main`) | When convenient |
-| **In ~2 months** | Remove QA environments and branches from CSIPay | When test environment removal is ready |
+| **Done** | Update AI infrastructure slash commands and docs for the 5-branch layout | 2026-09-06 |
+| **Done** | Migrate COMPASS to YAML pipelines (32, 33) + `dev`/`test`/`staging`/`prod` branches | 2026-09 |
+| **Done** | Rename CSIPay branches to lowercase; `test` replaces `QA` | 2026-09-04 |
+| **Done** | Add `Ready for Staging` / `Staging` states to User Story, Bug, Hot Fix | 2026-09-06 |
+| **Next** | Migrate Glasswing and Monarch (`develop` → `dev`, add `test`/`staging`/`prod`, pipeline stages) | Next available sprint |
+| **Next** | Confirm CSI.Signal (19) and PDF Viewer (24) are on the new layout | Next available sprint |
 | **Ongoing** | New projects use the standard from day one | All new projects |
 
 ---

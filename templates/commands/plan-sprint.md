@@ -54,7 +54,7 @@ FROM WorkItems
 WHERE [System.TeamProject] = '{project}'
   AND [System.WorkItemType] IN ('User Story', 'Bug')
   AND [System.IterationPath] UNDER '{current sprint iteration path}'
-  AND [System.State] NOT IN ('Closed', 'Removed', 'Done', 'Resolved', 'Code Review', 'Ready to Deploy', 'Deployed')
+  AND [System.State] NOT IN ('Closed', 'Removed', 'Done', 'Resolved', 'Code Review', 'Ready for Testing', 'Testing', 'Ready for Staging', 'Staging', 'Ready to Deploy', 'Deployed')
 ORDER BY [Microsoft.VSTS.Common.StackRank] ASC
 ```
 
