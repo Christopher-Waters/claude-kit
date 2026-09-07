@@ -92,7 +92,76 @@ Create a PR directly from the source branch to the target branch via Azure DevOp
 
 Link the associated work items to the PR.
 
-## Step 5: Present Summary and Wait for the Merge
+## Step 5: Pick Who Verifies Each Group (before the merge)
+
+The items are about to land in {target environment} for **someone** to verify. Decide who now, while the PR is still in review — nothing is written yet; the assignment is applied in Step 7 together with the state change, once the pipeline is green.
+
+### 5a. Group by title prefix
+
+Work item titles in the CSI Development project are `PREFIX - Title` (`COM`, `PAY`, `CDA`, `AUD`, `SER`, `PSSF`, `TPS`, `ILP`, `RBWO`, `MTG`, `CSI`). Group the carried **User Stories, Bugs, and Hot Fixes** by that prefix. Titles with a missing or unrecognized prefix go in a `(no prefix)` group. Features and Tasks are never assigned by this command — leave them out of the grouping.
+
+One question per group. Different products usually have different verifiers, but the same person may take several groups — that is the normal case, not an error.
+
+### 5b. Build each group's candidate list from the items themselves
+
+For every item in the group, collect the distinct identities already on it:
+
+- **whoever set the gate state** — `wit_work_item` `action: list_revisions`, then the `System.ChangedBy` on the revision where `System.State` became the target's gate state (`Ready for Staging`, `Ready to Deploy`, …). That is the QA person or stakeholder who signed the item off, and it is usually the right verifier.
+- `System.CreatedBy` — who asked for the work
+- comment authors — `wit_work_item` `action: list_comments`
+- `System.ChangedBy` — the most recent editor
+
+Then **drop the developers**, so what remains is the non-developer names on the item:
+
+- each item's current `System.AssignedTo` (the dev who implemented it)
+- the PR author
+- the authors of the promoted commits — `git log origin/<target>..origin/<source> --format='%an <%ae>' | sort -u`
+
+Rank the survivors by how many items in the group they appear on — the gate-state signer first, then creators. **Do not invent names**, do not pull from the org directory or a team list, and do not carry a name over from another group's items — every candidate must come from the items in that group.
+
+If the developer filter empties a group's list, say so and show the unfiltered names marked `(also a developer here)`, plus the option to type a name.
+
+### 5c. Ask
+
+```
+## Who verifies on {environment}?
+
+**COM** — 2 items (AB#1234, AB#1236)
+  1. Jane Doe (jane@caresolutions.com) — created both
+  2. Sam Lee (sam@caresolutions.com) — commented on AB#1234
+  3. Someone else — give me a name or email
+  4. Leave the current assignee alone
+
+**PAY** — 2 items (AB#1240, AB#1241)
+  1. Jane Doe (jane@caresolutions.com) — created AB#1240
+  2. Pat Ruiz (pat@caresolutions.com) — commented on both
+  3. Someone else
+  4. Leave the current assignee alone
+
+Reply per group — `COM 1, PAY 2` — or `all 1` to give every group to the same person.
+```
+
+### 5d. Confirm the mapping
+
+Echo the resolved plan and wait for an explicit `yes`:
+
+```
+When the {environment} pipeline goes green I will apply:
+
+| ID | Title | Prefix | Assign to | State |
+|----|-------|--------|-----------|-------|
+| AB#1234 | COM - Add payment export | COM | Jane Doe | Staging |
+| AB#1236 | COM - View history | COM | Jane Doe | Staging |
+| AB#1240 | PAY - Fix login redirect | PAY | Pat Ruiz | Staging |
+
+Approve? (yes / change)
+```
+
+`change` re-asks 5c. Only after `yes` do you move on — if the PR merges before the user answers, keep waiting for the answer, then run Step 7.
+
+## Step 6: Watch the Merge, Then the Pipeline
+
+Do NOT merge the PR yourself — a reviewer approves and completes it. Report the PR, then watch for the deployment:
 
 ```
 Promotion PR created: {source} → {target}
@@ -100,22 +169,62 @@ Promotion PR created: {source} → {target}
 PR: {pr-url}
 
 {count} commits, {n} work items included.
-Merging the PR triggers the CD pipeline for {target}.
-
-Reply `merged` once the PR is complete and the pipeline is green — I'll move the {n} work items to `{state after merge}`. (Or `skip` to leave the states alone.)
+Merging the PR triggers the CD pipeline for {target}. I'm watching the PR and
+that pipeline — when it comes back green I'll set the {n} work items to
+`{state after merge}` and assign them as approved above. Nothing is written
+until then. Say `stop watching` to leave the states alone.
 ```
 
-Do NOT merge the PR automatically — the user or a reviewer must approve and merge.
+1. **Wait for the PR to complete.** Poll `repo_pull_request` until `status` is `completed`; note the merge commit and the completion time. `abandoned` → stop, change nothing, report it.
+2. **Find the CD run.** Look up the target branch's pipeline ID(s) in the Pipeline Configuration table, then poll `pipelines_build` for runs on `refs/heads/<target-branch>` queued at or after the merge time — match the merge commit when the run exposes it — and **capture each run's id**. A run that was already completed before the merge is not this deployment; ignore it. A branch with more than one pipeline (API + Client) must have **all** of them green.
+3. **Wait for a terminal result** on each run: `succeeded`, `partiallySucceeded`, `failed`, or `canceled`.
 
-## Step 6: Advance Work Item States (after `merged`)
+**How to wait.** Never block on a foreground `sleep`. If the Azure CLI with the `azure-devops` extension is available, arm a background watch that notifies you on a terminal state:
 
-When the user replies `merged`:
+```bash
+# <run-id> is the run identified in step 2 — never "the latest run on the branch",
+# which can be a run queued before the merge and already completed.
+until az pipelines runs show --org <org-url> --project <project> \
+        --id <run-id> --query status -o tsv | grep -qx completed; do
+  sleep 60
+done
+az pipelines runs show --org <org-url> --project <project> \
+  --id <run-id> --query "[buildNumber,status,result]" -o tsv
+```
 
-1. **Confirm the PR is actually completed** via the Azure DevOps MCP. If it isn't, say so and wait — never advance states for an unmerged PR.
-2. For every carried work item of type **User Story**, **Bug**, or **Hot Fix**, set `System.State` to the target's state (`Ready for Testing` / `Testing` / `Staging` / `Deployed`) via `wit_update_work_item`.
+Run it with `Monitor` (or Bash `run_in_background`) so the session stays usable. Watch the **run id**, and print `result` when it exits — a guard that only greps for success is silent through a failed or canceled deploy, which looks identical to one still running. One watch per pipeline when the branch has more than one.
+
+Without the CLI, re-poll through the Azure DevOps MCP on roughly a 60-second cadence and report progress as you go. If the deploy outlasts the session's attention, say where it stands and that `check` will re-poll immediately — never claim a pipeline succeeded that you have not seen succeed.
+
+## Step 7: Assign and Advance States (automatic, on a green pipeline)
+
+This step runs **by itself** the moment the pipeline reports success — do not ask again; the approval in Step 5d covers it. All three preconditions must hold: the PR is `completed`, **every** CD run for {target} is `succeeded`, and a Step 5d mapping was approved.
+
+- `partiallySucceeded` → not green. Report which stage failed and ask `proceed` / `hold`.
+- `failed` / `canceled` → change nothing. Report the run, the failing stage, and the log link (`pipelines_build_log`), and offer `/rollback` if the environment is broken.
+- No Step 5d approval yet (user hasn't answered) → do the state changes only when they answer; don't guess an assignee.
+
+For every carried work item of type **User Story**, **Bug**, or **Hot Fix**, one `wit_work_item_write` update per item setting both fields:
+
+1. `System.State` → the target's state (`Ready for Testing` / `Testing` / `Staging` / `Deployed`).
    - **Never move backward** — an item already past the target state keeps it; note it.
-   - **Never touch a Feature or Task.**
    - An invalid-state error means this project's template differs — confirm with `get_type`, report the item, continue with the rest. Don't silently swallow it.
-3. Report a `Was → Now` table per item and the next human step (QA sets `Ready for Staging`; stakeholders set `Ready to Deploy`; verify in production, then `Closed`).
+2. `System.AssignedTo` → the person approved for that item's prefix group. Pass the identity's `uniqueName` / email, not the display name; if the update rejects it, resolve with `core_get_identity_ids` and retry once. A `Leave the current assignee alone` group keeps its assignee — never clear a field the user didn't ask you to clear.
 
-If the user replies `skip`, leave the states alone and note that `/status` will flag the lag later.
+**Never touch a Feature or Task** — neither state nor assignee.
+
+Report both fields, so a wrong assignment is easy to put back:
+
+```
+{source} → {target} is deployed (pipeline {build-number}, succeeded).
+
+| ID | State: was → now | Assignee: was → now |
+|----|------------------|---------------------|
+| AB#1234 | Ready for Staging → Staging | Chris Waters → Jane Doe |
+| AB#1240 | Ready for Staging → Staging | Chris Waters → Pat Ruiz |
+| AB#1250 | Deployed (unchanged — already ahead) | unchanged |
+
+Next: {the human step — "QA tests on Test and sets Ready for Staging" / "stakeholders verify on Staging and set Ready to Deploy" / "verify in production, then Close"}.
+```
+
+If the user said `stop watching`, or an update fails, leave the rest alone, say exactly which items were and were not updated, and note that `/status` will flag the lag later.

@@ -329,7 +329,8 @@ Claude automatically:
 2. Cherry-picks their commits into `release/23-to-staging`
 3. Creates a PR targeting the `staging` branch — merging it triggers the Staging pipeline
 4. Links all work items to the PR
-5. After you reply `merged`, moves the work items to `Staging`
+5. Asks who verifies each product group on Staging (`COM`, `PAY`, …) — candidates are the non-developer names already on those work items
+6. Watches the PR and the Staging pipeline; once it's green, moves the work items to `Staging` and assigns them to the approved verifiers
 
 The same command walks a release through `test` → `staging` → `prod`; with no environment given it picks the next one.
 
@@ -339,7 +340,7 @@ The same command walks a release through `test` → `staging` → `prod`; with n
 /cherry-pick AB#1234 AB#1235 prod
 ```
 
-Cherry-picks specific work items to an environment without a formal release. Same gate check and post-merge state advance as `/deploy-release`. `main` is also a valid target — that's how a hot fix that went straight to `prod` is brought back into the compare branch.
+Cherry-picks specific work items to an environment without a formal release. Same gate check, same verifier question, and the same automatic state advance + assignment once the pipeline is green as `/deploy-release`. `main` is also a valid target — that's how a hot fix that went straight to `prod` is brought back into the compare branch.
 
 ### Promote an Environment
 
@@ -349,7 +350,7 @@ Cherry-picks specific work items to an environment without a formal release. Sam
 /promote                  ← auto-detects from the current branch
 ```
 
-Creates a PR to promote all code from one branch to the next in the chain (`main → dev → test → staging → prod`). Shows every commit and work item before confirming, gate-checks the work items, and advances their states after you reply `merged`. `main → dev` is the usual first hop after feature PRs merge — nothing has deployed before that.
+Creates a PR to promote all code from one branch to the next in the chain (`main → dev → test → staging → prod`). Shows every commit and work item before confirming, gate-checks the work items, asks who verifies each product group, and advances and assigns them once the merge's pipeline is green. `main → dev` is the usual first hop after feature PRs merge — nothing has deployed before that.
 
 ### Rollback a Deployment
 
@@ -439,7 +440,7 @@ Every environment has a work item state, and the promotion commands keep them in
 | `test → staging` | `Ready for Staging` (QA sign-off) | `Staging` |
 | `staging → prod` | `Ready to Deploy` (stakeholder sign-off) | `Deployed` |
 
-`/deploy-release`, `/cherry-pick`, and `/promote` check the gate before creating the PR, then ask you to reply `merged` once the PR completes and advance the states. `/status` flags anything whose state lags the branch it's on.
+`/deploy-release`, `/cherry-pick`, and `/promote` check the gate before creating the PR, ask who verifies each product group while the PR is in review, then watch the PR and the environment's CD pipeline — on a green pipeline they set the state and the assignee together. A failed pipeline changes nothing. `/status` flags anything whose state lags the branch it's on.
 
 ### Branch Naming
 
@@ -507,7 +508,7 @@ The PR merges into `main`. **That merge deploys nothing** — `main` is the comp
 /promote main dev
 ```
 
-Merge that PR, reply `merged`, and the work items move to `Ready for Testing`.
+Merge that PR. Claude asks who verifies each product group on Dev, watches the Dev pipeline, and once it's green moves the work items to `Ready for Testing` and assigns them to those people.
 
 ### Step 2: Deploy Changes (Quick Commits)
 
@@ -550,7 +551,8 @@ Claude will:
 4. Cherry-pick all commits for each work item
 5. Create a PR from `release/23-to-test` → `test`
 6. Link all work items to the PR
-7. After you reply `merged`, move the work items to `Testing`
+7. Ask who verifies each product group on Test
+8. Watch the PR and the Test pipeline; on a green pipeline, move the work items to `Testing` and assign them to the approved verifiers
 
 After the PR is reviewed and merged, the Test CD pipeline triggers automatically. QA tests there and sets each passing item to `Ready for Staging`; then `/deploy-release 23 staging` repeats the process (gate `Ready for Staging`, state after merge `Staging`).
 
@@ -566,7 +568,7 @@ When stakeholders have verified on Staging and set the items to `Ready to Deploy
 /deploy-release 23 prod
 ```
 
-Same process — gate `Ready to Deploy`, cherry-picks from `staging` into a PR targeting `prod`. After merge, the Production CD pipeline triggers; reply `merged` and the items move to `Deployed`.
+Same process — gate `Ready to Deploy`, cherry-picks from `staging` into a PR targeting `prod`. After merge the Production CD pipeline triggers; when it comes back green the items move to `Deployed` and are assigned to whoever you named for each product group.
 
 ### Selective Deployment
 
@@ -671,10 +673,10 @@ Claude reviews for:
 | `/fix-review` | `/fix-review 142` | Fix everything flagged on a PR — human reviewer comments and automated `/review` findings alike: implement in severity order, validate, push, resolve threads |
 | `/deploy` | `/deploy "message"` | Commit, push, trigger pipeline if on an environment branch (`dev`/`test`/`staging`/`prod`) — never on `main` |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 iteration with tags |
-| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → cherry-pick release work items to environment via PR → advance states after `merged` |
+| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → cherry-pick release work items to environment via PR → ask who verifies → advance + assign on a green pipeline |
 | `/add-to-release` | `/add-to-release 24 AB#4599` | Add work items to an existing release |
-| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items to environment via PR → advance states after `merged` |
-| `/promote` | `/promote main dev` | PR to promote all code to the next branch in the chain (`main → dev → test → staging → prod`) → advance states after `merged` |
+| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items to environment via PR → ask who verifies → advance + assign on a green pipeline |
+| `/promote` | `/promote main dev` | PR to promote all code to the next branch in the chain (`main → dev → test → staging → prod`) → ask who verifies → advance + assign on a green pipeline |
 | `/rollback` | `/rollback AB#1234 prod` | Revert specific commits on an environment via PR |
 | `/status` | `/status release 24` | Check status of a release, pipeline, work item, or environment; flags work items whose state lags their environment |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose one child task with hours per story |

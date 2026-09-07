@@ -300,7 +300,8 @@ This will:
 1. Create a release branch: release/24-to-staging
 2. Cherry-pick all commits for the 6 work items
 3. Create a PR targeting `staging` — merging it triggers the Staging pipeline
-4. After you confirm the merge, move the work items to `Staging`
+4. Ask who verifies each product group on Staging (before the merge)
+5. Watch the pipeline — once it's green, move the work items to `Staging` and assign them to the approved verifiers
 
 Proceed? (yes/no)
 ```
@@ -368,7 +369,7 @@ Next: stakeholders verify on Staging and set each item to Ready to Deploy.
 /deploy-release 24 prod
 ```
 
-Same process — the gate is `Ready to Deploy`, the cherry-picks come from `staging` into a PR targeting `prod`, and after you reply `merged` the items move to `Deployed`.
+Same process — the gate is `Ready to Deploy`, the cherry-picks come from `staging` into a PR targeting `prod`, and once the production pipeline comes back green the items move to `Deployed` and are assigned to whoever you named for each product group.
 
 ---
 
@@ -455,7 +456,7 @@ Promote? (yes/no)
 yes
 ```
 
-Claude gate-checks the work items (`Ready to Deploy`) and creates a PR from `staging` → `prod`. Merging it triggers the production pipeline; reply `merged` afterwards and the work items move to `Deployed`.
+Claude gate-checks the work items (`Ready to Deploy`), creates a PR from `staging` → `prod`, and asks who verifies each product group. Merging it triggers the production pipeline; when that pipeline succeeds the work items move to `Deployed` and are assigned to those verifiers.
 
 ### Example: Auto-detect the next environment
 
@@ -772,9 +773,9 @@ Each one: summarize → confirm → plan → approve → implement → test → 
 ### Thursday: Promote to Dev, bundle into a release, deploy to Test
 
 ```
-/promote main dev         → Everything merged this week goes to Dev; reply `merged` → items go to Ready for Testing
+/promote main dev         → Everything merged this week goes to Dev; pick verifiers → green pipeline → items go to Ready for Testing, assigned
 /create-release 24        → Group AB#4521, 4522, 4530, 4535, 4589, 4590
-/deploy-release 24 test   → Cherry-pick to test, create PR; reply `merged` → items go to Testing
+/deploy-release 24 test   → Cherry-pick to test, create PR; pick verifiers → green pipeline → items go to Testing, assigned
 ```
 
 QA tests on Test and sets each passing item to `Ready for Staging`.
@@ -799,7 +800,7 @@ After the fix merges to `main`, cherry-pick it to test:
 QA has set everything to `Ready for Staging`:
 
 ```
-/deploy-release 24 staging   → reply `merged` → items go to Staging
+/deploy-release 24 staging   → pick verifiers → green pipeline → items go to Staging, assigned
 ```
 
 Stakeholders verify on Staging and set `Ready to Deploy` — except AB#4535 (email notifications), which needs more work. Only deploy the other 5:
@@ -815,7 +816,7 @@ Or create a new release with just those 5:
 /deploy-release 25 prod
 ```
 
-Either way, reply `merged` after the PR completes and the 5 items move to `Deployed`.
+Either way, once the PR completes and the production pipeline is green the 5 items move to `Deployed` and land with the verifiers you named.
 
 ### Tuesday: Production issue discovered
 

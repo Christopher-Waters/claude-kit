@@ -100,10 +100,11 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 3. **Hooks guard** against secrets and bad patterns automatically
 4. **PR merges** into `main` — the compare branch. **Nothing deploys yet.** The work item stays in `Code Review` until it is promoted
 5. **Promote or release** — `/promote main dev` carries everything on `main` to Dev; `/create-release <N>` groups work items so `/deploy-release <N> test` → `staging` → `prod` can carry just those
-6. **Merge each promotion PR** — that merge is what triggers the environment's CD pipeline. Reply `merged` and the command advances the work items to `Testing`, `Staging`, or `Deployed`
-7. **Test** using Playwright MCP for browser testing
-8. **Track** work items via the Azure DevOps MCP server
-9. **Learn** — Claude saves what worked for next time
+6. **Say who verifies** — before the merge, the command asks who each product group (`COM`, `PAY`, …) should be assigned to in the target environment, offering the non-developer names already on those work items
+7. **Merge each promotion PR** — that merge triggers the environment's CD pipeline. The command watches it and, once it's green, sets the work items to `Testing`, `Staging`, or `Deployed` **and** assigns them to the approved verifiers — automatically, no reply needed
+8. **Test** using Playwright MCP for browser testing
+9. **Track** work items via the Azure DevOps MCP server
+10. **Learn** — Claude saves what worked for next time
 
 ### Story Points & Dev Ready Policy
 
@@ -159,7 +160,7 @@ feature/AB#1234-...  ──PR──▸  main  ──PR──▸  dev  ──PR�
 
 #### Work Item States ↔ Environments
 
-Every environment in the chain has a work item state, so the board shows where each story physically is. The **"Ready for …" states are human gates** — QA or stakeholders set them when something passes; the slash commands never do. The **environment states** (`Testing`, `Staging`, `Deployed`) are set by the promotion commands once the PR into that branch has merged.
+Every environment in the chain has a work item state, so the board shows where each story physically is. The **"Ready for …" states are human gates** — QA or stakeholders set them when something passes; the slash commands never do. The **environment states** (`Testing`, `Staging`, `Deployed`) are set by the promotion commands once the PR into that branch has merged and its CD pipeline has come back green.
 
 | Branch | Environment | Gate — items should already be in… | Set once the PR into this branch merges |
 |---|---|---|---|
@@ -174,8 +175,18 @@ Human-only transitions — no slash command ever makes these: `Testing → Ready
 How the commands use this table:
 
 - **Gate check before the PR.** `/deploy-release`, `/cherry-pick`, and `/promote` compare each carried work item's state against the gate for the target environment. Anything behind the gate (e.g. still `Testing` when deploying to `staging`) is flagged and the user decides whether to include it. Items *ahead* of the gate (e.g. already `Deployed` on a cherry-pick to `prod`) are reported and left alone.
-- **Advance after the merge, not before.** The commands can't see the PR merge, so they finish by asking you to reply `merged` once the PR has completed and the pipeline is green; only then do they write the new state — for every carried User Story, Bug, and Hot Fix, never a Feature or Task, and never backward. `/status` reports items whose state lags the branch their commits are on and offers to catch them up.
+- **Advance on a green pipeline, automatically.** `/promote`, `/cherry-pick`, and `/deploy-release` do not stop at the PR. They poll it until it is `completed`, then poll the target branch's CD pipeline until every run finishes. Only on `succeeded` do they write the new state — for every carried User Story, Bug, and Hot Fix, never a Feature or Task, and never backward. A failed or canceled run changes **nothing** and is reported with the log link. `/status` reports items whose state lags the branch their commits are on and offers to catch them up.
+- **Assign the verifier at the same time.** The state change hands the item to a person, so the same three commands ask **before the merge** who each group of items should go to, then apply the assignee alongside the state once the pipeline is green. See **Verifier Assignment** below.
 - **Never assume the state list.** Confirm with `mcp__azure-devops__wit_work_item` (`action: get_type`) on an unfamiliar project before writing a state name — a bad name is accepted silently by a query and rejected only at write time.
+
+#### Verifier Assignment
+
+Moving an item to `Testing`, `Staging`, or `Deployed` puts it on someone's plate, so `/promote`, `/cherry-pick`, and `/deploy-release` also change who owns it. The developer implemented it; from here on it belongs to whoever checks it in that environment.
+
+- **Grouped by product prefix.** Work item titles are `PREFIX - Title`, so the commands group the carried items by prefix (`COM`, `PAY`, `CDA`, …) and ask **one question per group**. A staging → prod deploy carrying 2 `COM` and 2 `PAY` items asks twice; answering with the same person both times is fine, and `all 1` gives the whole batch to one person.
+- **Candidates come from the work items, never from a directory.** For each group the commands read the items' own history — who set the gate state (`Ready for Staging` / `Ready to Deploy`, from `list_revisions`), who created the item, who commented on it, who last edited it — then subtract the developers (current assignee, PR author, commit authors). What's left are the non-developer names actually attached to that work, ranked with the sign-off setter first. No name is ever invented.
+- **Asked before the merge, applied after.** The question comes while the PR is still in review and requires an explicit `yes`; nothing is written until the CD pipeline reports success. Then state and `System.AssignedTo` are set in the same update, and the report shows `was → now` for both so a wrong assignment is one edit to undo.
+- **`Leave the current assignee alone`** is always an option — the commands never clear an assignee, and never touch a Feature's or a Task's assignee.
 
 #### Release Management
 
@@ -193,7 +204,7 @@ This creates a `Release #23` iteration, assigns the selected work items to it, a
 /deploy-release 23 staging
 /deploy-release 23 prod
 ```
-This finds all work items in Release #23, checks each one against the target environment's gate state, cherry-picks their commits into a release branch (`release/23-to-staging`), creates a PR targeting the environment branch, links all work items, and — once you reply `merged` — advances them to the environment's state (`Testing`, `Staging`, `Deployed`).
+This finds all work items in Release #23, checks each one against the target environment's gate state, cherry-picks their commits into a release branch (`release/23-to-staging`), creates a PR targeting the environment branch, links all work items, asks who verifies each product group, and — once the merge's CD pipeline comes back green — advances them to the environment's state (`Testing`, `Staging`, `Deployed`) and assigns them to those verifiers.
 
 **Selective deployment:** Since releases are deployed via cherry-pick, you can deploy a full release or a subset. If staging has 5 user stories but only 3 are `Ready to Deploy`, create a release with just those 3 and deploy it.
 
@@ -213,7 +224,7 @@ Cherry-pick specific work items to an environment without a formal release:
 ```
 /cherry-pick AB#1234 AB#1235 prod
 ```
-This finds commits for the specified work items, checks them against the target's gate state, cherry-picks them into a branch (`cherry-pick/<date>-to-<environment>`), creates a PR, and advances the work items once you confirm the merge.
+This finds commits for the specified work items, checks them against the target's gate state, cherry-picks them into a branch (`cherry-pick/<date>-to-<environment>`), creates a PR, asks who verifies each product group, and — once the merge's CD pipeline is green — advances and assigns the work items.
 
 #### Promoting Environments
 
@@ -223,7 +234,7 @@ Promote all code from one environment to the next:
 /promote staging prod
 /promote                      ← auto-detects source and target from current branch
 ```
-This creates a PR from the source branch to the target branch with a summary of all included commits and their work items, checks the work items against the target's gate state, and advances them once you confirm the merge. `main → dev` is the usual first hop after feature PRs merge.
+This creates a PR from the source branch to the target branch with a summary of all included commits and their work items, checks the work items against the target's gate state, asks who verifies each product group, and — once the merge's CD pipeline is green — advances and assigns them. `main → dev` is the usual first hop after feature PRs merge.
 
 #### Rollbacks
 
@@ -288,10 +299,10 @@ All deployment and release operations are available as slash commands:
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
 | `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline (only on `dev`/`test`/`staging`/`prod` — never on `main`) |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 |
-| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → cherry-pick release to environment → PR → advance states after merge |
+| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → cherry-pick release to environment → PR → ask who verifies → advance + assign on a green pipeline |
 | `/add-to-release` | `/add-to-release 24 AB#4599` | Add work items to existing release |
-| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items → PR → advance states after merge |
-| `/promote` | `/promote main dev` | Promote all code between environments (`main → dev → test → staging → prod`) → advance states after merge |
+| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items → PR → ask who verifies → advance + assign on a green pipeline |
+| `/promote` | `/promote main dev` | Promote all code between environments (`main → dev → test → staging → prod`) → ask who verifies → advance + assign on a green pipeline |
 | `/rollback` | `/rollback AB#1234 prod` | Revert commits on an environment |
 | `/status` | `/status release 24` | Check release, pipeline, environment, or work item status; flags work items whose state lags their environment |
 | `/where` | `/where AB#1234` | Show which environment branches contain a work item's commits |

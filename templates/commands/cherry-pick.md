@@ -73,7 +73,7 @@ Options:
 Which option? (1 / 2 / 3)
 ```
 
-- **Option 1:** Run `git cherry-pick --skip` and continue with remaining work items. Note the skipped item in the summary — it does **not** get its state advanced in Step 7.
+- **Option 1:** Run `git cherry-pick --skip` and continue with remaining work items. Note the skipped item in the summary — it does **not** get its state advanced or its assignee changed in Step 8.
 - **Option 2:** Run `git cherry-pick --abort`, delete the cherry-pick branch, and switch back to the original branch.
 - **Option 3:** Wait for the user to resolve conflicts and run `git cherry-pick --continue`, then proceed.
 
@@ -94,32 +94,143 @@ Cherry-picking:
    - **description**: List all work items with IDs and titles
 3. Link all work items to the PR via `wit_link_work_item_to_pull_request`
 
-## Step 6: Present Summary and Wait for the Merge
+## Step 6: Pick Who Verifies Each Group (before the merge)
+
+When the target is `main` there is no pipeline, no state change, and **no assignment** — say so and skip to Step 8's summary.
+
+Otherwise the items are about to land in {environment} for **someone** to verify. Decide who now, while the PR is still in review — nothing is written yet; the assignment is applied in Step 8 together with the state change, once the pipeline is green.
+
+### 6a. Group by title prefix
+
+Work item titles in the CSI Development project are `PREFIX - Title` (`COM`, `PAY`, `CDA`, `AUD`, `SER`, `PSSF`, `TPS`, `ILP`, `RBWO`, `MTG`, `CSI`). Group the cherry-picked **User Stories, Bugs, and Hot Fixes** by that prefix. Titles with a missing or unrecognized prefix go in a `(no prefix)` group. Items skipped on a conflict (Step 4) or dropped at the gate (Step 1) are not on the branch — leave them out. Features and Tasks are never assigned by this command.
+
+One question per group. Different products usually have different verifiers, but the same person may take several groups — that is the normal case, not an error.
+
+### 6b. Build each group's candidate list from the items themselves
+
+For every item in the group, collect the distinct identities already on it:
+
+- **whoever set the gate state** — `wit_work_item` `action: list_revisions`, then the `System.ChangedBy` on the revision where `System.State` became the target's gate state (`Ready for Staging`, `Ready to Deploy`, …). That is the QA person or stakeholder who signed the item off, and it is usually the right verifier.
+- `System.CreatedBy` — who asked for the work
+- comment authors — `wit_work_item` `action: list_comments`
+- `System.ChangedBy` — the most recent editor
+
+Then **drop the developers**, so what remains is the non-developer names on the item:
+
+- each item's current `System.AssignedTo` (the dev who implemented it)
+- the PR author
+- the authors of the cherry-picked commits — `git log --format='%an <%ae>' <target-branch>..HEAD | sort -u`
+
+Rank the survivors by how many items in the group they appear on — the gate-state signer first, then creators. **Do not invent names**, do not pull from the org directory or a team list, and do not carry a name over from another group's items — every candidate must come from the items in that group.
+
+If the developer filter empties a group's list, say so and show the unfiltered names marked `(also a developer here)`, plus the option to type a name.
+
+### 6c. Ask
+
+```
+## Who verifies on {environment}?
+
+**COM** — 2 items (AB#1234, AB#1236)
+  1. Jane Doe (jane@caresolutions.com) — set Ready to Deploy on both
+  2. Sam Lee (sam@caresolutions.com) — commented on AB#1234
+  3. Someone else — give me a name or email
+  4. Leave the current assignee alone
+
+**PAY** — 2 items (AB#1240, AB#1241)
+  1. Pat Ruiz (pat@caresolutions.com) — created both
+  2. Jane Doe (jane@caresolutions.com) — commented on AB#1240
+  3. Someone else
+  4. Leave the current assignee alone
+
+Reply per group — `COM 1, PAY 1` — or `all 1` to give every group to the same person.
+```
+
+### 6d. Confirm the mapping
+
+Echo the resolved plan and wait for an explicit `yes`:
+
+```
+When the {environment} pipeline goes green I will apply:
+
+| ID | Title | Prefix | Assign to | State |
+|----|-------|--------|-----------|-------|
+| AB#1234 | COM - Add payment export | COM | Jane Doe | Deployed |
+| AB#1240 | PAY - Fix login redirect | PAY | Pat Ruiz | Deployed |
+
+Approve? (yes / change)
+```
+
+`change` re-asks 6c. Only after `yes` do you move on — if the PR merges before the user answers, keep waiting for the answer, then run Step 8.
+
+## Step 7: Watch the Merge, Then the Pipeline
+
+Do NOT merge the PR yourself — a reviewer approves and completes it. Report the PR, then watch for the deployment:
 
 ```
 Cherry-pick PR created for {environment}.
 
 PR: {pr-url}
 Work items:
-- AB#1234: Add payment export
-- AB#1235: Fix login redirect
+- AB#1234: COM - Add payment export
+- AB#1240: PAY - Fix login redirect
 
-Merging the PR triggers the CD pipeline for {environment}.
-Reply `merged` once the PR is complete and the pipeline is green — I'll move these {count} work items to `{state after merge}`. (Or `skip`.)
+Merging the PR triggers the CD pipeline for {environment}. I'm watching the PR
+and that pipeline — when it comes back green I'll set these {count} items to
+`{state after merge}` and assign them as approved above. Nothing is written
+until then. Say `stop watching` to leave the states alone.
 ```
 
-When the target is `main`, there is no pipeline and no state change — say so and stop here.
+1. **Wait for the PR to complete.** Poll `repo_pull_request` until `status` is `completed`; note the merge commit and completion time. `abandoned` → stop, change nothing, report it.
+2. **Find the CD run.** Look up the target branch's pipeline ID(s) in the Pipeline Configuration table, then poll `pipelines_build` for runs on `refs/heads/<target-branch>` queued at or after the merge time — match the merge commit when the run exposes it — and **capture each run's id**. A run that was already completed before the merge is not this deployment; ignore it. A branch with more than one pipeline (API + Client) must have **all** of them green.
+3. **Wait for a terminal result** on each run: `succeeded`, `partiallySucceeded`, `failed`, or `canceled`.
 
-## Step 7: Advance Work Item States (after `merged`)
+**How to wait.** Never block on a foreground `sleep`. If the Azure CLI with the `azure-devops` extension is available, arm a background watch that notifies you on a terminal state:
 
-When the user replies `merged`:
+```bash
+# <run-id> is the run identified in step 2 — never "the latest run on the branch",
+# which can be a run queued before the merge and already completed.
+until az pipelines runs show --org <org-url> --project <project> \
+        --id <run-id> --query status -o tsv | grep -qx completed; do
+  sleep 60
+done
+az pipelines runs show --org <org-url> --project <project> \
+  --id <run-id> --query "[buildNumber,status,result]" -o tsv
+```
 
-1. **Confirm the PR is actually completed** via the Azure DevOps MCP. If it isn't, say so and wait.
-2. For every cherry-picked work item of type **User Story**, **Bug**, or **Hot Fix**, set `System.State` to the target's state (`Ready for Testing` / `Testing` / `Staging` / `Deployed`) via `wit_update_work_item`.
+Run it with `Monitor` (or Bash `run_in_background`) so the session stays usable. Watch the **run id**, and print `result` when it exits — a guard that only greps for success is silent through a failed or canceled deploy, which looks identical to one still running. One watch per pipeline when the branch has more than one.
+
+Without the CLI, re-poll through the Azure DevOps MCP on roughly a 60-second cadence and report progress as you go. If the deploy outlasts the session's attention, say where it stands and that `check` will re-poll immediately — never claim a pipeline succeeded that you have not seen succeed.
+
+## Step 8: Assign and Advance States (automatic, on a green pipeline)
+
+This step runs **by itself** the moment the pipeline reports success — do not ask again; the approval in Step 6d covers it. All three preconditions must hold: the PR is `completed`, **every** CD run for {environment} is `succeeded`, and a Step 6d mapping was approved.
+
+- `partiallySucceeded` → not green. Report which stage failed and ask `proceed` / `hold`.
+- `failed` / `canceled` → change nothing. Report the run, the failing stage, and the log link (`pipelines_build_log`), and offer `/rollback` if the environment is broken.
+- No Step 6d approval yet (user hasn't answered) → do the state changes only when they answer; don't guess an assignee.
+
+For every cherry-picked work item of type **User Story**, **Bug**, or **Hot Fix**, one `wit_work_item_write` update per item setting both fields:
+
+1. `System.State` → the target's state (`Ready for Testing` / `Testing` / `Staging` / `Deployed`).
    - **Never move backward** — an item already past the target state keeps it; note it.
-   - **Never touch a Feature or Task.**
    - Skipped (conflict) or dropped items are not on the branch — leave them alone.
    - An invalid-state error means this project's template differs — confirm with `get_type`, report the item, continue. Don't silently swallow it.
-3. Report a `Was → Now` table per item and the next human step.
+2. `System.AssignedTo` → the person approved for that item's prefix group. Pass the identity's `uniqueName` / email, not the display name; if the update rejects it, resolve with `core_get_identity_ids` and retry once. A `Leave the current assignee alone` group keeps its assignee — never clear a field the user didn't ask you to clear.
 
-If the user replies `skip`, leave the states alone and note that `/status` will flag the lag later.
+**Never touch a Feature or Task** — neither state nor assignee.
+
+Report both fields, so a wrong assignment is easy to put back:
+
+```
+Cherry-pick is deployed to {environment} (pipeline {build-number}, succeeded).
+
+| ID | State: was → now | Assignee: was → now |
+|----|------------------|---------------------|
+| AB#1234 | Ready to Deploy → Deployed | Chris Waters → Jane Doe |
+| AB#1240 | Ready to Deploy → Deployed | Chris Waters → Pat Ruiz |
+| AB#1250 | Deployed (unchanged — already ahead) | unchanged |
+
+Next: {the human step — "QA tests on Test and sets Ready for Staging" / "stakeholders verify on Staging and set Ready to Deploy" / "verify in production, then Close"}.
+```
+
+If the user said `stop watching`, or an update fails, leave the rest alone, say exactly which items were and were not updated, and note that `/status` will flag the lag later.

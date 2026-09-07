@@ -60,7 +60,7 @@ Work items assigned:
 - AB#1235: Fix login redirect
 - AB#1236: View history
 
-Deploy it one environment at a time — each merge deploys, and the command advances the work items' states after you confirm the merge:
+Deploy it one environment at a time — each merge deploys, and once the pipeline is green the command advances the work items' states and assigns them to the verifiers you pick:
   /deploy-release {N} test      → items go to Testing
   /deploy-release {N} staging   → items go to Staging   (after QA sets Ready for Staging)
   /deploy-release {N} prod      → items go to Deployed  (after stakeholders set Ready to Deploy)
