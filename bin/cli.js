@@ -161,6 +161,74 @@ function mergeHooks(existing, template) {
 // don't linger. manager/uat-generator/api-tester were superseded by the
 // Workflow tool and inline command steps; devops-tracker by direct Azure
 // DevOps MCP access in the main loop.
+// The workflow section written into a target CLAUDE.md is delimited by this marker so
+// a re-install can replace it without touching anything the project added afterwards.
+// Installs from before the marker existed are recovered heuristically — see
+// splitWorkflowSection.
+const WORKFLOW_END_MARKER = '<!-- claude-kit:workflow:end -->';
+
+const WORKFLOW_HEADING_RE = /\n## (?:Claude Kit Workflow|Care Solutions AI Workflow)/;
+
+/**
+ * Split a target CLAUDE.md around the kit's workflow section.
+ *
+ * Returns { head, preserved } where `head` is everything before the workflow
+ * heading and `preserved` is project content that followed the kit's block —
+ * or null when there is no workflow section at all.
+ *
+ * The old implementation replaced /heading[\s\S]*$/, i.e. everything to end of
+ * file, which silently deleted any `## Pipeline Configuration` or
+ * `## Environment URLs` a project had placed below the heading. With the marker
+ * present the boundary is exact. Without it (a pre-marker install) we fall back
+ * to a heading scan: the template's only top-level heading outside a fenced code
+ * block is the workflow heading itself, so any other non-fenced `## ` heading in
+ * the tail is project content and is kept. Fenced headings are skipped because
+ * the template quotes `## Pipeline Configuration` inside ```markdown examples.
+ */
+function splitWorkflowSection(existing) {
+  const match = existing.match(WORKFLOW_HEADING_RE);
+  if (!match) return null;
+
+  const head = existing.slice(0, match.index).trimEnd();
+  const tail = existing.slice(match.index);
+
+  const markerIdx = tail.indexOf(WORKFLOW_END_MARKER);
+  if (markerIdx !== -1) {
+    return {
+      head,
+      preserved: tail.slice(markerIdx + WORKFLOW_END_MARKER.length).trim(),
+      recovered: false,
+    };
+  }
+
+  const lines = tail.split('\n');
+  // `tail` begins with the newline preceding the heading, so the heading is not at
+  // index 0. Find it explicitly and scan from the line after it — starting at a
+  // fixed offset would treat the heading itself as project content.
+  const headingIdx = lines.findIndex((l) =>
+    /^## (?:Claude Kit Workflow|Care Solutions AI Workflow)/.test(l)
+  );
+  let inFence = false;
+  let cut = -1;
+  for (let i = headingIdx + 1; i < lines.length; i++) {
+    if (/^\s*```/.test(lines[i])) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    if (/^## /.test(lines[i])) {
+      cut = i;
+      break;
+    }
+  }
+
+  return {
+    head,
+    preserved: cut === -1 ? '' : lines.slice(cut).join('\n').trim(),
+    recovered: cut !== -1,
+  };
+}
+
 const RETIRED_GLOBAL_AGENTS = ['manager.md', 'uat-generator.md', 'api-tester.md'];
 const RETIRED_PROJECT_AGENTS = ['devops-tracker.md'];
 
@@ -515,13 +583,16 @@ async function main() {
       'utf8'
     );
 
+    // Delimited so a re-install replaces only the kit's own section.
+    const workflowBlock = `${workflowContent.trimEnd()}\n\n${WORKFLOW_END_MARKER}\n`;
+
     const sensitiveDataPolicy = `## SENSITIVE DATA — MANDATORY RULE
 
 **NEVER query, display, read, grep, or expose sensitive PII fields from the database or codebase — even if the values are encrypted.** Blocked fields: TIN, SSN, EIN, TaxId, BankAccountNumber, RoutingNumber, and any \`Encrypted*\` variants. Always use explicit inclusion projections listing only non-sensitive fields. Direct users to the application UI for sensitive data access.
 `;
 
     if (!await fs.pathExists(claudeMdPath)) {
-      await fs.writeFile(claudeMdPath, `# ${basename(targetDir)}\n\n${sensitiveDataPolicy}\n${workflowContent}`);
+      await fs.writeFile(claudeMdPath, `# ${basename(targetDir)}\n\n${sensitiveDataPolicy}\n${workflowBlock}`);
       console.log(chalk.green('  ✓ Created CLAUDE.md with sensitive data policy and workflow'));
     } else {
       let existing = await fs.readFile(claudeMdPath, 'utf8');
@@ -547,8 +618,22 @@ async function main() {
       if (existing.includes('Claude Kit Workflow') || existing.includes('Care Solutions AI Workflow')) {
         // Check whether the existing workflow section matches the current template.
         // If it does, nothing to do. If not, replace it (auto in --all, prompt otherwise).
-        const cleaned = existing.replace(/\n## (?:Claude Kit Workflow|Care Solutions AI Workflow)[\s\S]*$/, '').trimEnd();
-        const expected = `${cleaned}\n\n${workflowContent}`;
+        const split = splitWorkflowSection(existing);
+        const { head, preserved, recovered } = split;
+        const expected = preserved
+          ? `${head}\n\n${workflowBlock}\n${preserved}\n`
+          : `${head}\n\n${workflowBlock}`;
+        if (recovered && preserved) {
+          const names = (preserved.match(/^## .*$/gm) || []).map((h) => h.replace(/^##\s*/, ''));
+          console.log(
+            chalk.yellow(
+              `  ! Kept project content found below the workflow section: ${names.join(', ') || 'unlabelled section'}`
+            )
+          );
+          console.log(
+            chalk.gray('    It now sits after the end marker, so future updates will leave it alone.')
+          );
+        }
         if (existing.trim() === expected.trim()) {
           console.log(chalk.gray('  = Workflow section up to date'));
         } else if (installAll) {
@@ -569,7 +654,7 @@ async function main() {
           }
         }
       } else {
-        await fs.appendFile(claudeMdPath, `\n\n${workflowContent}`);
+        await fs.appendFile(claudeMdPath, `\n\n${workflowBlock}`);
         console.log(chalk.green('  ✓ Workflow appended to CLAUDE.md'));
       }
     }
