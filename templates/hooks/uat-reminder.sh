@@ -7,3 +7,4 @@
 
 echo "Reminder: If you just completed a feature implementation, run UAT before marking it done."
 echo "Ask Claude to generate a UAT checklist from the work item's acceptance criteria."
+echo "Once it is merged and deployed, /qa AB#<id> runs an automated browser regression of the affected screens."

@@ -74,6 +74,15 @@
             "command": "bash .claude/hooks/sensitive-data-output-blocker.sh"
           }
         ]
+      },
+      {
+        "matcher": "mcp__playwright",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/sensitive-data-output-blocker.sh"
+          }
+        ]
       }
     ],
     "Stop": [

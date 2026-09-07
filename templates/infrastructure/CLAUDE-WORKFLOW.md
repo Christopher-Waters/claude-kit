@@ -18,6 +18,7 @@ You (give task)
   ├── deployer → commits, pushes, triggers CD pipeline
   ├── db-admin → queries/fixes MongoDB data
   ├── test-runner → runs xUnit, Vitest, Playwright tests
+  ├── qa → drives a real browser on a deployed environment, regression-tests the affected screens
   ├── build-validator → confirms builds pass
   ├── lint-checker → runs ESLint and dotnet format
   ├── security-auditor → scans for secrets, vulnerabilities
@@ -79,7 +80,7 @@ These run automatically — no action needed:
 | Server | What It Does |
 |--------|-------------|
 | **Azure DevOps** *(core — drives every slash command)* | Work items, repos, pull requests, pipelines, wiki, test plans, advanced security |
-| **Playwright** | Browser testing (navigate, click, fill, screenshot) |
+| **Playwright** | Browser testing (navigate, click, fill, screenshot) — **required by `/qa`** |
 | **MongoDB** | Direct database queries and updates |
 | **Microsoft Teams** | Send/read team messages and notifications |
 | **Stripe** | Payment management (when configured) |
@@ -169,6 +170,8 @@ Every environment in the chain has a work item state, so the board shows where e
 | `test` | Test | `Ready for Testing` | `Testing` |
 | `staging` | Staging | `Ready for Staging` | `Staging` |
 | `prod` | Production | `Ready to Deploy` | `Deployed` |
+
+`/qa` is the exception that proves the rule: it tests a work item in a browser and posts a pass/fail comment, but it **never writes a state** — not even `Ready for Testing`.
 
 Human-only transitions — no slash command ever makes these: `Testing → Ready for Staging` (QA sign-off), `Staging → Ready to Deploy` (stakeholder / UAT sign-off), `Deployed → Closed` (verified in production).
 
@@ -306,6 +309,7 @@ All deployment and release operations are available as slash commands:
 | `/rollback` | `/rollback AB#1234 prod` | Revert commits on an environment |
 | `/status` | `/status release 24` | Check release, pipeline, environment, or work item status; flags work items whose state lags their environment |
 | `/where` | `/where AB#1234` | Show which environment branches contain a work item's commits |
+| `/qa` | `/qa AB#1234 [env]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in as a test account → full regression of the screens the story touched → pass/fail comment (never a state change) |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, **bugs in `New`** (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Pointed items move to Dev Ready; stories that can't be quoted move back to **Design Review**, bugs that can't be quoted get a **`needs-info`** tag, so the next sweep skips them. Every run also audits the drop-out queue (tagged bugs **and** stories bounced to Design Review) and reports any whose creator answered but which nobody returned to the sweep — neither mechanism expires, so those are otherwise invisible forever |
@@ -375,6 +379,53 @@ Glasswing and Monarch (not yet migrated — 1 environment):
 | develop | Dev | CD - Development (28) |
 ```
 
+### Environment URLs
+
+`/qa` opens the app in a real browser, so it needs to know where each environment is hosted and which test account to sign in as. Without this section `/qa` reports and stops rather than guessing a hostname.
+
+Add this to your project's `CLAUDE.md` — **above the `## Claude Kit Workflow` heading.** Everything from that heading to the end of the file is replaced on each kit update, so configuration placed below it is lost.
+
+```markdown
+## Environment URLs
+
+| Branch | Environment | App URL | API URL |
+|--------|------------|---------|---------|
+| (none) | local | http://localhost:5173 | https://localhost:7001 |
+| dev | Dev | https://dev.myapp.example.com | https://dev.api.myapp.example.com |
+| test | Test | https://test.myapp.example.com | https://test.api.myapp.example.com |
+| staging | Staging | https://staging.myapp.example.com | https://staging.api.myapp.example.com |
+
+**Sign-in:** form at `/login` — app-issued JWT, no SSO. Signed-in landing: `/dashboard`.
+
+**Test accounts** — values live in environment variables; never write a password here.
+
+| Role | Username variable | Password variable | Default |
+|------|-------------------|-------------------|---------|
+| Admin | `MYAPP_QA_ADMIN_USERNAME` | `MYAPP_QA_ADMIN_PASSWORD` | yes |
+| Provider | `MYAPP_QA_PROVIDER_USERNAME` | `MYAPP_QA_PROVIDER_PASSWORD` | |
+```
+
+**Rules for slash commands:**
+- **Branch names must match the `## Pipeline Configuration` table** row for row. The two tables are joined on the branch column — `/qa` reads the URL here and the pipeline ID there. A mismatch is a configuration error worth reporting.
+- **There is no `prod` row, deliberately.** `/qa` refuses production: an unattended regression pass signs in and clicks through live member data.
+- **Include the rows below the one you test.** The row immediately below the target serves the pre-change build, which is how `/qa` tells a regression this story caused from a bug that was already there.
+- **App URL is required; API URL is optional** — it is used to attribute a failing network call to the backend rather than the screen.
+- **`Sign-in:`** is optional prose. Include it when the login route is not `/login`, when the landing page is not obvious, or — importantly — when sign-in goes through **SSO / Entra ID with MFA**. Say so, and `/qa` reports that it cannot sign in unattended instead of hanging on a browser prompt.
+- **Test accounts** are required by `/qa` and nothing else. The `Default` column marks the account used when `--role` is not given; if no row is marked, the first row wins. A second role lets `/qa` verify that restricted controls are correctly *absent* — a class of bug a manual checklist rarely catches.
+- **Never put a credential in this table.** Only variable names. The values belong in your shell profile — see Environment Setup below.
+
+**Example from an actual project:**
+
+COMPASS:
+```markdown
+| Branch | Environment | App URL | API URL |
+|--------|------------|---------|---------|
+| (none) | local | http://localhost:5173 | https://localhost:7169 |
+| dev | Dev | https://dev.compass.caresolutions.com | https://dev.api.compass.caresolutions.com |
+| test | Test | https://test.compass.caresolutions.com | https://test.api.compass.caresolutions.com |
+| staging | Staging | https://staging.compass.caresolutions.com | https://staging.api.compass.caresolutions.com |
+```
+
 ### Environment Setup
 
 Each team member needs to set their own environment variables (never commit these):
@@ -391,4 +442,15 @@ az login
 
 # Microsoft Teams MCP — no env vars needed. First invocation prints a
 # device code + URL to sign in via Microsoft Graph (OAuth device flow).
+
+# QA test accounts (required for /qa — browser testing on a deployed environment).
+# One pair per role. The variable NAMES are declared in the project's
+# `## Environment URLs` section; the VALUES live only here, never in any file.
+# Use throwaway QA accounts with least privilege, never a personal login.
+export COMPASS_QA_ADMIN_USERNAME="qa-admin@example.com"
+export COMPASS_QA_ADMIN_PASSWORD="..."
+export COMPASS_QA_PROVIDER_USERNAME="qa-provider@example.com"
+export COMPASS_QA_PROVIDER_PASSWORD="..."
 ```
+
+`/qa` reads these itself **inside a subagent** and fills the login form directly. It never prints a value, never writes one to a file, and never includes one in a report or a work item comment. If your app's sign-in requires MFA or SSO, unattended login is not possible — say so in the `Sign-in:` line of `## Environment URLs` and `/qa` will report that instead of hanging on a browser prompt.
