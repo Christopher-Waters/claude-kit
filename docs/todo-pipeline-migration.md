@@ -96,4 +96,4 @@ Branches on 2026-09-06: `main`, `develop` only. Pipeline `CD - Development` (28)
 - [ ] Verify `/deploy` on `main` triggers nothing, and on `dev` triggers the right pipeline
 - [ ] Verify `/promote main dev` → `merged` moves items to `Ready for Testing`
 - [ ] Test `/create-release` → `/deploy-release N test` → `staging` → `prod` end-to-end on one project, including the gate check and the `merged` state advance
-- [ ] Verify `/where` and `/status` treat `main` as "merged, not deployed"
+- [ ] Verify `/where` and `/track` treat `main` as "merged, not deployed"

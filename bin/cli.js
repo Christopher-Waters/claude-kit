@@ -231,10 +231,14 @@ function splitWorkflowSection(existing) {
 
 const RETIRED_GLOBAL_AGENTS = ['manager.md', 'uat-generator.md', 'api-tester.md'];
 const RETIRED_PROJECT_AGENTS = ['devops-tracker.md'];
+// status.md was renamed to track.md in 2.1.58 — Claude Code ships a built-in /status,
+// which shadowed the kit's command. The old file has to be deleted from existing
+// installs or the collision never goes away, since installs only ever add files.
+const RETIRED_COMMANDS = ['status.md'];
 
-async function removeRetiredAgents(agentsDir, retired) {
+async function removeRetiredFiles(dir, retired) {
   for (const file of retired) {
-    const target = join(agentsDir, file);
+    const target = join(dir, file);
     if (await fs.pathExists(target)) {
       await fs.remove(target);
       console.log(chalk.gray(`  - ${file} (retired, removed)`));
@@ -258,7 +262,7 @@ async function installGlobalAgents() {
       );
     }
   }
-  await removeRetiredAgents(globalAgentsDir, RETIRED_GLOBAL_AGENTS);
+  await removeRetiredFiles(globalAgentsDir, RETIRED_GLOBAL_AGENTS);
 }
 
 // ============================================================================
@@ -308,7 +312,7 @@ async function main() {
       choices: [
         { name: 'Project Agents (deployer, db-admin)', value: 'agents', checked: true },
         { name: 'Hooks (secret blocker, auto-format, test suggestions)', value: 'hooks', checked: true },
-        { name: 'Slash Commands (implement, review, deploy, releases, cherry-pick, promote, rollback, status, cleanup, create-work-item, …)', value: 'commands', checked: true },
+        { name: 'Slash Commands (implement, review, deploy, releases, cherry-pick, promote, rollback, track, cleanup, create-work-item, …)', value: 'commands', checked: true },
         { name: 'MCP Servers (Playwright, DB, Teams, Stripe, Azure, Azure DevOps)', value: 'mcp', checked: true },
         { name: 'Settings (hook registration)', value: 'settings', checked: true },
         { name: 'CLAUDE.md Workflow Section', value: 'workflow', checked: true },
@@ -333,7 +337,7 @@ async function main() {
         );
       }
     }
-    await removeRetiredAgents(agentsDir, RETIRED_PROJECT_AGENTS);
+    await removeRetiredFiles(agentsDir, RETIRED_PROJECT_AGENTS);
   }
 
   // ── Hooks ─────────────────────────────────────────────────────────────
@@ -369,6 +373,7 @@ async function main() {
         );
       }
     }
+    await removeRetiredFiles(cmdsDir, RETIRED_COMMANDS);
   }
 
   // ── MCP Servers (interactive selection) ───────────────────────────────

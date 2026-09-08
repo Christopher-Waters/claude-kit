@@ -17,7 +17,7 @@ The slash commands assume Azure DevOps as the system of record:
 - **Releases & deployments** — tracked as Azure DevOps iterations (`Release #N`) and tags; CD runs on Azure Pipelines
 - **Wiki, test plans, advanced security alerts** — all surfaced through the same Azure DevOps MCP server
 
-> **Not using Azure DevOps?** The Claude Code primitives (agents, hooks, memory) are still useful, but the slash commands and the deployment workflow won't apply out of the box — you'd need to rewrite the `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/rework`, and `/resolve-feedback` commands against GitHub / GitLab / Jira / etc.
+> **Not using Azure DevOps?** The Claude Code primitives (agents, hooks, memory) are still useful, but the slash commands and the deployment workflow won't apply out of the box — you'd need to rewrite the `/implement`, `/review`, `/deploy`, `/create-release`, `/deploy-release`, `/cherry-pick`, `/promote`, `/rollback`, `/track`, `/rework`, and `/resolve-feedback` commands against GitHub / GitLab / Jira / etc.
 
 Every session Claude learns from your feedback and gets better at helping you specifically. The infrastructure is modular — install only what your project needs.
 
@@ -28,7 +28,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 | **Global Agents** | 10 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), mockup, reviewer, test-runner, build-validator, lint-checker, azure-ops, security-auditor |
 | **Project Agents** | 2 | `.claude/agents/` (in the project) | deployer, db-admin |
 | **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
-| **Slash Commands** | 24 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/status`, `/plan-backlog`, `/plan-sprint`, `/quote-backlog`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain`, `/create-work-item`, `/edit-work-item` |
+| **Slash Commands** | 24 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/track`, `/plan-backlog`, `/plan-sprint`, `/quote-backlog`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain`, `/create-work-item`, `/edit-work-item` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | **Azure DevOps** (work items, repos, pipelines, wiki), Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
 | **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
@@ -73,7 +73,7 @@ You'll be asked:
 2. **Components** — checkboxes to pick which parts to install:
    - ☑ Project Agents (deployer, db-admin)
    - ☑ Hooks (secret blocker, auto-format, etc.)
-   - ☑ Slash Commands (/implement, /review, /resolve-feedback, /deploy, /create-release, /deploy-release, /add-to-release, /cherry-pick, /promote, /rollback, /status, /cleanup-branches, /quote, /explain)
+   - ☑ Slash Commands (/implement, /review, /resolve-feedback, /deploy, /create-release, /deploy-release, /add-to-release, /cherry-pick, /promote, /rollback, /track, /cleanup-branches, /quote, /explain)
    - ☑ MCP Servers
    - ☑ Settings
    - ☑ CLAUDE.md Workflow
@@ -214,7 +214,7 @@ your-project/                      ← Project-specific
 │   │   ├── promote.md             # /promote main dev
 │   │   ├── rollback.md            # /rollback AB#1234 prod
 │   │   ├── add-to-release.md      # /add-to-release 24 AB#4599
-│   │   ├── status.md              # /status release 24
+│   │   ├── track.md               # /track release 24
 │   │   ├── cleanup-branches.md    # /cleanup-branches
 │   │   ├── close-orphan-tasks.md  # /close-orphan-tasks
 │   │   ├── quote.md               # /quote AB#1234
@@ -261,7 +261,7 @@ Kit operations that benefit from ultracode when it's on:
 | Multi-file or cross-layer review | one agent per file/dimension, then adversarial verify before reporting |
 | Repo-wide sweeps (rename, dependency bump, pattern migration) | one agent per site, worktree-isolated |
 
-Short, single-query operations (`/status`, `/explain`, `/close-orphan-tasks`) don't need ultracode — they're already one pass and gain nothing from fan-out. Reach for it when the work-list is large and the per-item work is independent.
+Short, single-query operations (`/track`, `/explain`, `/close-orphan-tasks`) don't need ultracode — they're already one pass and gain nothing from fan-out. Reach for it when the work-list is large and the per-item work is independent.
 
 ### Implement a Work Item
 
@@ -373,11 +373,11 @@ Adds work items to an existing release — assigns them to the iteration and tag
 ### Check Status
 
 ```
-/status release 24
-/status pipeline
-/status AB#4521
-/status staging
-/status
+/track release 24
+/track pipeline
+/track AB#4521
+/track staging
+/track
 ```
 
 Shows the status of a release, pipeline, work item, environment, or a high-level overview of everything.
@@ -441,7 +441,7 @@ Every environment has a work item state, and the promotion commands keep them in
 | `test → staging` | `Ready for Staging` (QA sign-off) | `Staging` |
 | `staging → prod` | `Ready to Deploy` (stakeholder sign-off) | `Deployed` |
 
-`/deploy-release`, `/cherry-pick`, and `/promote` check the gate before creating the PR, ask who verifies each product group while the PR is in review, then watch the PR and the environment's CD pipeline — on a green pipeline they set the state and the assignee together. A failed pipeline changes nothing. `/status` flags anything whose state lags the branch it's on.
+`/deploy-release`, `/cherry-pick`, and `/promote` check the gate before creating the PR, ask who verifies each product group while the PR is in review, then watch the PR and the environment's CD pipeline — on a green pipeline they set the state and the assignee together. A failed pipeline changes nothing. `/track` flags anything whose state lags the branch it's on.
 
 ### Branch Naming
 
@@ -679,7 +679,7 @@ Claude reviews for:
 | `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items to environment via PR → ask who verifies → advance + assign on a green pipeline |
 | `/promote` | `/promote main dev` | PR to promote all code to the next branch in the chain (`main → dev → test → staging → prod`) → ask who verifies → advance + assign on a green pipeline |
 | `/rollback` | `/rollback AB#1234 prod` | Revert specific commits on an environment via PR |
-| `/status` | `/status release 24` | Check status of a release, pipeline, work item, or environment; flags work items whose state lags their environment |
+| `/track` | `/track release 24` | Check status of a release, pipeline, work item, or environment; flags work items whose state lags their environment |
 | `/qa` | `/qa AB#1234 [env]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in as a test account → full regression of the screens the story touched → pass/fail comment on the work item (never a state change). Environments: `local`, `dev`, `test`, `staging` |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose one child task with hours per story |
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |

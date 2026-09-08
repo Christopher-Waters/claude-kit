@@ -1,4 +1,4 @@
-Check the status of a release, pipeline, environment, or work item. Usage: `/status <target>`
+Check the status of a release, pipeline, environment, or work item. Usage: `/track <target>`
 
 Parse `$ARGUMENTS` to determine what to check:
 - **Release**: "release 24" or "r24" → show release status
@@ -23,7 +23,7 @@ Work item states track environments. Use this to spot **state lag** — an item 
 
 `Ready for Staging` and `Ready to Deploy` are human sign-offs and are never "lag". Only User Stories, Bugs, and Hot Fixes are checked — Features and Tasks have no environment state.
 
-## If Release (e.g., `/status release 24`):
+## If Release (e.g., `/track release 24`):
 
 Query all work items tagged `release-{N}` or in the `Release #{N}` iteration. For each, find which environment branches contain its commits (`repo_search_commits` with `includeWorkItems: true`, or `git merge-base --is-ancestor`).
 
@@ -51,7 +51,7 @@ Catch these up? (yes/no)
 
 If the user says yes, set `System.State` on each lagging item to the expected state via `wit_update_work_item` — never backward, never on a Feature or Task — and report `Was → Now`.
 
-## If Pipeline (e.g., `/status pipeline` or `/status build`):
+## If Pipeline (e.g., `/track pipeline` or `/track build`):
 
 Query recent builds for each pipeline in the Pipeline Configuration table.
 
@@ -67,7 +67,7 @@ Query recent builds for each pipeline in the Pipeline Configuration table.
 
 A run on `main` would be unexpected — `main` has no pipeline. If one appears, say so.
 
-## If Work Item (e.g., `/status AB#4521`):
+## If Work Item (e.g., `/track AB#4521`):
 
 Read the work item from Azure DevOps and show its full status, including which environment branches contain its commits.
 
@@ -102,7 +102,7 @@ State `Staging` matches the furthest environment. ✓
 
 If the state lags the furthest environment, flag it and offer to catch it up as in the release view.
 
-## If Environment (e.g., `/status staging`):
+## If Environment (e.g., `/track staging`):
 
 Map the name to its branch through the Pipeline Configuration table. Show the last deployment and what's currently there.
 
@@ -123,9 +123,9 @@ Map the name to its branch through the Pipeline Configuration table. Show the la
 {count} commits on `test` are not on `staging` — run `/promote test staging` or `/deploy-release <N> staging`.
 ```
 
-`/status main` is allowed but reports "compare branch — nothing deploys from main" and lists what's on `main` that hasn't been promoted to `dev`.
+`/track main` is allowed but reports "compare branch — nothing deploys from main" and lists what's on `main` that hasn't been promoted to `dev`.
 
-## If No Argument (e.g., `/status`):
+## If No Argument (e.g., `/track`):
 
 Show a high-level overview.
 

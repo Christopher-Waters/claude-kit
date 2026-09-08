@@ -610,12 +610,12 @@ Release #24 now contains 4 work items.
 
 ---
 
-## /status — Check Status of Anything
+## /track — Check Status of Anything
 
 ### Example: Check what's in a release
 
 ```
-/status release 24
+/track release 24
 ```
 
 ```
@@ -643,7 +643,7 @@ Catch these up? (yes/no)
 ### Example: Check pipeline status
 
 ```
-/status pipeline
+/track pipeline
 ```
 
 ```
@@ -659,7 +659,7 @@ Catch these up? (yes/no)
 ### Example: Check a work item
 
 ```
-/status AB#4521
+/track AB#4521
 ```
 
 Shows the work item details, linked PRs, child tasks, and which environments it's been deployed to.
@@ -667,7 +667,7 @@ Shows the work item details, linked PRs, child tasks, and which environments it'
 ### Example: Quick overview
 
 ```
-/status
+/track
 ```
 
 Shows active releases, recent pipeline runs, and open PRs at a glance.
@@ -843,8 +843,8 @@ After the fix is verified through test and staging, add it to the release and ch
 ### Wednesday: Check status and clean up
 
 ```
-/status release 25     → See what's deployed where
-/status pipeline       → Check recent build results
+/track release 25     → See what's deployed where
+/track pipeline       → Check recent build results
 /cleanup-branches      → Delete all the merged feature branches from the sprint
 ```
 
@@ -868,10 +868,10 @@ After the fix is verified through test and staging, add it to the release and ch
 | See where a work item is deployed | `/where AB#4521` |
 | Revert the last deploy | `/rollback last staging` |
 | Review a PR | `/review 142` |
-| Check what's in a release | `/status release 24` |
-| Check pipeline runs | `/status pipeline` |
-| Check a work item | `/status AB#4521` |
-| See overall project status | `/status` |
+| Check what's in a release | `/track release 24` |
+| Check pipeline runs | `/track pipeline` |
+| Check a work item | `/track AB#4521` |
+| See overall project status | `/track` |
 | Clean up old branches | `/cleanup-branches` |
 | Preview branch cleanup | `/cleanup-branches --dry-run` |
 | Close tasks whose parent already shipped | `/close-orphan-tasks` |

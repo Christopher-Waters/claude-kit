@@ -47,7 +47,7 @@ Ultracode is **opt-in**. It is on only when a system-reminder confirms it, when 
 | Multi-file or cross-layer review | one agent per file/dimension, then adversarial verify before reporting |
 | Repo-wide sweeps (rename, dependency bump, pattern migration) | one agent per site, worktree-isolated |
 
-Short, single-query operations (`/status`, `/explain`, `/close-orphan-tasks`) do **not** need ultracode — they are already one pass and gain nothing from fan-out. Reach for `Workflow` when the work-list is large and the per-item work is independent.
+Short, single-query operations (`/track`, `/explain`, `/close-orphan-tasks`) do **not** need ultracode — they are already one pass and gain nothing from fan-out. Reach for `Workflow` when the work-list is large and the per-item work is independent.
 
 **`/rework` always uses ultracode** — it does not wait to be asked. It fans out feedback gathering, codebase exploration, per-acceptance-criterion coverage checks, and the find → adversarially-verify review, while keeping every approval gate and write in the main loop.
 
@@ -178,7 +178,7 @@ Human-only transitions — no slash command ever makes these: `Testing → Ready
 How the commands use this table:
 
 - **Gate check before the PR.** `/deploy-release`, `/cherry-pick`, and `/promote` compare each carried work item's state against the gate for the target environment. Anything behind the gate (e.g. still `Testing` when deploying to `staging`) is flagged and the user decides whether to include it. Items *ahead* of the gate (e.g. already `Deployed` on a cherry-pick to `prod`) are reported and left alone.
-- **Advance on a green pipeline, automatically.** `/promote`, `/cherry-pick`, and `/deploy-release` do not stop at the PR. They poll it until it is `completed`, then poll the target branch's CD pipeline until every run finishes. Only on `succeeded` do they write the new state — for every carried User Story, Bug, and Hot Fix, never a Feature or Task, and never backward. A failed or canceled run changes **nothing** and is reported with the log link. `/status` reports items whose state lags the branch their commits are on and offers to catch them up.
+- **Advance on a green pipeline, automatically.** `/promote`, `/cherry-pick`, and `/deploy-release` do not stop at the PR. They poll it until it is `completed`, then poll the target branch's CD pipeline until every run finishes. Only on `succeeded` do they write the new state — for every carried User Story, Bug, and Hot Fix, never a Feature or Task, and never backward. A failed or canceled run changes **nothing** and is reported with the log link. `/track` reports items whose state lags the branch their commits are on and offers to catch them up.
 - **Assign the verifier at the same time.** The state change hands the item to a person, so the same three commands ask **before the merge** who each group of items should go to, then apply the assignee alongside the state once the pipeline is green. See **Verifier Assignment** below.
 - **Never assume the state list.** Confirm with `mcp__azure-devops__wit_work_item` (`action: get_type`) on an unfamiliar project before writing a state name — a bad name is accepted silently by a query and rejected only at write time.
 
@@ -307,7 +307,7 @@ All deployment and release operations are available as slash commands:
 | `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items → PR → ask who verifies → advance + assign on a green pipeline |
 | `/promote` | `/promote main dev` | Promote all code between environments (`main → dev → test → staging → prod`) → ask who verifies → advance + assign on a green pipeline |
 | `/rollback` | `/rollback AB#1234 prod` | Revert commits on an environment |
-| `/status` | `/status release 24` | Check release, pipeline, environment, or work item status; flags work items whose state lags their environment |
+| `/track` | `/track release 24` | Check release, pipeline, environment, or work item status; flags work items whose state lags their environment |
 | `/where` | `/where AB#1234` | Show which environment branches contain a work item's commits |
 | `/qa` | `/qa AB#1234 [env]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in as a test account → full regression of the screens the story touched → pass/fail comment (never a state change) |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
@@ -323,7 +323,7 @@ The CD pipeline is only triggered manually when pushing directly to an environme
 
 ### Pipeline Configuration
 
-Each project must define its compare branch, its environment chain, and its pipeline IDs so the slash commands (`/deploy`, `/promote`, `/deploy-release`, `/cherry-pick`, `/where`, `/status`) know which pipelines to trigger and what the promotion order is.
+Each project must define its compare branch, its environment chain, and its pipeline IDs so the slash commands (`/deploy`, `/promote`, `/deploy-release`, `/cherry-pick`, `/where`, `/track`) know which pipelines to trigger and what the promotion order is.
 
 Add this section to your project's `CLAUDE.md`:
 
@@ -345,7 +345,7 @@ Add this section to your project's `CLAUDE.md`:
 - `/deploy` triggers the pipeline(s) listed for the current branch. If the current branch is not in this table, or its pipeline cell is `—`, no pipeline is triggered.
 - `/promote` uses this table to determine the next environment (the next row down).
 - `/deploy-release` and `/cherry-pick` create PRs targeting environment branches listed here, and use the **Work Item States ↔ Environments** table to gate-check and advance work items.
-- `/where` and `/status` check every row; the compare branch reports as "merged to main", not as a deployment.
+- `/where` and `/track` check every row; the compare branch reports as "merged to main", not as a deployment.
 
 **Examples from actual projects:**
 

@@ -88,6 +88,6 @@ Open PRs:
 - PR #<n> → <target branch> (<status>)
 ```
 
-Finally, compare the work item's state with its furthest environment (`dev` → `Ready for Testing`, `test` → `Testing`, `staging` → `Staging`, `prod` → `Deployed`). If the state lags — e.g. commits on `staging` but the item is still `Testing` — add one line: `⚠ State lags environment: Testing, expected at least Staging — /status AB#<id> can catch it up.`
+Finally, compare the work item's state with its furthest environment (`dev` → `Ready for Testing`, `test` → `Testing`, `staging` → `Staging`, `prod` → `Deployed`). If the state lags — e.g. commits on `staging` but the item is still `Testing` — add one line: `⚠ State lags environment: Testing, expected at least Staging — /track AB#<id> can catch it up.`
 
 That's it — read-only. Do not modify branches, push, create PRs, or change states.

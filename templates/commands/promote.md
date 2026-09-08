@@ -227,4 +227,4 @@ Report both fields, so a wrong assignment is easy to put back:
 Next: {the human step — "QA tests on Test and sets Ready for Staging" / "stakeholders verify on Staging and set Ready to Deploy" / "verify in production, then Close"}.
 ```
 
-If the user said `stop watching`, or an update fails, leave the rest alone, say exactly which items were and were not updated, and note that `/status` will flag the lag later.
+If the user said `stop watching`, or an update fails, leave the rest alone, say exactly which items were and were not updated, and note that `/track` will flag the lag later.
