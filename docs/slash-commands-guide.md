@@ -301,7 +301,8 @@ This will:
 2. Cherry-pick all commits for the 6 work items
 3. Create a PR targeting `staging` — merging it triggers the Staging pipeline
 4. Ask who verifies each product group on Staging (before the merge)
-5. Watch the pipeline — once it's green, move the work items to `Staging` and assign them to the approved verifiers
+5. Merge the PR once Serena approves it
+6. Watch the pipeline — once it's green, move the work items to `Staging` and assign them to the approved verifiers
 
 Proceed? (yes/no)
 ```
@@ -339,20 +340,15 @@ Work items included:
 - AB#4589: Login 500 error with plus sign
 - AB#4590: Pagination resets when changing filters
 
-Next steps:
-- Review and approve the PR
-- Merging it triggers the CD pipeline for staging
-- Reply `merged` once the PR is complete and the pipeline is green — I'll move these 6 work items to `Staging`.
+Waiting on Serena's review. When she approves I'll complete the PR, which
+triggers the staging CD pipeline; when that comes back green I'll set these
+6 items to `Staging` and assign them as approved above. Say `don't merge` to
+stop before the merge, or `stop watching` to leave the work item states alone.
 ```
 
-**After the merge you reply:**
+**Serena approves, Claude merges, and the pipeline goes green — no reply needed:**
 ```
-merged
-```
-
-**Claude confirms the PR completed and advances the states:**
-```
-Release #24 is on staging.
+Release #24 is on staging (pipeline 20260906.3, succeeded).
 
 | ID | Was | Now |
 |----|-----|-----|
@@ -369,7 +365,7 @@ Next: stakeholders verify on Staging and set each item to Ready to Deploy.
 /deploy-release 24 prod
 ```
 
-Same process — the gate is `Ready to Deploy`, the cherry-picks come from `staging` into a PR targeting `prod`, and once the production pipeline comes back green the items move to `Deployed` and are assigned to whoever you named for each product group.
+Same process — the gate is `Ready to Deploy`, the cherry-picks come from `staging` into a PR targeting `prod`, and once the production pipeline comes back green the items move to `Deployed` and are assigned to whoever you named for each product group. **You merge this one yourself** — Claude auto-merges only into `dev`, `test`, and `staging`.
 
 ---
 

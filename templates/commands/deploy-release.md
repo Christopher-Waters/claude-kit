@@ -217,9 +217,20 @@ Approve? (yes / change)
 
 `change` re-asks 8c. Only after `yes` do you move on — if the PR merges before the user answers, keep waiting for the answer, then run Step 10.
 
-## Step 9: Watch the Merge, Then the Pipeline
+## Step 9: Get the PR Merged, Then Watch the Pipeline
 
-Do NOT merge the PR yourself, and do NOT trigger the CD pipeline — it triggers on the merge. Report the PR, then watch for the deployment:
+Never trigger the CD pipeline by hand — it triggers on the merge.
+
+### 9a. Who completes the PR depends on the target
+
+| Target | Who merges |
+|---|---|
+| `dev`, `test`, `staging` | **You do** — poll until Serena approves, then complete the PR (9b–9c) |
+| `prod` | A human. **Never auto-merge into production.** |
+
+Resolve the target through the Pipeline Configuration table, not by the spelling of the branch — a project whose staging branch is named `Staging` or `release/staging` is still staging, and a project with no `test` row simply has no test hop.
+
+Report the PR either way:
 
 ```
 Release #{N} PR created for {environment}.
@@ -232,13 +243,89 @@ Work items included:
 - AB#1236: COM - View history
 - AB#1240: PAY - Fix login redirect
 
-Review and approve the PR — merging it triggers the CD pipeline for {environment}.
-I'm watching the PR and that pipeline; when it comes back green I'll set these
+{merge line}
+```
+
+`{merge line}` for `dev` / `test` / `staging`:
+
+```
+Waiting on Serena's review. When she approves I'll complete the PR, which
+triggers the {environment} CD pipeline; when that comes back green I'll set
+these {count} items to `{state after merge}` and assign them as approved
+above. Say `don't merge` to stop before the merge, or `stop watching` to
+leave the work item states alone.
+```
+
+`{merge line}` for `prod`:
+
+```
+Review and approve the PR — a person merges this one; I don't merge into
+production. Merging it triggers the CD pipeline for {environment}. I'm
+watching the PR and that pipeline; when it comes back green I'll set these
 {count} items to `{state after merge}` and assign them as approved above.
 Nothing is written until then. Say `stop watching` to leave the states alone.
 ```
 
-1. **Wait for the PR to complete.** Poll `repo_pull_request` until `status` is `completed`; note the merge commit and completion time. `abandoned` → stop, change nothing, report it.
+### 9b. Wait for Serena's approval (`dev` / `test` / `staging` only)
+
+Serena is the AI reviewer on this org's pull requests. Find her among the PR's reviewers by matching `serena` case-insensitively against `displayName` / `uniqueName` — never hardcode an identity id, and never count another reviewer's approval as hers.
+
+Reviewer votes: `10` approved · `5` approved with suggestions · `0` no vote yet · `-5` waiting for author · `-10` rejected.
+
+- `10` or `5` → approved. Go to 9c.
+- `-5` or `-10` → **do not merge.** List her threads (`repo_pull_request_thread` `action: list`), report what she flagged, and stop. A release branch is a cherry-pick of commits that already merged upstream, so the fix usually belongs on the source branch and comes forward in the next release — not as a patch commit on `release/{N}-to-{environment}`.
+- `0`, or she is not on the reviewer list yet → keep polling.
+
+**Never cast a vote on the PR yourself** to satisfy an approval policy, and never add yourself as a reviewer to do it.
+
+Poll in the background — never a foreground `sleep`:
+
+```bash
+ORG=<org-url>; PR=<pr-id>; TRIES=0
+while [ $TRIES -lt 120 ]; do
+  VOTE=$(az repos pr show --id "$PR" --org "$ORG" \
+           --query "reviewers[].[displayName,vote]" -o tsv \
+         | grep -i serena | cut -f2 | head -1)
+  case "$VOTE" in
+    10|5)   echo "APPROVED vote=$VOTE"; break ;;
+    -5|-10) echo "BLOCKED  vote=$VOTE"; break ;;
+    *)      TRIES=$((TRIES + 1)); sleep 30 ;;
+  esac
+done
+[ $TRIES -ge 120 ] && echo "TIMEOUT - no Serena vote after 60 minutes"
+```
+
+Run it with `Monitor` (or Bash `run_in_background`). An empty `VOTE` means she isn't a reviewer yet, which is why the loop keeps going rather than treating it as a decision. Without the Azure CLI, poll `repo_pull_request` `action: get` on the same ~30-second cadence and read `reviewers[]`.
+
+If the loop times out, leave the PR open and ask whether to keep waiting or merge without her. **If she was never added as a reviewer at all, say exactly that** — it usually means the PR was never picked up for review, not that it sailed through.
+
+### 9c. Complete the PR
+
+Merge with `repo_pull_request_write` `action: update`:
+
+| Field | Value | Why |
+|---|---|---|
+| `autoComplete` | `true` | ADO completes it the moment the remaining branch policies pass — a required build still gates the merge |
+| `mergeStrategy` | `NoFastForward` | one merge commit, cherry-pick history intact |
+| `transitionWorkItems` | `false` | **required.** This command owns the work item states (Step 10); ADO's own transition moves parents too |
+| `deleteSourceBranch` | `true` | the `release/{N}-to-{environment}` branch is disposable — the release itself lives in the iteration and the `release-{N}` tags |
+| `bypassPolicy` | **never set it** | a policy that isn't passing is a stop, not an obstacle |
+
+Then poll `repo_pull_request` `action: get` until `status` is `completed`. If it stays `Active` with autocomplete queued, a branch policy is unmet — report which one and stop; do not bypass it and do not push to the source branch to force it.
+
+CLI fallback if the MCP update fails:
+
+```bash
+az repos pr update --id <pr-id> --org <org-url> \
+  --auto-complete true --transition-work-items false --delete-source-branch true \
+  --merge-commit-message "Release #{N} -> {Environment}"
+```
+
+If the user said `don't merge`, leave the PR open, say so, and skip to 9d — a human merging it later still gets the pipeline watch and the state changes.
+
+### 9d. Watch the CD pipeline
+
+1. **Confirm the PR completed.** Poll `repo_pull_request` until `status` is `completed`; note the merge commit and completion time. `abandoned` → stop, change nothing, report it.
 2. **Find the CD run.** Look up the target branch's pipeline ID(s) in the Pipeline Configuration table, then poll `pipelines_build` for runs on `refs/heads/<target-branch>` queued at or after the merge time — match the merge commit when the run exposes it — and **capture each run's id**. A run that was already completed before the merge is not this deployment; ignore it. A branch with more than one pipeline (API + Client) must have **all** of them green.
 3. **Wait for a terminal result** on each run: `succeeded`, `partiallySucceeded`, `failed`, or `canceled`.
 

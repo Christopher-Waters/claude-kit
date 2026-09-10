@@ -331,7 +331,8 @@ Claude automatically:
 3. Creates a PR targeting the `staging` branch — merging it triggers the Staging pipeline
 4. Links all work items to the PR
 5. Asks who verifies each product group on Staging (`COM`, `PAY`, …) — candidates are the non-developer names already on those work items
-6. Watches the PR and the Staging pipeline; once it's green, moves the work items to `Staging` and assigns them to the approved verifiers
+6. Waits for Serena (the AI reviewer) to approve the PR, then completes it — for `dev`, `test`, and `staging` only; a `prod` PR you merge yourself
+7. Watches the Staging pipeline; once it's green, moves the work items to `Staging` and assigns them to the approved verifiers
 
 The same command walks a release through `test` → `staging` → `prod`; with no environment given it picks the next one.
 

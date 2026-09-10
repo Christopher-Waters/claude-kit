@@ -102,7 +102,7 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 4. **PR merges** into `main` — the compare branch. **Nothing deploys yet.** The work item stays in `Code Review` until it is promoted
 5. **Promote or release** — `/promote main dev` carries everything on `main` to Dev; `/create-release <N>` groups work items so `/deploy-release <N> test` → `staging` → `prod` can carry just those
 6. **Say who verifies** — before the merge, the command asks who each product group (`COM`, `PAY`, …) should be assigned to in the target environment, offering the non-developer names already on those work items
-7. **The promotion PR merges** — for `dev`, `test`, and `staging`, `/cherry-pick` and `/promote` wait for Serena to approve and then complete the PR themselves; a `prod` PR is always merged by a person. That merge triggers the environment's CD pipeline. The command watches it and, once it's green, sets the work items to `Testing`, `Staging`, or `Deployed` **and** assigns them to the approved verifiers — automatically, no reply needed
+7. **The promotion PR merges** — for `dev`, `test`, and `staging`, the deploy commands wait for Serena to approve and then complete the PR themselves; a `prod` PR is always merged by a person. That merge triggers the environment's CD pipeline. The command watches it and, once it's green, sets the work items to `Testing`, `Staging`, or `Deployed` **and** assigns them to the approved verifiers — automatically, no reply needed
 8. **Test** using Playwright MCP for browser testing
 9. **Track** work items via the Azure DevOps MCP server
 10. **Learn** — Claude saves what worked for next time
@@ -179,7 +179,7 @@ How the commands use this table:
 
 - **Gate check before the PR.** `/deploy-release`, `/cherry-pick`, and `/promote` compare each carried work item's state against the gate for the target environment. Anything behind the gate (e.g. still `Testing` when deploying to `staging`) is flagged and the user decides whether to include it. Items *ahead* of the gate (e.g. already `Deployed` on a cherry-pick to `prod`) are reported and left alone.
 - **Advance on a green pipeline, automatically.** `/promote`, `/cherry-pick`, and `/deploy-release` do not stop at the PR. They poll it until it is `completed`, then poll the target branch's CD pipeline until every run finishes. Only on `succeeded` do they write the new state — for every carried User Story, Bug, and Hot Fix, never a Feature or Task, and never backward. A failed or canceled run changes **nothing** and is reported with the log link. `/track` reports items whose state lags the branch their commits are on and offers to catch them up.
-- **Auto-merge below production.** When the target is `dev`, `test`, or `staging`, `/cherry-pick` and `/promote` poll the PR until **Serena** (the AI reviewer) votes, then complete it with autocomplete — remaining branch policies still gate the merge, work item transitions are left off so the command's own state logic owns them, and a branch policy that isn't passing is a stop, never a bypass. A rejection or *waiting for author* vote stops the merge and reports her threads. A PR into `prod` (or into `main`) is **always** merged by a person. `/deploy-release` also leaves its merge to a human.
+- **Auto-merge below production.** When the target is `dev`, `test`, or `staging`, all three commands poll the PR until **Serena** (the AI reviewer) votes, then complete it with autocomplete — remaining branch policies still gate the merge, work item transitions are left off so the command's own state logic owns them, and a branch policy that isn't passing is a stop, never a bypass. A rejection or *waiting for author* vote stops the merge and reports her threads. A PR into `prod` (or into `main`) is **always** merged by a person.
 - **Assign the verifier at the same time.** The state change hands the item to a person, so the same three commands ask **before the merge** who each group of items should go to, then apply the assignee alongside the state once the pipeline is green. See **Verifier Assignment** below.
 - **Never assume the state list.** Confirm with `mcp__azure-devops__wit_work_item` (`action: get_type`) on an unfamiliar project before writing a state name — a bad name is accepted silently by a query and rejected only at write time.
 
@@ -208,7 +208,7 @@ This creates a `Release #23` iteration, assigns the selected work items to it, a
 /deploy-release 23 staging
 /deploy-release 23 prod
 ```
-This finds all work items in Release #23, checks each one against the target environment's gate state, cherry-picks their commits into a release branch (`release/23-to-staging`), creates a PR targeting the environment branch, links all work items, asks who verifies each product group, and — once the merge's CD pipeline comes back green — advances them to the environment's state (`Testing`, `Staging`, `Deployed`) and assigns them to those verifiers.
+This finds all work items in Release #23, checks each one against the target environment's gate state, cherry-picks their commits into a release branch (`release/23-to-staging`), creates a PR targeting the environment branch, links all work items, asks who verifies each product group, merges the PR once Serena approves it (`dev`/`test`/`staging` only — a `prod` PR waits for a person), and — once the merge's CD pipeline comes back green — advances them to the environment's state (`Testing`, `Staging`, `Deployed`) and assigns them to those verifiers.
 
 **Selective deployment:** Since releases are deployed via cherry-pick, you can deploy a full release or a subset. If staging has 5 user stories but only 3 are `Ready to Deploy`, create a release with just those 3 and deploy it.
 
@@ -303,7 +303,7 @@ All deployment and release operations are available as slash commands:
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
 | `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline (only on `dev`/`test`/`staging`/`prod` — never on `main`) |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 |
-| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → cherry-pick release to environment → PR → ask who verifies → advance + assign on a green pipeline |
+| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → cherry-pick release to environment → PR → ask who verifies → merge on Serena's approval (below prod) → advance + assign on a green pipeline |
 | `/add-to-release` | `/add-to-release 24 AB#4599` | Add work items to existing release |
 | `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items → PR → ask who verifies → merge on Serena's approval (below prod) → advance + assign on a green pipeline |
 | `/promote` | `/promote main dev` | Promote all code between environments (`main → dev → test → staging → prod`) → ask who verifies → merge on Serena's approval (below prod) → advance + assign on a green pipeline |
