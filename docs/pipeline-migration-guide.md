@@ -396,8 +396,8 @@ The 8 slash commands available after installing the AI infrastructure:
 | `/deploy "message"` | Commit, push, trigger pipeline | Triggers pipeline if on an environment branch |
 | `/create-release 23` | Group work items into Release #23 | No pipeline interaction |
 | `/deploy-release 23 staging` | Gate-check, cherry-pick release to environment, create PR, advance states after merge | No pipeline trigger — pipeline triggers on PR merge |
-| `/cherry-pick AB#1234 prod` | Gate-check, cherry-pick specific work items, create PR, advance states after merge | No pipeline trigger — pipeline triggers on PR merge |
-| `/promote main dev` | Create PR to promote between environments, advance states after merge | No pipeline trigger — pipeline triggers on PR merge (never on `main`) |
+| `/cherry-pick AB#1234 prod` | Gate-check, cherry-pick specific work items, create PR, merge it on Serena's approval (`dev`/`test`/`staging` only), advance states after merge | No pipeline trigger — pipeline triggers on PR merge |
+| `/promote main dev` | Create PR to promote between environments, merge it on Serena's approval (`dev`/`test`/`staging` only), advance states after merge | No pipeline trigger — pipeline triggers on PR merge (never on `main`) |
 | `/rollback AB#1234 prod` | Revert commits, create PR | No pipeline trigger — pipeline triggers on PR merge |
 | `/review 142` | Code review a PR | No pipeline interaction |
 

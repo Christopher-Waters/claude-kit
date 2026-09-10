@@ -341,7 +341,7 @@ The same command walks a release through `test` → `staging` → `prod`; with n
 /cherry-pick AB#1234 AB#1235 prod
 ```
 
-Cherry-picks specific work items to an environment without a formal release. Same gate check, same verifier question, and the same automatic state advance + assignment once the pipeline is green as `/deploy-release`. `main` is also a valid target — that's how a hot fix that went straight to `prod` is brought back into the compare branch.
+Cherry-picks specific work items to an environment without a formal release. Same gate check, same verifier question, and the same automatic state advance + assignment once the pipeline is green as `/deploy-release`. Targeting `dev`, `test`, or `staging` it also merges the PR itself once Serena approves it; a `prod` PR waits for a person. `main` is also a valid target — that's how a hot fix that went straight to `prod` is brought back into the compare branch.
 
 ### Promote an Environment
 
@@ -351,7 +351,7 @@ Cherry-picks specific work items to an environment without a formal release. Sam
 /promote                  ← auto-detects from the current branch
 ```
 
-Creates a PR to promote all code from one branch to the next in the chain (`main → dev → test → staging → prod`). Shows every commit and work item before confirming, gate-checks the work items, asks who verifies each product group, and advances and assigns them once the merge's pipeline is green. `main → dev` is the usual first hop after feature PRs merge — nothing has deployed before that.
+Creates a PR to promote all code from one branch to the next in the chain (`main → dev → test → staging → prod`). Shows every commit and work item before confirming, gate-checks the work items, asks who verifies each product group, and advances and assigns them once the merge's pipeline is green. Below production it also **merges the PR for you**: it polls until Serena (the AI reviewer) approves, then completes it with autocomplete — a PR into `prod` is always merged by a person. `main → dev` is the usual first hop after feature PRs merge — nothing has deployed before that.
 
 ### Rollback a Deployment
 
@@ -509,7 +509,7 @@ The PR merges into `main`. **That merge deploys nothing** — `main` is the comp
 /promote main dev
 ```
 
-Merge that PR. Claude asks who verifies each product group on Dev, watches the Dev pipeline, and once it's green moves the work items to `Ready for Testing` and assigns them to those people.
+Claude asks who verifies each product group on Dev, waits for Serena to approve the PR and merges it, watches the Dev pipeline, and once it's green moves the work items to `Ready for Testing` and assigns them to those people. (Dev, Test, and Staging merge themselves this way; a production PR you merge yourself.)
 
 ### Step 2: Deploy Changes (Quick Commits)
 
@@ -569,7 +569,7 @@ When stakeholders have verified on Staging and set the items to `Ready to Deploy
 /deploy-release 23 prod
 ```
 
-Same process — gate `Ready to Deploy`, cherry-picks from `staging` into a PR targeting `prod`. After merge the Production CD pipeline triggers; when it comes back green the items move to `Deployed` and are assigned to whoever you named for each product group.
+Same process — gate `Ready to Deploy`, cherry-picks from `staging` into a PR targeting `prod`. **You merge this one** — Claude auto-merges only into `dev`, `test`, and `staging`. After merge the Production CD pipeline triggers; when it comes back green the items move to `Deployed` and are assigned to whoever you named for each product group.
 
 ### Selective Deployment
 

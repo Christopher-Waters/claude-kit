@@ -411,8 +411,9 @@ Work items:
 - AB#4589: Login 500 error with plus sign in email
 - AB#4590: Pagination resets when changing filters
 
-Merging the PR triggers the CD pipeline for prod.
-Reply `merged` once it's complete — I'll move AB#4589 and AB#4590 to `Deployed`.
+A reviewer approves and completes this one — I don't merge into prod.
+I'm watching the PR and that pipeline: when it comes back green I'll set these
+2 items to `Deployed` and assign them as approved above.
 ```
 
 ### Example: Cherry-picking a single feature to test for early QA
@@ -422,6 +423,8 @@ Reply `merged` once it's complete — I'll move AB#4589 and AB#4590 to `Deployed
 ```
 
 This lets QA start testing the payment export feature on Test while other features are still being finished on `main`.
+
+Because the target is `test`, Claude also **merges the PR itself**: it polls until Serena (the AI reviewer) votes, completes the PR with autocomplete once she approves, then watches the Test pipeline. A rejection or *waiting for author* vote stops the merge and reports her threads instead. `dev`, `test`, and `staging` work this way; `prod` and `main` always wait for a person.
 
 ---
 
@@ -456,7 +459,7 @@ Promote? (yes/no)
 yes
 ```
 
-Claude gate-checks the work items (`Ready to Deploy`), creates a PR from `staging` → `prod`, and asks who verifies each product group. Merging it triggers the production pipeline; when that pipeline succeeds the work items move to `Deployed` and are assigned to those verifiers.
+Claude gate-checks the work items (`Ready to Deploy`), creates a PR from `staging` → `prod`, and asks who verifies each product group. **You merge this one** — Claude never auto-merges into production. Merging it triggers the production pipeline; when that pipeline succeeds the work items move to `Deployed` and are assigned to those verifiers.
 
 ### Example: Auto-detect the next environment
 
@@ -466,7 +469,7 @@ You're on `main` after a week of merged feature PRs and want everything on Dev:
 /promote
 ```
 
-Claude auto-detects: "You're on `main`, the next environment is `dev`." Then shows the same confirmation flow. Nothing has deployed yet — the merge of this PR is the first deployment.
+Claude auto-detects: "You're on `main`, the next environment is `dev`." Then shows the same confirmation flow. Nothing has deployed yet — the merge of this PR is the first deployment, and since the target is `dev`, Claude waits for Serena's approval and completes the PR itself.
 
 ---
 
