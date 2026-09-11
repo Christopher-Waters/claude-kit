@@ -16,12 +16,12 @@ Work item states track environments. Use this to spot **state lag** — an item 
 | Commits are on… | State should be at least… |
 |---|---|
 | `main` | `Code Review` |
-| `dev` | `Ready for Testing` |
+| `dev` | `Code Review` |
 | `test` | `Testing` |
 | `staging` | `Staging` |
 | `prod` | `Deployed` |
 
-`Ready for Staging` and `Ready to Deploy` are human sign-offs and are never "lag". Only User Stories, Bugs, and Hot Fixes are checked — Features and Tasks have no environment state.
+`Ready for Testing`, `Ready for Staging` and `Ready to Deploy` are human sign-offs and are never "lag" — an item sitting at `Code Review` with commits on `dev` is waiting on the developer, not behind. Only User Stories, Bugs, and Hot Fixes are checked — Features and Tasks have no environment state.
 
 ## If Release (e.g., `/track release 24`):
 

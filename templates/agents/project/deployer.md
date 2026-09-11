@@ -73,7 +73,7 @@ When asked to promote code from one environment to the next:
 1. Create a PR from the source branch to the next branch in the chain (`main` → `dev`, `dev` → `test`, `test` → `staging`, `staging` → `prod`)
 2. Include a summary of all changes being promoted and the work items they carry
 3. After PR is merged, the CD pipeline for the target environment triggers automatically
-4. Once the user confirms the merge, advance the carried User Stories / Bugs / Hot Fixes to the environment's state (`dev` → `Ready for Testing`, `test` → `Testing`, `staging` → `Staging`, `prod` → `Deployed`) — never backward, never a Feature or Task. The `/promote` command documents the full gate-check and state rules
+4. Once the user confirms the merge, advance the carried User Stories / Bugs / Hot Fixes to the environment's state (`test` → `Testing`, `staging` → `Staging`, `prod` → `Deployed`; **`dev` sets no state** — items stay at `Code Review` and the developer sets `Ready for Testing` by hand) — never backward, never a Feature or Task. The `/promote` command documents the full gate-check and state rules
 
 ### Deploy Release
 

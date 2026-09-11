@@ -11,12 +11,12 @@ Resolve branch names from the project's `CLAUDE.md` **Pipeline Configuration** t
 | Branch | Environment | Gate — items should already be in… | State set after the PR merges |
 |---|---|---|---|
 | `main` | — (compare branch) | — | — |
-| `dev` | Dev | `Code Review` (merged to `main`) | `Ready for Testing` |
+| `dev` | Dev | `Code Review` (merged to `main`) | *(no change — stays `Code Review`)* |
 | `test` | Test | `Ready for Testing` | `Testing` |
 | `staging` | Staging | `Ready for Staging` | `Staging` |
 | `prod` | Production | `Ready to Deploy` | `Deployed` |
 
-`Ready for Staging` and `Ready to Deploy` are set by QA and stakeholders — **never by this command**. If the project's table has different environments, confirm the type's states with `mcp__azure-devops__wit_work_item` (`action: get_type`) and map them the same way: a "Ready for X" gate → an "in X" state.
+`Ready for Testing`, `Ready for Staging` and `Ready to Deploy` are set by the developer, QA, and stakeholders — **never by this command**. A `main → dev` deploy therefore sets **no state**: items stay at `Code Review` until the developer has checked the change on Dev and moves it to `Ready for Testing` by hand. If the project's table has different environments, confirm the type's states with `mcp__azure-devops__wit_work_item` (`action: get_type`) and map them the same way: a "Ready for X" gate → an "in X" state.
 
 ## Step 1: Read the Release
 
@@ -387,7 +387,8 @@ This step runs **by itself** the moment the pipeline reports success — do not 
 
 For every carried work item of type **User Story**, **Bug**, or **Hot Fix**, one `wit_work_item_write` update per item (or the batch variant) setting both fields:
 
-1. `System.State` → the target environment's state (`Ready for Testing` / `Testing` / `Staging` / `Deployed`).
+1. `System.State` → the target environment's state (`Testing` / `Staging` / `Deployed`).
+   - **A deploy to `dev` sets no state.** Items stay at `Code Review`; the developer sets `Ready for Testing` by hand. Update the assignee only.
    - **Never move backward.** An item already past the target state (e.g. `Deployed` when deploying to `staging`) keeps its state; note it.
    - Items skipped in Step 6 (conflict) or dropped in Step 3 are not on the branch — leave them alone.
    - An invalid-state error means this project's template differs — confirm with `get_type`, report the item, continue with the rest. Don't silently swallow it.

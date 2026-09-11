@@ -161,19 +161,19 @@ feature/AB#1234-...  ──PR──▸  main  ──PR──▸  dev  ──PR�
 
 #### Work Item States ↔ Environments
 
-Every environment in the chain has a work item state, so the board shows where each story physically is. The **"Ready for …" states are human gates** — QA or stakeholders set them when something passes; the slash commands never do. The **environment states** (`Testing`, `Staging`, `Deployed`) are set by the promotion commands once the PR into that branch has merged and its CD pipeline has come back green.
+Every environment in the chain has a work item state, so the board shows where each story physically is. The **"Ready for …" states are human gates** — the developer, QA, or stakeholders set them when something passes; the slash commands never do. The **environment states** (`Testing`, `Staging`, `Deployed`) are set by the promotion commands once the PR into that branch has merged and its CD pipeline has come back green.
 
 | Branch | Environment | Gate — items should already be in… | Set once the PR into this branch merges |
 |---|---|---|---|
 | `main` | — | `Code Review` (the `/implement` PR is open) | *(no change — nothing deployed)* |
-| `dev` | Dev | `Code Review` (merged to `main`) | `Ready for Testing` |
+| `dev` | Dev | `Code Review` (merged to `main`) | *(no change — stays `Code Review`)* |
 | `test` | Test | `Ready for Testing` | `Testing` |
 | `staging` | Staging | `Ready for Staging` | `Staging` |
 | `prod` | Production | `Ready to Deploy` | `Deployed` |
 
 `/qa` is the exception that proves the rule: it tests a work item in a browser and posts a pass/fail comment, but it **never writes a state** — not even `Ready for Testing`.
 
-Human-only transitions — no slash command ever makes these: `Testing → Ready for Staging` (QA sign-off), `Staging → Ready to Deploy` (stakeholder / UAT sign-off), `Deployed → Closed` (verified in production).
+Human-only transitions — no slash command ever makes these: `Code Review → Ready for Testing` (the developer confirms the change on Dev), `Testing → Ready for Staging` (QA sign-off), `Staging → Ready to Deploy` (stakeholder / UAT sign-off), `Deployed → Closed` (verified in production).
 
 How the commands use this table:
 

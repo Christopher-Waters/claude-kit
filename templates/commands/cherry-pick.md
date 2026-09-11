@@ -11,12 +11,12 @@ Resolve branch names from the project's `CLAUDE.md` **Pipeline Configuration** t
 | Branch | Environment | Gate — items should already be in… | State set after the PR merges |
 |---|---|---|---|
 | `main` | — (compare branch) | — | *(no change)* |
-| `dev` | Dev | `Code Review` (merged to `main`) | `Ready for Testing` |
+| `dev` | Dev | `Code Review` (merged to `main`) | *(no change — stays `Code Review`)* |
 | `test` | Test | `Ready for Testing` | `Testing` |
 | `staging` | Staging | `Ready for Staging` | `Staging` |
 | `prod` | Production | `Ready to Deploy` | `Deployed` |
 
-`Ready for Staging` and `Ready to Deploy` are set by QA and stakeholders — **never by this command**.
+`Ready for Testing`, `Ready for Staging` and `Ready to Deploy` are set by the developer, QA, and stakeholders — **never by this command**. A `main → dev` deploy therefore sets **no state**: items stay at `Code Review` until the developer has checked the change on Dev and moves it to `Ready for Testing` by hand.
 
 ## Step 1: Read the Work Items and Gate-Check Them
 
@@ -327,7 +327,8 @@ This step runs **by itself** the moment the pipeline reports success — do not 
 
 For every cherry-picked work item of type **User Story**, **Bug**, or **Hot Fix**, one `wit_work_item_write` update per item setting both fields:
 
-1. `System.State` → the target's state (`Ready for Testing` / `Testing` / `Staging` / `Deployed`).
+1. `System.State` → the target's state (`Testing` / `Staging` / `Deployed`).
+   - **A cherry-pick to `dev` sets no state.** Items stay at `Code Review`; the developer sets `Ready for Testing` by hand. Update the assignee only.
    - **Never move backward** — an item already past the target state keeps it; note it.
    - Skipped (conflict) or dropped items are not on the branch — leave them alone.
    - An invalid-state error means this project's template differs — confirm with `get_type`, report the item, continue. Don't silently swallow it.

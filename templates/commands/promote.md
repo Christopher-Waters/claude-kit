@@ -11,12 +11,12 @@ Resolve branch names from the project's `CLAUDE.md` **Pipeline Configuration** t
 | Branch | Environment | Gate — items should already be in… | State set after the PR merges |
 |---|---|---|---|
 | `main` | — (compare branch) | — | — |
-| `dev` | Dev | `Code Review` (merged to `main`) | `Ready for Testing` |
+| `dev` | Dev | `Code Review` (merged to `main`) | *(no change — stays `Code Review`)* |
 | `test` | Test | `Ready for Testing` | `Testing` |
 | `staging` | Staging | `Ready for Staging` | `Staging` |
 | `prod` | Production | `Ready to Deploy` | `Deployed` |
 
-`Ready for Staging` and `Ready to Deploy` are set by QA and stakeholders — **never by this command**.
+`Ready for Testing`, `Ready for Staging` and `Ready to Deploy` are set by the developer, QA, and stakeholders — **never by this command**. A `main → dev` deploy therefore sets **no state**: items stay at `Code Review` until the developer has checked the change on Dev and moves it to `Ready for Testing` by hand.
 
 ## Step 1: Determine Source and Target
 
@@ -321,7 +321,8 @@ This step runs **by itself** the moment the pipeline reports success — do not 
 
 For every carried work item of type **User Story**, **Bug**, or **Hot Fix**, one `wit_work_item_write` update per item setting both fields:
 
-1. `System.State` → the target's state (`Ready for Testing` / `Testing` / `Staging` / `Deployed`).
+1. `System.State` → the target's state (`Testing` / `Staging` / `Deployed`).
+   - **`main → dev` sets no state.** Items stay at `Code Review` — the developer sets `Ready for Testing` by hand once they have checked it on Dev. Update the assignee only, and show the state as `Code Review (unchanged — developer sets Ready for Testing)`.
    - **Never move backward** — an item already past the target state keeps it; note it.
    - An invalid-state error means this project's template differs — confirm with `get_type`, report the item, continue with the rest. Don't silently swallow it.
 2. `System.AssignedTo` → the person approved for that item's prefix group. Pass the identity's `uniqueName` / email, not the display name; if the update rejects it, resolve with `core_get_identity_ids` and retry once. A `Leave the current assignee alone` group keeps its assignee — never clear a field the user didn't ask you to clear.
@@ -339,7 +340,7 @@ Report both fields, so a wrong assignment is easy to put back:
 | AB#1240 | Ready for Staging → Staging | Chris Waters → Pat Ruiz |
 | AB#1250 | Deployed (unchanged — already ahead) | unchanged |
 
-Next: {the human step — "QA tests on Test and sets Ready for Staging" / "stakeholders verify on Staging and set Ready to Deploy" / "verify in production, then Close"}.
+Next: {the human step — "the developer checks it on Dev and sets Ready for Testing" / "QA tests on Test and sets Ready for Staging" / "stakeholders verify on Staging and set Ready to Deploy" / "verify in production, then Close"}.
 ```
 
 If the user said `stop watching`, or an update fails, leave the rest alone, say exactly which items were and were not updated, and note that `/track` will flag the lag later.
