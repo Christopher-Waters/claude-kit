@@ -79,6 +79,37 @@ Which? (1 / 2)
 
 For `main → dev` the gate is `Code Review`: an item still at `Code Review` whose commits are on `main` has had its PR merged, which is exactly right — not a warning. Features and Tasks are skipped. Items *ahead* of the gate are reported and left alone.
 
+## Step 3b: Scripts That Have to Be Run
+
+A deployment script — a SQL migration, a data backfill, a PowerShell step — is attached to the work item it belongs to, and it has to run in **every** environment that item's code lands in. A promotion carries the code; it does not carry the script, and nothing in the PR says one exists. That is how an environment ends up half-deployed.
+
+Fetch each carried work item with its attachments — `wit_work_item` `action: get`, `expand: "Relations"`, one call per item (`get_batch` has no `expand`) — and keep every relation whose `rel` is `AttachedFile` and whose filename extension is **not** a document, image or video:
+
+```
+.xlsx .xls .xlsm .xlsb .csv  .docx .doc .docm  .pdf
+.png .jpg .jpeg .gif .bmp .ico .svg .webp .tiff .tif
+.mp4 .mov .avi .webm .mkv .wmv .flv .m4v
+```
+
+Everything else counts, extensionless files included. The rule is deliberately loose, because the two mistakes do not cost the same: a filename someone glances at and dismisses costs seconds, a migration nobody ran costs an environment.
+
+Show them with the gate check, before the confirmation:
+
+```
+📜 Scripts to run with this promotion:
+
+| Work Item | Script |
+|-----------|--------|
+| AB#1234 | 2026-09-11_add_delivery_index.sql |
+| AB#1240 | backfill-tenant-flags.ps1 |
+
+Download them from the work items. This command does not run them.
+```
+
+If nothing carries an attachment, say `No deployment scripts attached` on one line and move on.
+
+**Reported, never enforced.** A script does not block the promotion and does not change the gate check: the attachment may already have been run, may be a reference copy, may not be a script at all. Listing it is the whole job — the person deploying decides.
+
 Then confirm: `Promote {count} commits from {source} to {target}? (yes/no)` — and wait.
 
 ## Step 4: Create PR
@@ -88,7 +119,7 @@ Create a PR directly from the source branch to the target branch via Azure DevOp
 - **sourceRefName**: `refs/heads/<source-branch>`
 - **targetRefName**: `refs/heads/<target-branch>`
 - **title**: `Promote {source} → {target}`
-- **description**: List all commits and associated work items being promoted
+- **description**: List all commits and associated work items being promoted, and — under a `Scripts to run` heading — any deployment scripts found in Step 3b, so whoever merges sees them without opening the work items
 
 Link the associated work items to the PR.
 
@@ -312,3 +343,10 @@ Next: {the human step — "QA tests on Test and sets Ready for Staging" / "stake
 ```
 
 If the user said `stop watching`, or an update fails, leave the rest alone, say exactly which items were and were not updated, and note that `/track` will flag the lag later.
+
+If any carried item had a deployment script (Step 3b), repeat it here — this is the moment it has to run, and the list is stale in the scroll-back by now:
+
+```
+📜 Still to run on {target}: AB#1234 2026-09-11_add_delivery_index.sql, AB#1240 backfill-tenant-flags.ps1
+```
+

@@ -33,6 +33,37 @@ Fetch each work item from Azure DevOps via MCP. Compare each one's `System.State
 Cherry-pick {count} work items to {environment}? Items behind the gate: include / drop / cancel
 ```
 
+### Step 1b: Scripts That Have to Be Run
+
+A deployment script — a SQL migration, a data backfill, a PowerShell step — is attached to the work item it belongs to, and it has to run in **every** environment that item's code lands in. A promotion carries the code; it does not carry the script, and nothing in the PR says one exists. That is how an environment ends up half-deployed.
+
+Fetch each carried work item with its attachments — `wit_work_item` `action: get`, `expand: "Relations"`, one call per item (`get_batch` has no `expand`) — and keep every relation whose `rel` is `AttachedFile` and whose filename extension is **not** a document, image or video:
+
+```
+.xlsx .xls .xlsm .xlsb .csv  .docx .doc .docm  .pdf
+.png .jpg .jpeg .gif .bmp .ico .svg .webp .tiff .tif
+.mp4 .mov .avi .webm .mkv .wmv .flv .m4v
+```
+
+Everything else counts, extensionless files included. The rule is deliberately loose, because the two mistakes do not cost the same: a filename someone glances at and dismisses costs seconds, a migration nobody ran costs an environment.
+
+Show them with the table above, before the confirmation:
+
+```
+📜 Scripts to run with this promotion:
+
+| Work Item | Script |
+|-----------|--------|
+| AB#1234 | 2026-09-11_add_delivery_index.sql |
+| AB#1240 | backfill-tenant-flags.ps1 |
+
+Download them from the work items. This command does not run them.
+```
+
+If nothing carries an attachment, say `No deployment scripts attached` on one line and move on.
+
+**Reported, never enforced.** A script does not block the promotion and does not change the gate check: the attachment may already have been run, may be a reference copy, may not be a script at all. Listing it is the whole job — the person deploying decides.
+
 Wait for confirmation. `drop` removes flagged items from this cherry-pick only.
 
 ## Step 2: Find Commits
@@ -91,7 +122,7 @@ Cherry-picking:
    - **sourceRefName**: `refs/heads/cherry-pick/<date>-to-<environment>`
    - **targetRefName**: `refs/heads/<target-environment-branch>`
    - **title**: `Cherry-pick AB#1234, AB#1235 → {Environment}`
-   - **description**: List all work items with IDs and titles
+   - **description**: List all work items with IDs and titles, and — under a `Scripts to run` heading — any deployment scripts found in Step 1b, so whoever merges sees them without opening the work items
 3. Link all work items to the PR via `wit_link_work_item_to_pull_request`
 
 ## Step 6: Pick Who Verifies Each Group (before the merge)
@@ -319,3 +350,10 @@ Next: {the human step — "QA tests on Test and sets Ready for Staging" / "stake
 ```
 
 If the user said `stop watching`, or an update fails, leave the rest alone, say exactly which items were and were not updated, and note that `/track` will flag the lag later.
+
+If any carried item had a deployment script (Step 1b), repeat it here — this is the moment it has to run, and the list is stale in the scroll-back by now:
+
+```
+📜 Still to run on {environment}: AB#1234 2026-09-11_add_delivery_index.sql, AB#1240 backfill-tenant-flags.ps1
+```
+

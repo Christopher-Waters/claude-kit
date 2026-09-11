@@ -183,6 +183,14 @@ How the commands use this table:
 - **Assign the verifier at the same time.** The state change hands the item to a person, so the same three commands ask **before the merge** who each group of items should go to, then apply the assignee alongside the state once the pipeline is green. See **Verifier Assignment** below.
 - **Never assume the state list.** Confirm with `mcp__azure-devops__wit_work_item` (`action: get_type`) on an unfamiliar project before writing a state name — a bad name is accepted silently by a query and rejected only at write time.
 
+#### Deployment Scripts
+
+A SQL migration or a backfill script is attached to the work item it belongs to, and it has to run in **every** environment that item's code lands in — test, then staging, then prod. The promotion carries the code, never the script.
+
+`/promote`, `/cherry-pick` and `/deploy-release` therefore read the carried items' attachments (`wit_work_item` `action: get`, `expand: "Relations"`) and list any that look like something to run: an `AttachedFile` whose extension is **not** a document, image or video (`.docx .xlsx .csv .pdf .png .jpg .mp4` and friends). Everything else counts — the rule is loose on purpose, because a filename glanced at and dismissed costs seconds while a migration nobody ran costs an environment. The list appears before the confirmation, in the PR description, and again once the pipeline is green, which is when it actually has to be run.
+
+**Reported, never enforced.** A script never blocks a promotion and never changes the gate check — it may already have been run, or be a reference copy. The person deploying decides; the commands only make sure nobody finds out afterwards.
+
 #### Verifier Assignment
 
 Moving an item to `Testing`, `Staging`, or `Deployed` puts it on someone's plate, so `/promote`, `/cherry-pick`, and `/deploy-release` also change who owns it. The developer implemented it; from here on it belongs to whoever checks it in that environment.
@@ -303,10 +311,10 @@ All deployment and release operations are available as slash commands:
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
 | `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline (only on `dev`/`test`/`staging`/`prod` — never on `main`) |
 | `/create-release` | `/create-release 23` | Group work items into Release #23 |
-| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → cherry-pick release to environment → PR → ask who verifies → merge on Serena's approval (below prod) → advance + assign on a green pipeline |
+| `/deploy-release` | `/deploy-release 23 staging` | Gate-check → list deployment scripts → cherry-pick release to environment → PR → ask who verifies → merge on Serena's approval (below prod) → advance + assign on a green pipeline |
 | `/add-to-release` | `/add-to-release 24 AB#4599` | Add work items to existing release |
-| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → cherry-pick specific work items → PR → ask who verifies → merge on Serena's approval (below prod) → advance + assign on a green pipeline |
-| `/promote` | `/promote main dev` | Promote all code between environments (`main → dev → test → staging → prod`) → ask who verifies → merge on Serena's approval (below prod) → advance + assign on a green pipeline |
+| `/cherry-pick` | `/cherry-pick AB#1234 AB#1235 prod` | Gate-check → list deployment scripts → cherry-pick specific work items → PR → ask who verifies → merge on Serena's approval (below prod) → advance + assign on a green pipeline |
+| `/promote` | `/promote main dev` | Promote all code between environments (`main → dev → test → staging → prod`) → list deployment scripts → ask who verifies → merge on Serena's approval (below prod) → advance + assign on a green pipeline |
 | `/rollback` | `/rollback AB#1234 prod` | Revert commits on an environment |
 | `/track` | `/track release 24` | Check release, pipeline, environment, or work item status; flags work items whose state lags their environment |
 | `/where` | `/where AB#1234` | Show which environment branches contain a work item's commits |
