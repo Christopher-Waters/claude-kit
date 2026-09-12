@@ -45,14 +45,14 @@ Today `templates/agents/project/deployer.md` commits, pushes, and triggers pipel
 
 Reuses the existing commands — `/promote`, `/deploy-release` — so this is orchestration, not new deployment logic.
 
-**Open: what wakes it up?** Claude Code isn't a daemon. Realistic options:
-1. `/loop` or a scheduled routine polling ADO for items in machine-owned states. Simplest; the `loop` and `schedule` skills already exist.
-2. Triggered inline at the end of `/implement-sprint` and at the end of each qa run. No polling, but nothing moves when no session is open.
+**Decided: inline triggering, not polling.** Claude Code isn't a daemon, so something has to call it. The options were:
+1. `/loop` or a scheduled routine polling ADO for items in machine-owned states. The `loop` and `schedule` skills already exist.
+2. Triggered inline at the end of `/implement-sprint` and at the end of each qa run. No polling, but nothing moves while no session is open.
 3. ADO service hooks → needs a listener this repo doesn't have. Out of scope.
 
-Start with (2), add (1) when it proves useful.
+**Start with (2).** Add (1) only if inline proves too passive in practice. A polling loop that finds nothing is pure cost, and (2) fails benignly: work sits until the next session rather than moving when it shouldn't.
 
-**Open: who reviews the PR?** Auto-merging to Dev means the PR lands without a human reading it. Probably acceptable *for Dev specifically*, given `/implement` already runs an automated code review and the promotion to Test is gated on a human. Worth being deliberate about rather than sliding into it.
+**Decided: the Dev merge is not human-reviewed, on purpose.** Auto-merging to Dev means the PR lands without a person reading it. That's acceptable *for Dev specifically*, and only because two other things are true — `/implement` has already run its own code review (including the architect pass at plan time), and the promotion out of Dev is gated on a human who has read the QA report. This decision rests on those two, not on Dev being unimportant. If either stops holding, revisit it.
 
 **Production stays gated.** `Ready to Deploy → Deployed` should keep a human confirmation even when everything upstream is automatic.
 
@@ -94,20 +94,28 @@ Screenshots keep a slice of the PII problem, and it concentrates in the one plac
 - Test data only, never a production-shaped record.
 - "This AC can't be tested without showing a sensitive field" is a **stop and ask**, not a problem to route around.
 
-### The spec-generation tradeoff
+### Decided: generate specs, without widening the tool allowlist
 
-`qa.md`'s security model is built on what it omits — no `browser_evaluate`, no `browser_run_code_unsafe` — because arbitrary page JS defeats every PII rule in the file. Generating a spec reintroduces page JS through the side door. The mitigating difference is real but needs to be decided deliberately: generated code is committed, diffed, and reviewed before it runs again, where runtime `evaluate` is none of those things. See `docs/agent-authoring.md`.
+`qa.md`'s security model is built on what it omits — no `browser_evaluate`, no `browser_run_code_unsafe` — because arbitrary page JS defeats every PII rule in the file. Generating a spec looks like it smuggles page JS back in.
+
+It doesn't have to. **The agent's MCP allowlist stays exactly as it is.** The spec is written as a *file* and executed by Playwright through Bash. The qa agent never gains a tool that runs arbitrary JS against whatever happens to be on screen; it gains the ability to write code that is committed, diffed, and reviewed before it ever runs a second time.
+
+That distinction is the entire decision — runtime `evaluate` is invisible and unreviewable, a committed spec is neither. If some future change proposes putting `browser_evaluate` back on the allowlist to make spec generation easier, **that** is the thing to refuse. Re-read `qa.md`'s sensitive-data rules before touching its `tools:` line. See `docs/agent-authoring.md`.
 
 ### The fix loop
 
 qa fails → findings to the dev agent → fix → redeploy → re-test. Needs a **round cap** (2–3) before escalating to a human, or it ping-pongs indefinitely on something it can't fix.
 
-## Open questions
+## Decisions
 
-1. ~~`Testing` fail → `Dev Ready`?~~ **Decided: run `/rework`, not `/implement`.** It fits better than expected — `/rework` ends by moving the item back to `Code Review` (`rework.md:381`), which is exactly this pipeline's re-entry point, so devops redeploys to Dev, qa re-tests, and the developer gate comes around again. It also already handles the case that matters here: a `Testing` failure happens after the PR merged, and Step 6 covers a completed PR by branching fresh from the target. No change needed to `/rework` itself.
-2. **Does qa re-run after Test and Staging promotions,** or only on Dev? Re-running is cheap insurance, and cheaper now that the evidence is a committed spec — later environments just re-run it rather than producing new artifacts.
-3. **Where does `/qa`'s existing read-only guarantee go?** Today `/qa` provably cannot change state — it has no ADO write tools. This pipeline wants qa to hand off to devops. Keep qa stateless and let devops read its verdict, rather than giving qa write access.
-4. **One PR per item, or per sprint?** Per item, almost certainly — but it means a sprint produces N PRs on a schedule set by the agents.
+Settled, with the reasoning, so a later session inherits conclusions instead of re-litigating them.
+
+1. ~~`Testing` fail → `Dev Ready`?~~ **Run `/rework`, not `/implement`.** It fits better than expected — `/rework` ends by moving the item back to `Code Review` (`rework.md:381`), which is exactly this pipeline's re-entry point, so devops redeploys to Dev, qa re-tests, and the developer gate comes around again. It also already handles the case that matters here: a `Testing` failure happens after the PR merged, and Step 6 covers a completed PR by branching fresh from the target. No change needed to `/rework` itself.
+2. **qa re-runs after every promotion, not only on Dev.** It got cheap the moment the evidence became a committed spec: later environments re-run the same test instead of producing new artifacts, so the marginal cost is a browser session rather than a new review surface. Treat it as a smoke test per hop — it catches environment-config drift, which is precisely the class of bug that only appears *after* a promotion.
+
+3. **qa stays read-only; devops does every write.** Today `/qa` cannot change a work item's state because it holds no Azure DevOps write tools at all — the guarantee is structural, not a prose rule the model could talk itself out of. This pipeline creates real pressure to give qa write access so it can hand off directly. Resist it: qa posts a verdict, devops reads the verdict and moves the state. `docs/agent-authoring.md` covers why omission is the enforcement.
+
+4. **One PR per work item.** A per-sprint PR would bundle unrelated changes into a single review and a single revert unit, which breaks `/rollback` and makes cherry-picking a subset impossible — and the kit's whole release model depends on both. The cost is real and accepted: a sprint produces N PRs, landing on a schedule the agents choose rather than when you're ready to read them. If that becomes the bottleneck, batch the *notification*, not the PRs.
 
 ## Suggested sequencing
 
@@ -115,7 +123,7 @@ Each step is independently useful, which matters because this may never be finis
 
 1. **`/implement-sprint`, serial, fully manual gates.** Valuable alone. No new agents.
 2. **qa agent, report only** — automated AC testing on Dev, structured report as a work item comment. Text only: the whole value of the loop, none of the PII risk.
-3. **Generated spec committed to the repo**, once the page-JS tradeoff above is decided.
+3. **Generated spec committed to the repo** — written as a file and run through Bash, with `qa.md`'s tool allowlist untouched.
 4. **Masked screenshots**, once the denylist exists.
 5. **devops agent**, triggered inline (option 2 above).
 6. **Polling / scheduled devops**, if inline triggering proves too passive.
