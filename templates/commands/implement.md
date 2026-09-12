@@ -82,6 +82,35 @@ Reply with your Ultracode choice (and any added context). Say **ready** once you
 
 1. **Explore** the codebase to map relevant files
 2. **Plan** the implementation approach
+3. **Re-analyze the plan as an architect** — the pass below, before the user sees anything
+
+### Architect Review (runs before the plan is presented)
+
+The draft plan is a first answer, not the answer. Re-read it cold — as an experienced architect who did not write it and who cares what this codebase looks like a year from now. This happens on **every** plan, before the user sees anything.
+
+> **Ultracode (if opted in):** run this as a separate `Workflow` agent so the review is actually independent. Give it the work item, the acceptance criteria, and the draft plan — but **not** your reasoning for the plan — and have it read the affected files itself. A reviewer who has seen the author's justification anchors to it. Without ultracode, run the pass in the main loop, but answer each question from the code, not from the plan's own prose.
+
+Each question below is about a cost that is cheap now and expensive once the code exists:
+
+| # | Question | What a bad answer looks like |
+|---|----------|------------------------------|
+| 1 | **Does this already exist?** A service, hook, component, or extension method that already does this, or is one call away. | A new `PaymentExportService` beside the `ExportService` that already handles three other exports |
+| 2 | **Is each piece in the right layer?** Domain / Application / Infrastructure / API boundaries hold — no business rules in a controller, no Mongo or EF types in Domain, no HTTP concepts below API. | An `IMongoCollection<T>` parameter on a Domain method |
+| 3 | **What is the simplest plan that still meets every AC?** State it, then adopt it or say in one line why the heavier one is needed. | An interface with exactly one implementation, added "for testability" |
+| 4 | **What else touches the files being modified?** Name the callers. A change to a shared contract, DTO, or response shape is a breaking change until proven otherwise. | Editing a shared DTO with no note about its other consumers |
+| 5 | **What happens to data that already exists?** New required fields, schema changes, and backfills each need an answer for rows written before this change. | A non-nullable field added with no default and no backfill |
+| 6 | **How does it fail?** Partial failure, concurrent callers, a retried request. Is the operation idempotent, and does it need to be? | A multi-step write with no story for a crash between steps |
+| 7 | **Does it hold at real data volume?** Queries inside loops, unbounded result sets, a missing index, a list endpoint with no paging. | A `foreach` over accounts issuing one query each |
+| 8 | **Is it safe?** Authorization on every new endpoint, and **no sensitive field** (TIN, SSN, EIN, TaxId, BankAccountNumber, RoutingNumber, any `Encrypted*`) read, logged, returned, or projected — see the sensitive-data rule in CLAUDE.md. | A new endpoint returning a whole entity because it was convenient |
+| 9 | **Can it be tested without heavy mocking?** A test needing five mocks is telling you the seams are in the wrong place. | A test plan that starts "mock the repository, the clock, and the HTTP client" |
+| 10 | **Can it be undone?** `/rollback` reverts commits; it does not un-migrate data or un-send an email. Flag anything one-way. | A destructive migration with no reverse path |
+
+**Two hard limits on this pass:**
+
+- **It may not grow the scope.** It exists to simplify, correct, and de-risk — not to add caching, abstraction layers, or features nobody asked for. Anything outside the acceptance criteria goes in *Risks / Considerations*, or becomes a separate work item you mention. It is never folded into the plan silently.
+- **It may not invent findings.** If the plan survives every question, say so in one line. A manufactured concern to look thorough spends the user's attention at the one gate that is supposed to protect it.
+
+Apply what the pass finds, then report it in the plan as the **Architect Review** section below. The pass is never skipped; only its output scales — on a one-file config change most rows answer themselves and the report is two lines.
 
 Present the plan to the user:
 
@@ -114,6 +143,10 @@ List every test file you will add or modify and the scenarios each covers (happy
 
 ### Risks / Considerations
 - {any potential issues or trade-offs}
+
+### Architect Review
+{One line per change the review made: what the draft said → what it says now → why.}
+{If nothing changed: "Reviewed against every question — no changes." plus the one that came closest to a finding and why it is fine.}
 
 Approve this plan? (yes / no / suggest changes)
 ```
@@ -482,7 +515,7 @@ Capture `BASE_BRANCH` and create `feature/AB#{feature-id}-{sanitized-title}` per
 
 For each wave in ascending order:
 
-1. **Explore & plan** each story in the wave (Step 3 rules; Ultracode fan-outs apply per story if opted in). Present **one combined plan** with a section per story — each section covering approach, files, unit tests, and agents — plus a note on any files touched by more than one story in the wave (a conflict warning). **One approval gate per wave**; wait for the user.
+1. **Explore & plan** each story in the wave (Step 3 rules; Ultracode fan-outs apply per story if opted in). Present **one combined plan** with a section per story — each section covering approach, files, unit tests, and agents — plus a note on any files touched by more than one story in the wave (a conflict warning). The **Architect Review** runs on the combined wave plan before you present it, and the shared-file conflicts are exactly what question 4 is for. **One approval gate per wave**; wait for the user.
 2. **Implement:**
    - **Move every story in the wave to `Active`** first (same rules and fallbacks as "Move the Work Item to Active" in Step 4). The Feature's state is never changed.
    - **Ensure each story in the wave has an open child Task** (Step 4's "Ensure an Open Child Task Exists" rules, applied per story — Tasks hang off the stories, never off the Feature). Batch the proposals into **one** table covering the whole wave and take a single approval, so parallel agents never wait on a prompt:
