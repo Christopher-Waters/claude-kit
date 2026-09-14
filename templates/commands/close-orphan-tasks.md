@@ -16,7 +16,7 @@ All work items live in the **CSI Development** Azure DevOps project (see CLAUDE.
 
 ## Step 1: Find Orphaned Tasks
 
-Use the Azure DevOps MCP `wit_query_by_wiql` with a hierarchy link query. The Source is the parent, the Target is the child Task:
+Use the Azure DevOps MCP `wit_query` (action `wiql`) with a hierarchy link query. The Source is the parent, the Target is the child Task:
 
 ```sql
 SELECT [System.Id]
@@ -31,11 +31,11 @@ MODE (MustContain)
 
 If a **scope** was given, add the matching constraint to the `[Target]` clause (e.g. `AND [Target].[System.AreaPath] UNDER 'CSI Development\\Compass'`, or `AND [Target].[System.Title] CONTAINS 'PAY'`).
 
-> **Note on state names:** Process templates vary. Some projects close tasks to `Done` instead of `Closed`, or use `Resolved`. If the query returns nothing or errors on an unknown state, first confirm the valid states for the Task type via `wit_get_work_item_type`, then adjust the `NOT IN` list and the close target in Step 3 accordingly.
+> **Note on state names:** Process templates vary. Some projects close tasks to `Done` instead of `Closed`, or use `Resolved`. If the query returns nothing or errors on an unknown state, first confirm the valid states for the Task type via `wit_work_item` (action `get_type`), then adjust the `NOT IN` list and the close target in Step 3 accordingly.
 
 If the link query is unsupported or returns no usable pairs, fall back to: query all open Tasks in scope with a flat WIQL, fetch each task's parent via `relations`, and keep only those whose parent state is in the three target states.
 
-Fetch the matched tasks (and their parents) in a batch via `wit_get_work_items_batch_by_ids` to get titles, states, assignees, and parent context.
+Fetch the matched tasks (and their parents) in a batch via `wit_work_item` (action `get_batch`) to get titles, states, assignees, and parent context.
 
 ## Step 2: Present the Candidates
 
@@ -59,11 +59,11 @@ Otherwise, wait for explicit confirmation before proceeding. Never close tasks w
 
 ## Step 3: Close the Tasks
 
-For each confirmed task, use `wit_update_work_items_batch`:
+For each confirmed task, use `wit_work_item_write` (action `update_batch`):
 - **path**: `/fields/System.State`
 - **value**: `Closed` (or the project's terminal Task state confirmed in Step 1)
 
-Then add a comment on each via `wit_add_work_item_comment` so the auto-close is traceable:
+Then add a comment on each via `wit_work_item_comment_write` (action `add`) so the auto-close is traceable:
 
 > Auto-closed by `/close-orphan-tasks` — parent AB#{parentId} is in state "{parentState}".
 

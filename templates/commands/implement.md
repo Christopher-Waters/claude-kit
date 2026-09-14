@@ -32,7 +32,7 @@ The description and acceptance criteria fields may contain embedded images (scre
 
 ### Comments
 
-Read the work item comments via `wit_list_work_item_comments`. Comments often contain clarifications, scope changes, or additional requirements added after the work item was created. Incorporate any relevant information from comments into your understanding of the work item.
+Read the work item comments via `wit_work_item` (action `list_comments`). Comments often contain clarifications, scope changes, or additional requirements added after the work item was created. Incorporate any relevant information from comments into your understanding of the work item.
 
 ## Step 2: Summarize and Confirm
 
@@ -188,11 +188,13 @@ Remember the `BASE_BRANCH` — you will need it for the PR step.
 
 ### Move the Work Item to Active
 
-Once the branch is created, move the work item (User Story, Bug, Hot Fix, or other single work item — never a Feature) to `Active` via `wit_update_work_item`:
+Once the branch is created, move the work item (User Story, Bug, Hot Fix, or other single work item — never a Feature) to `Active` via `wit_work_item_write` (action `update`):
 - **path**: `/fields/System.State`
 - **value**: `Active`
 
 If the work item is already `Active`, skip the update. If the project's process template does not have an `Active` state (the update call returns an invalid-state error), fall back in this order: `In Progress` → `Doing` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
+
+After the update, **read the work item back** (`wit_work_item`, action `get`) and confirm `System.State` actually changed. If it didn't, say so explicitly — do not proceed reporting the item as in progress when the board still shows it otherwise.
 
 ### Ensure an Open Child Task Exists
 
@@ -264,7 +266,7 @@ Create it? (yes / edit / skip)
 - `edit` → ask what to change (title or hours), revise, re-show, ask again
 - `skip` → continue without a Task, and **warn** that Step 10 will have no Task to close and no hours will be logged for this story
 
-On `yes`, create it with `mcp__azure-devops__wit_create_work_item`:
+On `yes`, create it with `mcp__azure-devops__wit_work_item_write` (action `create`):
 
 - **workItemType**: `Task`
 - **title**: `{PREFIX} - Implement: {short summary of the story}` — reuse the parent's product prefix (`COM`, `PAY`, `CDA`, …), extracted from the parent's title
@@ -275,7 +277,7 @@ On `yes`, create it with `mcp__azure-devops__wit_create_work_item`:
   - `System.AssignedTo` — copy from the parent (pass the parent's `uniqueName` / email if the value is an identity object). If the parent is unassigned, leave it unset rather than failing.
   - `System.State` — `Active`, since implementation is starting right now (fall back to the template's in-progress equivalent, or leave it at the default and note it)
 
-Then link it as a child of the work item with `mcp__azure-devops__wit_add_child_work_items` (or `wit_work_items_link` with `System.LinkTypes.Hierarchy-Forward`, parent → task).
+Then link it as a child of the work item with `mcp__azure-devops__wit_work_item_write` (action `add_child`) (or `wit_work_item_link_write` (action `link`) with `System.LinkTypes.Hierarchy-Forward`, parent → task).
 
 If the create or link call fails, report it and ask whether to implement without a Task or stop. Don't silently continue — the user needs to know hours won't be tracked.
 
@@ -387,9 +389,9 @@ Wait for the user's response before proceeding. Do NOT create a PR until confirm
    - **targetRefName**: `refs/heads/{BASE_BRANCH}` (the branch captured in Step 4)
    - **title**: `AB#{id}: {work item title}`
    - **labels**: `["hotfix"]` if the work item type is Hot Fix
-3. Link the PR to the work item via `wit_link_work_item_to_pull_request`
+3. Link the PR to the work item via `wit_work_item_link_write` (action `link_to_pull_request`)
 4. **Close related Tasks and log hours** — see "Closing Related Tasks" below.
-5. **Move the work item to `Code Review`** via `wit_update_work_item`:
+5. **Move the work item to `Code Review`** via `wit_work_item_write` (action `update`):
    - **path**: `/fields/System.State`
    - **value**: `Code Review`
 
@@ -452,7 +454,7 @@ For each task being processed, prompt for completed hours:
 
 **Wait for the user's response on every task.** Accept the suggested/current value (enter), a new numeric value, or `skip` to leave that one untouched.
 
-Once the user has answered, update each task in a **single** `wit_update_work_item` call per task:
+Once the user has answered, update each task in a **single** `wit_work_item_write` (action `update`) call per task:
 - `Microsoft.VSTS.Scheduling.CompletedWork` → the agreed value
 - `Microsoft.VSTS.Scheduling.RemainingWork` → `0`
 - `Microsoft.VSTS.Scheduling.OriginalEstimate` → only if it is still empty; set it to the agreed completed hours so the Task isn't left with no estimate at all. Never overwrite an estimate that's already there — the gap between estimate and actual is the useful signal.

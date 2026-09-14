@@ -111,7 +111,7 @@ After displaying the estimate, ask the user: *"Want me to set Story Points = {n}
 
 Only update the work item if the user explicitly says yes. Do not modify anything otherwise.
 
-When the user agrees, in the **same** `wit_update_work_item` call:
+When the user agrees, in the **same** `wit_work_item_write` (action `update`) call:
 
 1. Set `Microsoft.VSTS.Scheduling.StoryPoints` to the agreed value (the user's number wins if they adjusted it).
 2. Set `System.State` to `Dev Ready` — **but only if** the work item type is `User Story`, `Bug`, or `Hot Fix` **and** the item is not already past Dev Ready in the workflow (e.g. `Active`, `Code Review`, `Testing`, `Staging`, `Ready to Deploy`). Never move an item backward — if it's already past Dev Ready, set the points only and mention the state was left alone.
@@ -134,7 +134,7 @@ In the CSI Development process template, `Bug` and `Hot Fix` have **no design st
 
 > *"I can't size this until {what's missing}. Want me to move AB#{id} back to Design Review so it's out of the next `/quote-backlog` sweep until the creator responds?"*
 
-**Wait for the user.** Only update the work item if they say yes. Then set `System.State` = `Design Review` with `mcp__azure-devops__wit_update_work_item`. Rules:
+**Wait for the user.** Only update the work item if they say yes. Then set `System.State` = `Design Review` with `mcp__azure-devops__wit_work_item_write` (action `update`). Rules:
 
 - **`User Story` only** — never a Bug, Hot Fix, Feature, or Task. A Bug takes 5b; the update would fail on it anyway.
 - **Never move an item backward past the design stage.** Only from `Design Approved`; if it's already `Dev Ready` or anything at `Active` or later (`Active`, `Code Review`, `Ready for Testing`, `Testing`, `Ready for Staging`, `Staging`, `Ready to Deploy`, …), leave the state alone and say so — someone is already working on it, and a state bounce there does real damage.
@@ -146,7 +146,7 @@ In the CSI Development process template, `Bug` and `Hot Fix` have **no design st
 
 > *"I can't size this until {what's missing} — and a Bug has no design state to send it back to. Want me to tag AB#{id} `needs-info` so it drops out of the next `/quote-backlog` sweep? Removing the tag is what re-queues it — a reply alone leaves it excluded, though `/quote-backlog`'s stale-tag audit will surface it."*
 
-**Wait for the user.** Only update the work item if they say yes. Then add the tag with `mcp__azure-devops__wit_update_work_item`. Rules:
+**Wait for the user.** Only update the work item if they say yes. Then add the tag with `mcp__azure-devops__wit_work_item_write` (action `update`). Rules:
 
 - **Append to `System.Tags`, never replace it.** Take the current tag list captured in Step 1, append `needs-info`, and write the whole semicolon-separated list back. Writing the field bare wipes tags someone else set — `release-{N}`, triage labels, scope hints.
 - Already tagged `needs-info` → no-op; say it's already there.

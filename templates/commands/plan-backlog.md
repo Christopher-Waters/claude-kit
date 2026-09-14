@@ -27,7 +27,7 @@ If the user types `list`, call `mcp__azure-devops__core_list_projects` and prese
 
 ## Step 2: Query the Backlog
 
-Run a WIQL query via `mcp__azure-devops__wit_query_by_wiql` to find candidate stories. "Backlog" means items at the **root iteration path** (not assigned to any sprint).
+Run a WIQL query via `mcp__azure-devops__wit_query` (action `wiql`) to find candidate stories. "Backlog" means items at the **root iteration path** (not assigned to any sprint).
 
 ```sql
 SELECT [System.Id], [System.Title], [System.State],
@@ -55,7 +55,7 @@ and stop.
 
 ## Step 3: Filter Out Stories That Already Have Child Tasks
 
-For each candidate from Step 2, fetch the work item with `mcp__azure-devops__wit_get_work_item` expanding `relations`. If the item has any `System.LinkTypes.Hierarchy-Forward` relation pointing at a `Task`, mark it as **already broken down** and skip it.
+For each candidate from Step 2, fetch the work item with `mcp__azure-devops__wit_work_item` (action `get`) expanding `relations`. If the item has any `System.LinkTypes.Hierarchy-Forward` relation pointing at a `Task`, mark it as **already broken down** and skip it.
 
 Present a one-line summary of what was skipped:
 
@@ -175,7 +175,7 @@ Approve? (yes / edit / skip / cancel-all)
 
 ### 5e. Create the child task
 
-Create the approved task with `mcp__azure-devops__wit_create_work_item`:
+Create the approved task with `mcp__azure-devops__wit_work_item_write` (action `create`):
 
 - **project**: the chosen project
 - **workItemType**: `Task`
@@ -187,7 +187,7 @@ Create the approved task with `mcp__azure-devops__wit_create_work_item`:
   - `System.AreaPath` — copy from the parent
   - `System.AssignedTo` — copy from the parent (pass the parent's `uniqueName` / email if its `System.AssignedTo` value is an identity object). If the parent is unassigned, leave this field unset rather than failing.
 
-Then link the new task as a child of the parent with `mcp__azure-devops__wit_add_child_work_items` (or fall back to `wit_work_items_link` with link type `System.LinkTypes.Hierarchy-Forward` from parent → task).
+Then link the new task as a child of the parent with `mcp__azure-devops__wit_work_item_write` (action `add_child`) (or fall back to `wit_work_item_link_write` (action `link`) with link type `System.LinkTypes.Hierarchy-Forward` from parent → task).
 
 If the create or link call fails, report the failure and ask the user whether to continue with the next story or abort the loop.
 

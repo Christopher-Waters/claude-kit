@@ -123,7 +123,7 @@ Cherry-picking:
    - **targetRefName**: `refs/heads/<target-environment-branch>`
    - **title**: `Cherry-pick AB#1234, AB#1235 → {Environment}`
    - **description**: List all work items with IDs and titles, and — under a `Scripts to run` heading — any deployment scripts found in Step 1b, so whoever merges sees them without opening the work items
-3. Link all work items to the PR via `wit_link_work_item_to_pull_request`
+3. Link all work items to the PR via `wit_work_item_link_write` (action `link_to_pull_request`)
 
 ## Step 6: Pick Who Verifies Each Group (before the merge)
 

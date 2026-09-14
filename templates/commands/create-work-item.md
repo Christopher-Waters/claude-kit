@@ -404,7 +404,7 @@ This applies to **User Story**. It does **not** apply to Bug or Hot Fix: neither
 
 ### Call the create API
 
-Call `mcp__azure-devops__wit_create_work_item` with:
+Call `mcp__azure-devops__wit_work_item_write` (action `create`) with:
 
 - **project**: the chosen project
 - **workItemType**: `Feature`, `Bug`, `User Story`, or `Hot Fix` (two words, exact casing)
@@ -431,7 +431,7 @@ If the `Open Questions` section is non-empty, append it as a clearly-labeled HTM
 
 ### Move to Dev Ready (pointed items only)
 
-If story points were agreed in Step 4, set `System.State` to `Dev Ready` via `mcp__azure-devops__wit_update_work_item` **after** the item is created (a separate call — new items start in `New`, and some process templates reject a non-initial state in the create call). If the state transition is rejected, report the error and leave the state as-is — don't silently retry through intermediate states. Items created without points stay in `New`.
+If story points were agreed in Step 4, set `System.State` to `Dev Ready` via `mcp__azure-devops__wit_work_item_write` (action `update`) **after** the item is created (a separate call — new items start in `New`, and some process templates reject a non-initial state in the create call). If the state transition is rejected, report the error and leave the state as-is — don't silently retry through intermediate states. Items created without points stay in `New`.
 
 **Features are never moved.** A Feature stays in `New` and advances only as its child stories are verified and closed — the same rule `/implement` follows.
 
@@ -462,7 +462,7 @@ On `yes`:
    ```
 
    **Wait for the user.** Revise and re-present until approved. Do not create anything before approval.
-5. On approval, create each story with `mcp__azure-devops__wit_create_work_item` in the same project, setting:
+5. On approval, create each story with `mcp__azure-devops__wit_work_item_write` (action `create`) in the same project, setting:
    - `System.Description` and `Microsoft.VSTS.Common.AcceptanceCriteria` — rendered to HTML per the Step 8 rules
    - `Custom.Order` — the wave number
    - `Microsoft.VSTS.Scheduling.StoryPoints` — the agreed points
@@ -489,7 +489,7 @@ For a **Bug**, fetch `Microsoft.VSTS.TCM.ReproSteps` and `Microsoft.VSTS.TCM.Sys
 
 For a **Hot Fix**, fetch `System.Description` and `Microsoft.VSTS.TCM.ReproSteps`, and confirm the narrative is in the former and the reproduction detail in the latter.
 
-If a check fails the write didn't take — fix it with `wit_update_work_item` before reporting success. Don't report a created item you haven't read back.
+If a check fails the write didn't take — fix it with `wit_work_item_write` (action `update`) before reporting success. Don't report a created item you haven't read back.
 
 After creation, report:
 

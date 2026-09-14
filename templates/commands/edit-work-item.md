@@ -230,9 +230,9 @@ Render every Markdown section to HTML first — Azure DevOps description and acc
 
 Apply writes in this order, so a failure partway through leaves the most useful state behind:
 
-1. **Update the parent item** — one `mcp__azure-devops__wit_update_work_item` call with every changed field. Never include `System.State` for a Feature.
+1. **Update the parent item** — one `mcp__azure-devops__wit_work_item_write` (action `update`) call with every changed field. Never include `System.State` for a Feature.
 2. **Update existing children** (verdict `Update`) — one call per story, points and `Custom.Order` in the same call as the text changes. If points were set on a story still at or before `Dev Ready`, set `System.State` = `Dev Ready` in that same call.
-3. **Create added children** — `mcp__azure-devops__wit_create_work_item` with description, acceptance criteria, `Custom.Order`, agreed `Microsoft.VSTS.Scheduling.StoryPoints`, and `System.AssignedTo` copied from the Feature if it has an assignee. Then link each to the Feature as a child via `mcp__azure-devops__wit_work_item_link_write` (`System.LinkTypes.Hierarchy-Reverse`), then move pointed ones to `Dev Ready` in a follow-up call.
+3. **Create added children** — `mcp__azure-devops__wit_work_item_write` (action `create`) with description, acceptance criteria, `Custom.Order`, agreed `Microsoft.VSTS.Scheduling.StoryPoints`, and `System.AssignedTo` copied from the Feature if it has an assignee. Then link each to the Feature as a child via `mcp__azure-devops__wit_work_item_link_write` (`System.LinkTypes.Hierarchy-Reverse`), then move pointed ones to `Dev Ready` in a follow-up call.
 4. **Re-order** any story whose only change is `Custom.Order` — one call each, touching that field alone.
 5. **Retire** stories the user approved — set `System.State` = `Removed`, or remove the parent link, whichever the user chose. **Never delete a work item.**
 6. **Post comments** (if the user said yes) via `mcp__azure-devops__wit_work_item_comment_write` — one short comment per edited item saying what changed and why, and naming the Feature edit that drove it (e.g. `Scope updated via edit of AB#6240: acceptance criteria 2 reworded to cover SSO; re-ordered from wave 3 to wave 2.`).

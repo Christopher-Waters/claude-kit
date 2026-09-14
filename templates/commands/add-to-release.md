@@ -38,7 +38,7 @@ Wait for confirmation.
 
 ## Step 4: Assign and Tag
 
-Use `wit_update_work_items_batch` to:
+Use `wit_work_item_write` (action `update_batch`) to:
 1. Set the Iteration Path to `{project}\Release #{N}` on each new work item
 2. Append `release-{N}` to each work item's tags
 

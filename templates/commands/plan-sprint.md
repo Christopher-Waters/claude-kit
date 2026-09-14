@@ -44,7 +44,7 @@ and stop.
 
 ## Step 3: Query the Sprint
 
-Run a WIQL query via `mcp__azure-devops__wit_query_by_wiql` using the **literal iteration path** from Step 2:
+Run a WIQL query via `mcp__azure-devops__wit_query` (action `wiql`) using the **literal iteration path** from Step 2:
 
 ```sql
 SELECT [System.Id], [System.Title], [System.State],
@@ -73,7 +73,7 @@ and stop.
 
 ## Step 4: Filter Out Items That Already Have Child Tasks
 
-For each candidate from Step 3, fetch the work item with `mcp__azure-devops__wit_get_work_item` expanding `relations`. If the item has any `System.LinkTypes.Hierarchy-Forward` relation pointing at a `Task`, mark it as **already broken down** and skip it.
+For each candidate from Step 3, fetch the work item with `mcp__azure-devops__wit_work_item` (action `get`) expanding `relations`. If the item has any `System.LinkTypes.Hierarchy-Forward` relation pointing at a `Task`, mark it as **already broken down** and skip it.
 
 Present a one-line summary of what was skipped:
 
@@ -196,7 +196,7 @@ For unpointed items, the header line reads `(no points — estimated from descri
 
 ### 6e. Create the child task
 
-Create the approved task with `mcp__azure-devops__wit_create_work_item`:
+Create the approved task with `mcp__azure-devops__wit_work_item_write` (action `create`):
 
 - **project**: the chosen project
 - **workItemType**: `Task`
@@ -208,7 +208,7 @@ Create the approved task with `mcp__azure-devops__wit_create_work_item`:
   - `System.AreaPath` — copy from the parent
   - `System.AssignedTo` — copy from the parent (pass the parent's `uniqueName` / email if its `System.AssignedTo` value is an identity object). If the parent is unassigned, leave this field unset rather than failing.
 
-Then link the new task as a child of the parent with `mcp__azure-devops__wit_add_child_work_items` (or fall back to `wit_work_items_link` with link type `System.LinkTypes.Hierarchy-Forward` from parent → task).
+Then link the new task as a child of the parent with `mcp__azure-devops__wit_work_item_write` (action `add_child`) (or fall back to `wit_work_item_link_write` (action `link`) with link type `System.LinkTypes.Hierarchy-Forward` from parent → task).
 
 If the create or link call fails, report the failure and ask the user whether to continue with the next item or abort the loop.
 

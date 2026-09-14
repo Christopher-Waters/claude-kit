@@ -36,13 +36,13 @@ Save the PR's `creationDate` as `LAST_PR_DATE` — everything after this timesta
 
 ### New Comments
 
-Read the work item comments via `wit_list_work_item_comments`. Filter to only comments created **after** `LAST_PR_DATE`. These contain the rework feedback.
+Read the work item comments via `wit_work_item` (action `list_comments`). Filter to only comments created **after** `LAST_PR_DATE`. These contain the rework feedback.
 
 For each new comment, check for embedded images (`<img>` tags with `src` URLs pointing to Azure DevOps attachments). **Download and view every embedded image** using WebFetch — they often contain screenshots of bugs, visual issues, or annotated UI showing what needs to change.
 
 ### Description & Acceptance Criteria Changes
 
-Read the work item revisions via `wit_list_work_item_revisions`. Check if the **description** or **acceptance criteria** fields were modified **after** `LAST_PR_DATE`.
+Read the work item revisions via `wit_work_item` (action `list_revisions`). Check if the **description** or **acceptance criteria** fields were modified **after** `LAST_PR_DATE`.
 
 - If changed: extract the **current** description and acceptance criteria, and note what was added or modified
 - If unchanged: still read the current description and acceptance criteria — a comment may reference something that was in the original requirements but missing from the implementation
@@ -236,7 +236,7 @@ Enter the estimated hours for this task (press enter to accept {n}):
 
 If the user provided hours (suggested or overridden):
 
-1. Call `mcp__azure-devops__wit_create_work_item`:
+1. Call `mcp__azure-devops__wit_work_item_write` (action `create`):
    - **workItemType**: `Task`
    - **title**: `Rework AB#{id} — round {N}`
    - **fields**: JSON Patch document setting:
@@ -262,8 +262,9 @@ If the user provided hours (suggested or overridden):
      - `System.AreaPath` — same as the parent
      - `System.IterationPath` — same as the parent
      - `System.AssignedTo` — same as the parent (copy the parent's `System.AssignedTo` value; pass the `uniqueName` / email if the parent's value is an identity object). If the parent is unassigned, leave this field unset rather than failing.
+     - `System.State` — `Active`, since the rework starts right now (fall back to the template's in-progress equivalent, or leave it at the default and note it). A rework Task left at `New` while the work is underway misreports the board.
 
-2. Link the new Task as a child of the parent work item via `wit_work_items_link`:
+2. Link the new Task as a child of the parent work item via `wit_work_item_link_write` (action `link`):
    - **type**: `Child` (the parent → child link from the parent's perspective; equivalent to `Parent` from the task's perspective)
    - **source**: parent work item ID
    - **target**: new task ID
@@ -281,6 +282,18 @@ The work item already has a branch from the previous PR. Switch to it:
 3. Pull the latest: `git pull`
 
 If the PR was completed/merged and the branch was deleted, create a new branch from the PR's target branch following the same naming convention as `/implement` Step 4.
+
+### Move the Work Item to Active
+
+Once you are on the branch, move the work item (User Story, Bug, Hot Fix, or other single work item — **never** a Feature) to `Active` via `wit_work_item_write` (action `update`):
+- **path**: `/fields/System.State`
+- **value**: `Active`
+
+Rework restarts implementation, so the item must leave `Code Review` / `Rework` and go back to in-progress for the duration of this round — Step 12 hands it back to `Code Review` when the fixes are pushed. Without this the item sits in a review state while it is actively being worked, and the board lies.
+
+If the work item is already `Active`, skip the update. If the project's process template does not have an `Active` state (the update call returns an invalid-state error), fall back in this order: `In Progress` → `Doing` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
+
+After the update, **read the work item back** (`wit_work_item`, action `get`) and confirm `System.State` actually changed. If it didn't, say so explicitly — do not proceed reporting the item as in progress when the board still shows it otherwise.
 
 ## Step 7: Implement
 
@@ -375,9 +388,9 @@ Wait for the user's response before proceeding. Do NOT push until confirmed.
 ## Step 12: Push and Update
 
 1. Push the changes: `git push`
-2. **Do not post a rework summary comment.** Do not add a summary of what changed to the work item Discussion (`wit_add_work_item_comment`) or as a PR thread. The pushed commits and the PR diff are the record of what changed — a prose summary duplicates them and clutters the work item. If the reviewer left specific PR comment threads, reply on those threads directly (that is what `/resolve-feedback` and `/fix-review` do); otherwise post nothing.
+2. **Do not post a rework summary comment.** Do not add a summary of what changed to the work item Discussion (`wit_work_item_comment_write` (action `add`)) or as a PR thread. The pushed commits and the PR diff are the record of what changed — a prose summary duplicates them and clutters the work item. If the reviewer left specific PR comment threads, reply on those threads directly (that is what `/resolve-feedback` and `/fix-review` do); otherwise post nothing.
 3. **Close related Tasks and log hours** — see "Closing Related Tasks" below. This includes the rework Task created in Step 5 as well as any other child Tasks that became `Completed` as a result of this rework round.
-4. **Move the work item back to `Code Review`** via `wit_update_work_item`:
+4. **Move the work item back to `Code Review`** via `wit_work_item_write` (action `update`):
    - **path**: `/fields/System.State`
    - **value**: `Code Review`
 
@@ -440,7 +453,7 @@ For each task being processed, prompt for completed hours:
 
 **Wait for the user's response on every task.** Accept the suggested/current value (enter), a new numeric value, or `skip` to leave that one untouched.
 
-Once the user has answered, update each task via `wit_update_work_item`:
+Once the user has answered, update each task via `wit_work_item_write` (action `update`):
 - `Microsoft.VSTS.Scheduling.CompletedWork` → the agreed value
 - `Microsoft.VSTS.Scheduling.RemainingWork` → `0`
 - `System.State` → `Closed` (fall back to `Done` if the project's task template uses Agile; warn if neither is valid)

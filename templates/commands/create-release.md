@@ -38,13 +38,13 @@ Create a new iteration in Azure DevOps via `work_create_iterations`:
 
 ## Step 4: Assign Work Items to the Release
 
-Use `wit_update_work_items_batch` to set the Iteration Path on each work item to the new release iteration:
+Use `wit_work_item_write` (action `update_batch`) to set the Iteration Path on each work item to the new release iteration:
 - **path**: `/fields/System.IterationPath`
 - **value**: `{project}\Release #{N}`
 
 ## Step 5: Tag Work Items
 
-Use `wit_update_work_items_batch` to add a release tag to each work item:
+Use `wit_work_item_write` (action `update_batch`) to add a release tag to each work item:
 - **path**: `/fields/System.Tags`
 - **value**: append `release-{N}` to existing tags
 

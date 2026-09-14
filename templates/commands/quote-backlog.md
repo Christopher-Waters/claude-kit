@@ -91,7 +91,7 @@ If the user types `list`, call `mcp__azure-devops__core_list_projects` and prese
 
 ## Step 2: Query the Backlog
 
-Run a WIQL query via `mcp__azure-devops__wit_query_by_wiql` to find candidate items. "Backlog" means items at the **root iteration path** (not assigned to any sprint).
+Run a WIQL query via `mcp__azure-devops__wit_query` (action `wiql`) to find candidate items. "Backlog" means items at the **root iteration path** (not assigned to any sprint).
 
 ```sql
 SELECT [System.Id], [System.Title], [System.State],
@@ -203,7 +203,7 @@ For each item in the batch, do all of 3a–3e before presenting anything. Collec
 
 ### 3a. Fetch the full work item
 
-Fetch with `mcp__azure-devops__wit_get_work_item` expanding `relations`. Capture: title, type, description, acceptance criteria, tags, `System.CreatedBy` (display name + unique name — needed for the comment draft), child items, and any linked PRs, commits, or branches.
+Fetch with `mcp__azure-devops__wit_work_item` (action `get`) expanding `relations`. Capture: title, type, description, acceptance criteria, tags, `System.CreatedBy` (display name + unique name — needed for the comment draft), child items, and any linked PRs, commits, or branches.
 
 ### 3b. Completeness review
 
@@ -368,8 +368,8 @@ Approve? (all / numbers e.g. "1,2,4" / edit N / skip N / apply rewrite N / cance
 
 Only for approved items, in batch order:
 
-1. **Set Story Points and move to Dev Ready** (items with a proposed number): in one `mcp__azure-devops__wit_update_work_item` call, set `Microsoft.VSTS.Scheduling.StoryPoints` **and** `System.State` = `Dev Ready`. The state change applies only to `User Story`, `Bug`, and `Hot Fix` types, and never moves an item backward — if an item is somehow already past Dev Ready, set the points only and note it. Touch no other field — assignee, iteration, and tags stay as they are.
-2. **Send unquotable User Stories back to Design Review** (approved `User Story` items with **no** proposed points, where the blocker is missing information): set `System.State` = `Design Review` via `mcp__azure-devops__wit_update_work_item`. Do this **before** posting the comment in step 4, so the creator's notification arrives with the item already back in their queue. Rules:
+1. **Set Story Points and move to Dev Ready** (items with a proposed number): in one `mcp__azure-devops__wit_work_item_write` (action `update`) call, set `Microsoft.VSTS.Scheduling.StoryPoints` **and** `System.State` = `Dev Ready`. The state change applies only to `User Story`, `Bug`, and `Hot Fix` types, and never moves an item backward — if an item is somehow already past Dev Ready, set the points only and note it. Touch no other field — assignee, iteration, and tags stay as they are.
+2. **Send unquotable User Stories back to Design Review** (approved `User Story` items with **no** proposed points, where the blocker is missing information): set `System.State` = `Design Review` via `mcp__azure-devops__wit_work_item_write` (action `update`). Do this **before** posting the comment in step 4, so the creator's notification arrives with the item already back in their queue. Rules:
 
    - **`User Story` only.** Do not attempt this on a `Bug` or a `Hot Fix` — those types have no `Design Review` state, so the update fails at runtime in the middle of the batch. They take step 3 instead.
    - Only from `Design Approved` — **never move an item backward past the design stage.** An item at `Dev Ready`, or anything at `Active` or later (`Active`, `Code Review`, `Ready for Testing`, `Testing`, `Ready for Staging`, `Staging`, `Ready to Deploy`, …), keeps its state; note it in the summary instead.
@@ -387,8 +387,8 @@ Only for approved items, in batch order:
    - Skip items whose only finding is **needs to be split** — nothing is missing, so no tag.
    - Touch no other field — points stay empty; assignee, iteration, and state stay as they are.
 
-4. **Post the comment** (items with an approved draft): add it with `mcp__azure-devops__wit_add_work_item_comment` (or the server's work-item comment tool). Use the mention syntax the server supports so the creator is notified; otherwise lead with their display name as drafted. For a story that just moved to Design Review, the comment must say so — the creator needs to know why it left their Design Approved column. For a bug that just got the `needs-info` tag, the comment must say that too, and say that removing the tag re-queues it.
-5. **Apply the rewrite** (only items the user marked `apply rewrite N`): update `System.Description` (and `System.Title` if the rewrite included one) via `wit_update_work_item`, and adjust the comment to say the rewrite was applied ("rewrote the description/AC per the above — please review") rather than suggesting it. Never apply a rewrite the user didn't explicitly mark.
+4. **Post the comment** (items with an approved draft): add it with `mcp__azure-devops__wit_work_item_comment_write` (action `add`) (or the server's work-item comment tool). Use the mention syntax the server supports so the creator is notified; otherwise lead with their display name as drafted. For a story that just moved to Design Review, the comment must say so — the creator needs to know why it left their Design Approved column. For a bug that just got the `needs-info` tag, the comment must say that too, and say that removing the tag re-queues it.
+5. **Apply the rewrite** (only items the user marked `apply rewrite N`): update `System.Description` (and `System.Title` if the rewrite included one) via `wit_work_item_write` (action `update`), and adjust the comment to say the rewrite was applied ("rewrote the description/AC per the above — please review") rather than suggesting it. Never apply a rewrite the user didn't explicitly mark.
 
    **Guard on `Microsoft.VSTS.Common.AcceptanceCriteria`:** write it only if the item's AC field was **non-empty** when fetched in 3a. Re-check the fetched value at write time — if it was blank, drop AC from the update payload and write the other fields. Blank means no criteria at all: empty string, whitespace, an empty HTML shell like `<div></div>` or `<p><br></p>`, **or the process template's placeholder tip text** (`💡 Tip: Add "@serena rewrite" to Description for AI suggestions  Define acceptance criteria: - [ ]  - [ ]  - [ ]`). The placeholder is the one that bites — it is a stored, non-empty field value that means the exact opposite of what its length suggests.
 

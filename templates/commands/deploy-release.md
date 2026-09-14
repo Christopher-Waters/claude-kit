@@ -20,7 +20,7 @@ Resolve branch names from the project's `CLAUDE.md` **Pipeline Configuration** t
 
 ## Step 1: Read the Release
 
-Query Azure DevOps for all work items tagged with `release-{N}` or assigned to the `Release #{N}` iteration using `search_workitem` or `wit_get_work_items_for_iteration`.
+Query Azure DevOps for all work items tagged with `release-{N}` or assigned to the `Release #{N}` iteration using `search_workitem` or `wit_work_item` (action `list_for_iteration`).
 
 Present the release contents:
 
@@ -179,7 +179,7 @@ Cherry-picking commits for Release #{N}:
    - **targetRefName**: `refs/heads/<target-environment-branch>`
    - **title**: `Release #{N} → {Environment}`
    - **description**: List all work items included with their IDs and titles, and — under a `Scripts to run` heading — any deployment scripts found in Step 3b, so whoever merges sees them without opening the work items
-3. Link all work items to the PR via `wit_link_work_item_to_pull_request`
+3. Link all work items to the PR via `wit_work_item_link_write` (action `link_to_pull_request`)
 
 ## Step 8: Pick Who Verifies Each Group (before the merge)
 

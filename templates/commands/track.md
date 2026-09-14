@@ -49,7 +49,7 @@ Deployed to:
 Catch these up? (yes/no)
 ```
 
-If the user says yes, set `System.State` on each lagging item to the expected state via `wit_update_work_item` — never backward, never on a Feature or Task — and report `Was → Now`.
+If the user says yes, set `System.State` on each lagging item to the expected state via `wit_work_item_write` (action `update`) — never backward, never on a Feature or Task — and report `Was → Now`.
 
 ## If Pipeline (e.g., `/track pipeline` or `/track build`):
 
