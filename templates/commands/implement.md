@@ -98,7 +98,7 @@ Each question below is about a cost that is cheap now and expensive once the cod
 | 2 | **Is each piece in the right layer?** Domain / Application / Infrastructure / API boundaries hold — no business rules in a controller, no Mongo or EF types in Domain, no HTTP concepts below API. | An `IMongoCollection<T>` parameter on a Domain method |
 | 3 | **What is the simplest plan that still meets every AC?** State it, then adopt it or say in one line why the heavier one is needed. | An interface with exactly one implementation, added "for testability" |
 | 4 | **What else touches the files being modified?** Name the callers. A change to a shared contract, DTO, or response shape is a breaking change until proven otherwise. | Editing a shared DTO with no note about its other consumers |
-| 5 | **What happens to data that already exists?** New required fields, schema changes, and backfills each need an answer for rows written before this change. | A non-nullable field added with no default and no backfill |
+| 5 | **What happens to data that already exists?** New required fields, schema changes, and backfills each need an answer for rows written before this change — and the answer should run itself: the project's run-once migration mechanism if it has one, not a script someone has to remember in every environment (see **Deployment Scripts** in CLAUDE.md). | A non-nullable field added with no default and no backfill; a `backfill.js` to run by hand on test, staging and prod when the API already runs one-time migrations at startup |
 | 6 | **How does it fail?** Partial failure, concurrent callers, a retried request. Is the operation idempotent, and does it need to be? | A multi-step write with no story for a crash between steps |
 | 7 | **Does it hold at real data volume?** Queries inside loops, unbounded result sets, a missing index, a list endpoint with no paging. | A `foreach` over accounts issuing one query each |
 | 8 | **Is it safe?** Authorization on every new endpoint, and **no sensitive field** (TIN, SSN, EIN, TaxId, BankAccountNumber, RoutingNumber, any `Encrypted*`) read, logged, returned, or projected — see the sensitive-data rule in CLAUDE.md. | A new endpoint returning a whole entity because it was convenient |
@@ -130,6 +130,10 @@ Present the plan to the user:
 
 ### Files to Delete (if any)
 - `path/to/old/file.cs` — {why it's being removed}
+
+### Data Changes (if any)
+- {what changes in existing data} — **automated** by {the project's run-once mechanism}: `{file}`
+- {what changes in existing data} — **hand-run** `{script path}`, because {which Deployment Scripts reason applies}. Attached to the work item when the PR goes up.
 
 ### Unit Tests
 - `path/to/new.tests.cs` — covers {scenario 1}, {scenario 2}, {edge case}
@@ -390,14 +394,25 @@ Wait for the user's response before proceeding. Do NOT create a PR until confirm
    - **title**: `AB#{id}: {work item title}`
    - **labels**: `["hotfix"]` if the work item type is Hot Fix
 3. Link the PR to the work item via `wit_work_item_link_write` (action `link_to_pull_request`)
-4. **Close related Tasks and log hours** — see "Closing Related Tasks" below.
-5. **Move the work item to `Code Review`** via `wit_work_item_write` (action `update`):
+4. **Attach deployment scripts** — see "Attaching Deployment Scripts" below.
+5. **Close related Tasks and log hours** — see "Closing Related Tasks" below.
+6. **Move the work item to `Code Review`** via `wit_work_item_write` (action `update`):
    - **path**: `/fields/System.State`
    - **value**: `Code Review`
 
    If the project's process template does not have a `Code Review` state (the update call returns an invalid-state error), fall back in this order: `Resolved` → `In Review` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
 
-> **Only the Task ever gets closed — never the parent.** The child Task is closed here, at PR creation (step 4 above). When the PR is later completed/merged, do **not** enable Azure DevOps's "Complete associated work items" option: it transitions *every* linked work item, including the parent this PR is linked to. The parent User Story or Bug stays in `Code Review`: merging this PR into `main` deploys nothing, and promoting to `dev` deploys the code but **leaves the state alone** — the developer moves it to `Ready for Testing` once they have checked it on Dev. From there `/promote` and `/deploy-release` advance it to `Testing` → `Staging` → `Deployed` across `test → staging → prod` (see **Work Item States ↔ Environments** in CLAUDE.md).
+> **Only the Task ever gets closed — never the parent.** The child Task is closed here, at PR creation (step 5 above). When the PR is later completed/merged, do **not** enable Azure DevOps's "Complete associated work items" option: it transitions *every* linked work item, including the parent this PR is linked to. The parent User Story or Bug stays in `Code Review`: merging this PR into `main` deploys nothing, and promoting to `dev` deploys the code but **leaves the state alone** — the developer moves it to `Ready for Testing` once they have checked it on Dev. From there `/promote` and `/deploy-release` advance it to `Testing` → `Staging` → `Deployed` across `test → staging → prod` (see **Work Item States ↔ Environments** in CLAUDE.md).
+
+### Attaching Deployment Scripts
+
+A script that has to be run by hand — a SQL migration, a data backfill, a rename — is useless to the next environment if it only lives in the repo: `/promote`, `/cherry-pick` and `/deploy-release` find scripts on the **work item**, never in the diff. So every one this change adds or modifies is attached to the work item now, not left for someone to remember.
+
+List the files the PR adds or modifies (`git diff --name-only --diff-filter=AM {BASE_BRANCH}...HEAD`) and pick out the ones a person runs by hand, once per environment. The test: if the UAT checklist, the PR, or your report tells someone to run it, it's one of these. App code, tests, build tooling and migrations the app or pipeline applies by itself are not. Each one should already be in the approved plan's **Data Changes** section with its reason for not being automated. A hand-run script that isn't there still gets attached, but say plainly that it wasn't in the plan.
+
+Attach each one per **Deployment Scripts** in CLAUDE.md — upload through the REST API (the MCP server can only download), link it as an `AttachedFile` whose comment holds the repo path and the exact run command with the environment as a placeholder, and replace a stale same-name attachment rather than adding a second copy. Never attach a file with a connection string, key, password, or sensitive field value in it.
+
+Report it on one line per script — `📜 Attached to AB#{id}: {file} — {how to run}` — or `No deployment scripts in this change` when there are none. A failed upload does not undo the PR; say `⚠️ NOT attached: {file} → AB#{id}` with the error and keep going.
 
 ### Closing Related Tasks
 
@@ -559,6 +574,7 @@ Present **one combined UAT checklist grouped by story** (Step 9 rules). Wait for
 
 1. Push the feature branch and create **one PR**: title `AB#{feature-id}: {feature title}`, source `feature/...`, target `BASE_BRANCH`.
 2. Link the **Feature and every implemented story** to the PR.
-3. Run **Closing Related Tasks** (Step 10) once, covering the child Tasks of every implemented story — one combined table, then the usual per-task hour prompts. Every story that got a Task in F4 has one to close here; a story whose Task creation was skipped gets one created and closed now, as in Step 10.
-4. Move each implemented story to `Code Review` (same fallback rules as Step 10). **Do not change the Feature's state** — the Feature is a parent container; it advances only when its child stories are verified/closed, not when the PR goes up for review.
-5. The Step 10 closing rule applies unchanged: only child **Tasks** are ever closed — here at PR creation, never the stories and never the Feature. Don't enable "Complete associated work items" when the PR is merged; it would transition the stories and the Feature along with the Tasks.
+3. Run **Attaching Deployment Scripts** (Step 10) over the whole feature diff. Each script goes on the **story** whose change needs it — never on the Feature, which promotions don't gate.
+4. Run **Closing Related Tasks** (Step 10) once, covering the child Tasks of every implemented story — one combined table, then the usual per-task hour prompts. Every story that got a Task in F4 has one to close here; a story whose Task creation was skipped gets one created and closed now, as in Step 10.
+5. Move each implemented story to `Code Review` (same fallback rules as Step 10). **Do not change the Feature's state** — the Feature is a parent container; it advances only when its child stories are verified/closed, not when the PR goes up for review.
+6. The Step 10 closing rule applies unchanged: only child **Tasks** are ever closed — here at PR creation, never the stories and never the Feature. Don't enable "Complete associated work items" when the PR is merged; it would transition the stories and the Feature along with the Tasks.

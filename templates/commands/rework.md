@@ -123,7 +123,7 @@ Each question below is about a cost that is cheap now and expensive once the cod
 | 2 | **Is each piece in the right layer?** Domain / Application / Infrastructure / API boundaries hold — no business rules in a controller, no Mongo or EF types in Domain, no HTTP concepts below API. | An `IMongoCollection<T>` parameter on a Domain method |
 | 3 | **What is the simplest plan that still meets every AC?** State it, then adopt it or say in one line why the heavier one is needed. | An interface with exactly one implementation, added "for testability" |
 | 4 | **What else touches the files being modified?** Name the callers. A change to a shared contract, DTO, or response shape is a breaking change until proven otherwise. | Editing a shared DTO with no note about its other consumers |
-| 5 | **What happens to data that already exists?** New required fields, schema changes, and backfills each need an answer for rows written before this change. | A non-nullable field added with no default and no backfill |
+| 5 | **What happens to data that already exists?** New required fields, schema changes, and backfills each need an answer for rows written before this change — and the answer should run itself: the project's run-once migration mechanism if it has one, not a script someone has to remember in every environment (see **Deployment Scripts** in CLAUDE.md). | A non-nullable field added with no default and no backfill; a `backfill.js` to run by hand on test, staging and prod when the API already runs one-time migrations at startup |
 | 6 | **How does it fail?** Partial failure, concurrent callers, a retried request. Is the operation idempotent, and does it need to be? | A multi-step write with no story for a crash between steps |
 | 7 | **Does it hold at real data volume?** Queries inside loops, unbounded result sets, a missing index, a list endpoint with no paging. | A `foreach` over accounts issuing one query each |
 | 8 | **Is it safe?** Authorization on every new endpoint, and **no sensitive field** (TIN, SSN, EIN, TaxId, BankAccountNumber, RoutingNumber, any `Encrypted*`) read, logged, returned, or projected — see the sensitive-data rule in CLAUDE.md. | A new endpoint returning a whole entity because it was convenient |
@@ -157,6 +157,10 @@ Present the plan to the user:
 
 ### Files to Delete (if any)
 - `path/to/old/file.cs` — {why it's being removed}
+
+### Data Changes (if any)
+- {what changes in existing data} — **automated** by {the project's run-once mechanism}: `{file}`
+- {what changes in existing data} — **hand-run** `{script path}`, because {which Deployment Scripts reason applies}. Attached to the work item when the PR goes up.
 
 ### Unit Tests
 - `path/to/new.tests.cs` — covers {scenario the rework adds or fixes}
@@ -389,8 +393,9 @@ Wait for the user's response before proceeding. Do NOT push until confirmed.
 
 1. Push the changes: `git push`
 2. **Do not post a rework summary comment.** Do not add a summary of what changed to the work item Discussion (`wit_work_item_comment_write` (action `add`)) or as a PR thread. The pushed commits and the PR diff are the record of what changed — a prose summary duplicates them and clutters the work item. If the reviewer left specific PR comment threads, reply on those threads directly (that is what `/resolve-feedback` and `/fix-review` do); otherwise post nothing.
-3. **Close related Tasks and log hours** — see "Closing Related Tasks" below. This includes the rework Task created in Step 5 as well as any other child Tasks that became `Completed` as a result of this rework round.
-4. **Move the work item back to `Code Review`** via `wit_work_item_write` (action `update`):
+3. **Attach deployment scripts.** Run `/implement`'s **Attaching Deployment Scripts** step against this branch — diff it against the PR's target branch (`git diff --name-only --diff-filter=AM {target}...HEAD`), so a script the original PR added and never attached is caught too. A script this rework changed is already attached in its old form: replace that attachment, don't add a second copy — a promotion that lists both versions invites someone to run the stale one. Same rules and report lines as in `/implement` (see **Deployment Scripts** in CLAUDE.md).
+4. **Close related Tasks and log hours** — see "Closing Related Tasks" below. This includes the rework Task created in Step 5 as well as any other child Tasks that became `Completed` as a result of this rework round.
+5. **Move the work item back to `Code Review`** via `wit_work_item_write` (action `update`):
    - **path**: `/fields/System.State`
    - **value**: `Code Review`
 

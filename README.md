@@ -279,6 +279,7 @@ Claude automatically:
 7. Generates a UAT checklist from acceptance criteria
 8. **Pauses for you to manually test**
 9. Creates the PR after you confirm
+10. **Attaches any hand-run deployment script** to the work item, with the run command in the attachment comment, so `/promote`, `/cherry-pick`, and `/deploy-release` list it for every environment. Data fixes are planned as run-once migrations the app applies by itself wherever the project has that mechanism; a hand-run script is the fallback and the plan says why
 
 **Implementing a whole Feature:** point `/implement` at a Feature work item and it implements the child User Stories in waves driven by the `Custom.Order` field — stories with the same order value are implemented in parallel (one agent per story, each in an isolated git worktree), and the next order value starts only after the previous wave is merged and green. Everything lands on one `feature/` branch with a single review, UAT pass, and PR that links every story.
 

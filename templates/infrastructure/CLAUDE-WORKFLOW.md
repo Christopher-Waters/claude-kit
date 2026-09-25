@@ -185,9 +185,47 @@ How the commands use this table:
 
 #### Deployment Scripts
 
-A SQL migration or a backfill script is attached to the work item it belongs to, and it has to run in **every** environment that item's code lands in — test, then staging, then prod. The promotion carries the code, never the script.
+A SQL migration, a data backfill, a rename script — anything someone has to **run by hand** against an environment — is attached to the work item it belongs to, and it has to run in **every** environment that item's code lands in — test, then staging, then prod. The promotion carries the code, never the script.
 
 `/promote`, `/cherry-pick` and `/deploy-release` therefore read the carried items' attachments (`wit_work_item` `action: get`, `expand: "Relations"`) and list any that look like something to run: an `AttachedFile` whose extension is **not** a document, image or video (`.docx .xlsx .csv .pdf .png .jpg .mp4` and friends). Everything else counts — the rule is loose on purpose, because a filename glanced at and dismissed costs seconds while a migration nobody ran costs an environment. The list appears before the confirmation, in the PR description, and again once the pipeline is green, which is when it actually has to be run.
+
+**Automate first — a hand-run script is the fallback.** When a change needs existing data corrected, backfilled or renamed, Claude plans it through the project's own run-once migration mechanism if it has one: a seeder that records finished migrations (COMPASS's `DataSeeder` and its `dataMigrations` collection), EF Core migrations applied at startup, DbUp, a migration step the pipeline already runs. Those run by themselves on every environment's deploy, after the new code is live, with the app's own connection string — nothing to remember, nothing to attach. A hand-run script is right only when the change can't live there, and the plan names which reason applies:
+
+- the project has no such mechanism — building one is its own work item, never folded into this one;
+- the script creates the database or tenant the app would run in (provisioning);
+- it touches something outside the app's own data stores (Azure resources, another system);
+- a person has to check the result before it is applied.
+
+**Claude always attaches the hand-run script it writes.** Committing it to the repo is not enough: the promotion commands look for scripts on the work item, never in the repo, so an unattached script is reported as `No deployment scripts attached` and goes unrun in staging or prod. Whenever Claude writes one — in `/implement`, `/rework`, or any other session — or tells someone to run one that isn't attached yet, it attaches it before finishing:
+
+- **Which files.** A file in the change that a person runs by hand, once per environment: `.sql`, a Mongo script, a `.sh` / `.ps1` / `.py` / `.js` data fix. The test: if the UAT checklist, the PR, or Claude's report tells someone to run it, it gets attached. Not app code, not tests or build tooling, not a migration the app or the pipeline applies by itself.
+- **Which work item.** The one whose change needs it. In a Feature run, the child story — never the Feature.
+- **The comment says how to run it.** The attachment comment carries the repo path and the exact command, with the environment as a placeholder (e.g. `scripts/tenant-provisioning/rename-manager-roles.sh — after each environment's deploy: RMR_CONFIRM='apply <Env>' scripts/…/rename-manager-roles.sh apply <Env>`). Whoever deploys to prod next month won't have this session.
+- **No secrets in the file.** Never attach a script with a connection string, key, password, or sensitive field value in it — the script reads those from the environment. If it can't, stop and tell the user instead of attaching.
+- **Replace, don't duplicate.** If an attachment with the same filename is already on the item, compare it with the repo copy (`curl` the attachment's `url` into `diff`). Identical → leave it. Different → swap it in one PATCH (`remove` the old relation by its index, then `add` the new one), so a promotion never lists two versions of one script.
+
+The Azure DevOps MCP server can only *download* attachments, so the upload goes through the REST API with an `az` token. The org and project GUID come from the work item's own `url` (`https://dev.azure.com/{org}/{projectId}/_apis/wit/workItems/{id}`):
+
+```bash
+TOKEN=$(az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv)
+BASE="https://dev.azure.com/{org}/{projectId}/_apis/wit"
+
+# 1. Upload the bytes — the response JSON carries the attachment "url"
+curl -sS -X POST "$BASE/attachments?fileName={file name}&api-version=7.1" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" \
+  --data-binary @"{repo path}"
+
+# 2. Link it to the work item. The body goes in a scratch file, because the run command
+#    in the comment usually has quotes that break inline JSON:
+#    [{"op":"test","path":"/rev","value":{rev from a fresh get}},
+#     {"op":"add","path":"/relations/-","value":{"rel":"AttachedFile","url":"{attachment url}",
+#      "attributes":{"comment":"{repo path} — {how to run}"}}}]
+curl -sS -X PATCH "$BASE/workitems/{id}?api-version=7.1" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json-patch+json" \
+  --data-binary @"{scratch dir}/attach-patch.json"
+```
+
+Never print the token. If `az` has no session, swap the bearer header for `-u ":$AZURE_DEVOPS_PAT"`; if neither works, ask the user to run `! az login`. A failed attachment never blocks the PR, and it is never skipped quietly — the summary says `⚠️ NOT attached: {file} → AB#{id}` so it can be fixed before the first promotion.
 
 **Reported, never enforced.** A script never blocks a promotion and never changes the gate check — it may already have been run, or be a reference copy. The person deploying decides; the commands only make sure nobody finds out afterwards.
 

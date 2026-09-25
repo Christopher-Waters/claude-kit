@@ -52,13 +52,15 @@ Show them with the table above, before the confirmation:
 ```
 📜 Scripts to run with this promotion:
 
-| Work Item | Script |
-|-----------|--------|
-| AB#1234 | 2026-09-11_add_delivery_index.sql |
-| AB#1240 | backfill-tenant-flags.ps1 |
+| Work Item | Script | How to run |
+|-----------|--------|------------|
+| AB#1234 | 2026-09-11_add_delivery_index.sql | sqlcmd -S <server> -d Compass -i 2026-09-11_add_delivery_index.sql |
+| AB#1240 | backfill-tenant-flags.ps1 | — |
 
 Download them from the work items. This command does not run them.
 ```
+
+`How to run` is the attachment's comment (`attributes.comment` on the relation) — `/implement` and `/rework` write the run command there when they attach a script. Show `—` when it is empty.
 
 If nothing carries an attachment, say `No deployment scripts attached` on one line and move on.
 
