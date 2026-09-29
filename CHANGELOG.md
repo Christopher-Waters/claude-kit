@@ -1,6 +1,8 @@
 # Changelog
 
-## 2.3.0 — 2026-09-29
+## 2.3.1 — 2026-09-29
+
+The first published release of this work. 2.3.0 was tagged locally but never published.
 
 ### `/implement` and `/rework` work in their own git worktree per ticket
 
@@ -21,6 +23,8 @@ Several Claude Code sessions on the same repo no longer clobber each other's wor
 ### Fixed
 
 - `/implement` no longer cuts a ticket from, or aims its PR at, another ticket's branch when the session's folder was left on one. A current branch starting with `feature/`, `story/`, `bugfix/`, `hotfix/`, `work/`, `cherry-pick/`, `release/` or `revert/` is skipped in favour of the PR target the project's CLAUDE.md names, or the user is asked.
+
+- `/rework` no longer pushes to a branch that no PR is watching. The latest PR's status now decides the branch: an `active` or `abandoned` PR's branch is built on. A `completed` PR, or one whose branch was deleted, gets a new branch from its target. That applies even when the merged branch still exists, so a squash-merged PR's changes don't show up again. The new branch gets a `-rework-{N}` suffix if the merged branch kept its name. Whenever the push lands on a branch without an active PR, Step 12 opens a new PR into the old PR's target and links it to the work item. Step 3's summary says up front when that will happen.
 
 ### Upgrade note
 

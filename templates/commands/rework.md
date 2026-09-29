@@ -12,7 +12,7 @@ The one exception is Step 2 (gathering feedback), which runs **before** the Step
 When Ultracode is in use, these rules apply:
 
 - **Fan out the read / analyze / verify work** — gathering feedback (Step 2), exploring the codebase (Step 4), and reviewing + verifying the diff and AC coverage (Steps 9–10) are run as `Workflow` scripts with one agent per independent unit (per comment, per subsystem, per review dimension, per acceptance criterion). Each agent returns **structured findings** via a `schema`; you synthesize the results in the main loop.
-- **Never fan out an interactive gate or a write.** Every user prompt (Steps 3, 4-approval, 5, 10-decisions, 11) and every work-item or git mutation (Step 0 worktree, Step 5 create, Step 6 branch, Step 7 implement, Step 12 push/close, Step 13 cleanup) stays in the **main loop**. Workflow agents here are **read-only analysts** — they use MCP read tools, `Read`, and `Grep`, and they return data. They do not create or close work items, switch branches, write code, or ask the user anything.
+- **Never fan out an interactive gate or a write.** Every user prompt (Steps 3, 4-approval, 5, 10-decisions, 11) and every work-item or git mutation (Step 0 worktree, Step 5 create, Step 6 branch, Step 7 implement, Step 12 push/PR/close, Step 13 cleanup) stays in the **main loop**. Workflow agents here are **read-only analysts** — they use MCP read tools, `Read`, and `Grep`, and they return data. They do not create or close work items, switch branches, write code, or ask the user anything.
 - **Give every Workflow agent the ticket's worktree path** (Step 0) — that is where the code under analysis lives, not the folder the session started in.
 - **Stay in the loop between phases.** Run one `Workflow` per phase, read its results, present/await the user as the steps require, then launch the next phase's workflow. This is several short workflows in sequence — not one monolithic run that tries to swallow the approval gates.
 - **Review uses the canonical find → adversarially-verify pipeline** (Step 10): fan out per dimension, then spawn skeptic verifiers per finding and drop findings the majority refute, so only confirmed issues reach the user.
@@ -29,7 +29,7 @@ Find the most recent PR linked to this work item:
 2. For each linked PR, fetch its details via `repo_get_pull_request_by_id` and record the **creationDate**
 3. Identify the **most recent PR** by creation date — this is the baseline for detecting new feedback
 
-Save the PR's `creationDate` as `LAST_PR_DATE` — everything after this timestamp is new feedback. Also save its **source branch** and **target branch** (`sourceRefName` / `targetRefName`, minus `refs/heads/`) — Step 0 needs both.
+Save the PR's `creationDate` as `LAST_PR_DATE` — everything after this timestamp is new feedback. Also save its **source branch** and **target branch** (`sourceRefName` / `targetRefName`, minus `refs/heads/`) — Step 0 needs both — and its **status** (`active`, `completed`, or `abandoned`). The status decides which branch the rework builds on (Step 0c) and whether Step 12 has to open a new PR.
 
 ## Step 0: Set Up the Ticket's Workspace
 
@@ -67,14 +67,19 @@ Look at every **other** worktree in `git worktree list --porcelain` whose folder
   Remove with `git -C "{MAIN}" worktree remove "{path}"`, then `git -C "{MAIN}" branch -D "{branch}"`. **Never `--force`, never `rm` the folder.** If a removal fails because another session removed it first, ignore that and move on.
 - **Anything else stays.** List what was kept in one line, with the reason — `Kept: ../CSIPay-AB5301 (2 uncommitted files), ../CSIPay-AB5310 (locked — another session, or abandoned: git worktree unlock "{path}")`.
 
-### 0c. Put the worktree on the PR's branch
+### 0c. Put the worktree on the rework's branch
 
-Take the first case that matches:
+**First, pick `BRANCH`** — the branch this rework builds on:
 
-1. **A worktree is already on `SOURCE`** — a `branch refs/heads/{SOURCE}` line in `git worktree list --porcelain` → use that worktree as `WT`, wherever it is (a hand-made folder, or even `MAIN` itself). Don't create a second one, and don't fail because the branch is checked out elsewhere. Bring it up to date with `git -C "{WT}" pull --ff-only`.
-2. **`WT` is already a worktree, but on something else** (a detached HEAD, another branch) → show `git -C "{WT}" status -sb` and ask whether to switch it to `SOURCE` or stop.
+- **The PR is `active` or `abandoned`, and `SOURCE` is still on origin** (`git -C "{MAIN}" rev-parse --verify --quiet "refs/remotes/origin/{SOURCE}"` succeeds) → `BRANCH` is `SOURCE`. The rework continues the unmerged work.
+- **Otherwise** → `BRANCH` is a **new branch** from the PR's target. This covers a `completed` PR (merged), or `SOURCE` deleted. A completed PR's work is already in the target, so the rework starts there even if `SOURCE` still exists. Building on the merged branch would make the new PR show the old changes again after a squash merge. Name the new branch by `/implement` Step 4's convention (`{prefix}AB#{id}-{sanitized-title}`). If that name is still on origin (the merged branch was kept), append `-rework-{N}`, where `{N}` is the rework round Step 5 will use: existing `Rework AB#{id}` child Tasks + 1.
+
+Then take the first case that matches:
+
+1. **A worktree is already on `BRANCH`** — a `branch refs/heads/{BRANCH}` line in `git worktree list --porcelain` → use that worktree as `WT`, wherever it is (a hand-made folder, or even `MAIN` itself). Don't create a second one, and don't fail because the branch is checked out elsewhere. If `BRANCH` is `SOURCE`, bring it up to date with `git -C "{WT}" pull --ff-only`.
+2. **`WT` is already a worktree, but on something else** (a detached HEAD, another branch) → show `git -C "{WT}" status -sb` and ask whether to switch it to `BRANCH` or stop.
 3. **`WT` exists but git doesn't know it** (not in the list even after 0a's prune) → stop and ask the user to delete or rename it. Its contents aren't in git, so there is no way to tell whether anything in it is worth keeping.
-4. **`SOURCE` is still on origin** (`git -C "{MAIN}" rev-parse --verify --quiet "refs/remotes/origin/{SOURCE}"` succeeds) → check it out, tracking `origin/{SOURCE}`:
+4. **`BRANCH` is `SOURCE`** → check it out, tracking `origin/{SOURCE}`:
    - **No local branch:**
 
      ```bash
@@ -83,13 +88,13 @@ Take the first case that matches:
    - **A local branch exists:** run `git -C "{MAIN}" worktree add "{WT}" "{SOURCE}"`, then `git -C "{WT}" branch --set-upstream-to "origin/{SOURCE}"`, then `git -C "{WT}" pull --ff-only`.
 
    If `pull --ff-only` fails, the local branch and origin have diverged. Stop and show both sides (`git -C "{WT}" log --oneline --left-right '@{u}...HEAD'`). Never merge, rebase, or reset without asking.
-5. **`SOURCE` was deleted** (its PR merged) → create a new branch from the PR's **target**. Name it by `/implement` Step 4's convention (`{prefix}AB#{id}-{sanitized-title}`) — the rule from before worktrees, now inside the worktree:
+5. **`BRANCH` is new** → create it from the PR's **target** — the rule from before worktrees, now inside the worktree:
 
    ```bash
-   git -C "{MAIN}" worktree add --no-track -b "{new-branch}" "{WT}" "origin/{TARGET}"
+   git -C "{MAIN}" worktree add --no-track -b "{BRANCH}" "{WT}" "origin/{TARGET}"
    ```
 
-   It has no upstream until Step 12 pushes it with `-u`. If `-b` fails because a leftover local branch has that name, show what it holds that the target doesn't (`git -C "{MAIN}" log --oneline "origin/{TARGET}..{new-branch}"`) and ask whether to delete it (`git -C "{MAIN}" branch -D "{new-branch}"`) and retry, or reuse it.
+   It has no upstream until Step 12 pushes it with `-u`, and no PR until Step 12 opens one. If `-b` fails because a leftover local branch has that name, show what it holds that the target doesn't (`git -C "{MAIN}" log --oneline "origin/{TARGET}..{BRANCH}"`). Then ask whether to delete it (`git -C "{MAIN}" branch -D "{BRANCH}"`) and retry, or reuse it.
 
 Then **lock it** so another session's 0b leaves it alone — a clean, fully pushed worktree would otherwise pass every tidy check the moment its PR merges:
 
@@ -129,7 +134,7 @@ Report the workspace in one short block, then go on to Step 2:
 
 ```
 Workspace for AB#{id}: {WT}
-  {reused, on {SOURCE} | new, on {SOURCE} from origin | new branch {new-branch} from origin/{TARGET} — PR #{n}'s branch was deleted}
+  {reused, on {BRANCH} | new, on {SOURCE} from origin | new branch {BRANCH} from origin/{TARGET} — PR #{n} {was completed | lost its branch}}
   Tidied: {removed worktrees, or "nothing to tidy"}    Kept: {kept worktrees + reason, or omit}
   Edits there need approval once — run `/add-dir {WT}` to allow them for this session.
 ```
@@ -175,7 +180,8 @@ Present a summary of the rework feedback to the user. **Every feedback item must
 ```
 ## Rework for AB#{id}: {title}
 
-**Last PR:** #{pr_id} (created {date})
+**Last PR:** #{pr_id} (created {date}, {status})
+{only if status is not active: "PR #{pr_id} is {status} — this rework goes up as a new PR."}
 **New comments:** {count}
 
 ### Current Acceptance Criteria
@@ -383,15 +389,15 @@ If the user cancels, skip task creation and proceed — note "No rework task cre
 
 ## Step 6: Switch to Existing Branch
 
-**In a worktree** (the default), there is nothing to switch. Step 0c has already put `WT` on the previous PR's branch and pulled it — or, if that PR merged and its branch was deleted, on a new branch from the PR's target. Confirm with `git -C "{WT}" status -sb` and go on to "Move the Work Item to Active".
+**In a worktree** (the default), there is nothing to switch. Step 0c has already put `WT` on the previous PR's branch and pulled it. If that PR was completed or its branch deleted, Step 0c put it on a new branch from the PR's target instead. Confirm with `git -C "{WT}" status -sb` and go on to "Move the Work Item to Active".
 
-**Working in place**, the work item already has a branch from the previous PR. Switch to it:
+**Working in place**, if the PR is `active` or `abandoned`, the work item already has a branch from the previous PR. Switch to it:
 
 1. Get the source branch name from the most recent PR
 2. Switch to that branch: `git checkout <branch-name>`
 3. Pull the latest: `git pull`
 
-If the PR was completed/merged and the branch was deleted, create a new branch from the PR's target branch following the same naming convention as `/implement` Step 4.
+If the PR was completed, or its branch was deleted, create a new branch from the PR's target branch instead, following the same naming convention as `/implement` Step 4 (`git fetch --prune origin`, then `git checkout -b "<branch-name>" "origin/<target>"`). Don't build on a completed PR's branch even if it still exists. Add the `-rework-{N}` suffix when the name is still on origin. Step 0c explains both rules.
 
 ### Move the Work Item to Active
 
@@ -499,18 +505,29 @@ Wait for the user's response before proceeding. Do NOT push until confirmed.
 
 ## Step 12: Push and Update
 
-1. Push the changes: `git push` (in a worktree: `git -C "{WT}" push` — or `git -C "{WT}" push -u origin HEAD` when Step 0c created a new branch because the old one was deleted; it has no upstream yet)
-2. **Do not post a rework summary comment.** Do not add a summary of what changed to the work item Discussion (`wit_work_item_comment_write` (action `add`)) or as a PR thread. The pushed commits and the PR diff are the record of what changed — a prose summary duplicates them and clutters the work item. If the reviewer left specific PR comment threads, reply on those threads directly (that is what `/resolve-feedback` and `/fix-review` do); otherwise post nothing.
-3. **Attach deployment scripts.** Run `/implement`'s **Attaching Deployment Scripts** step against this branch — diff it against the PR's target branch (`git diff --name-only --diff-filter=AM {target}...HEAD`), so a script the original PR added and never attached is caught too. A script this rework changed is already attached in its old form: replace that attachment, don't add a second copy — a promotion that lists both versions invites someone to run the stale one. Same rules and report lines as in `/implement` (see **Deployment Scripts** in CLAUDE.md).
-4. **Close related Tasks and log hours** — see "Closing Related Tasks" below. This includes the rework Task created in Step 5 as well as any other child Tasks that became `Completed` as a result of this rework round.
-5. **Move the work item back to `Code Review`** via `wit_work_item_write` (action `update`):
+1. Push the changes: `git push` (in a worktree: `git -C "{WT}" push`). A **new branch** from Step 0c case 5, or from the in-place fallback in Step 6, has no upstream yet, so push it with `git push -u origin HEAD` (`git -C "{WT}" push -u origin HEAD`).
+2. **Open a PR if none is active.** A push only reaches a reviewer through an active PR. Re-read the latest PR's status, since it may have changed during the rework:
+   - **Still `active`** → the push updated it. Nothing to create.
+   - **`completed` or `abandoned`, or the rework is on a new branch** → nothing is reviewing these commits yet. Create a PR the way `/implement` Step 10 does:
+     - **sourceRefName**: `refs/heads/{branch}` — the branch just pushed
+     - **targetRefName**: `refs/heads/{target}` — the latest PR's target
+     - **title**: `AB#{id}: {work item title} (rework round {N})`
+     - **description**: `Rework round {N} of AB#{id}. Follows PR #{old} ({status}).` Keep it to that one line; item 3 applies.
+     - **labels**: `["hotfix"]` if the work item type is Hot Fix
+
+     Link it to the work item via `wit_work_item_link_write` (action `link_to_pull_request`). Report `Opened PR #{new} → {target} (PR #{old} is {status})`. The next `/rework` finds this PR as the latest.
+   - **Completed during this rework** (it was `active` at Step 1, so the rework was built on the old branch) → open the new PR the same way, but warn first: if #{old} was squash-merged, the new PR shows its changes again. Offer to merge `origin/{target}` into the branch and push again before opening the PR, which clears them.
+3. **Do not post a rework summary comment.** Do not add a summary of what changed to the work item Discussion (`wit_work_item_comment_write` (action `add`)) or as a PR thread. The pushed commits and the PR diff are the record of what changed — a prose summary duplicates them and clutters the work item. If the reviewer left specific PR comment threads, reply on those threads directly (that is what `/resolve-feedback` and `/fix-review` do); otherwise post nothing.
+4. **Attach deployment scripts.** Run `/implement`'s **Attaching Deployment Scripts** step against this branch — diff it against the PR's target branch (`git diff --name-only --diff-filter=AM {target}...HEAD`), so a script the original PR added and never attached is caught too. A script this rework changed is already attached in its old form: replace that attachment, don't add a second copy — a promotion that lists both versions invites someone to run the stale one. Same rules and report lines as in `/implement` (see **Deployment Scripts** in CLAUDE.md).
+5. **Close related Tasks and log hours** — see "Closing Related Tasks" below. This includes the rework Task created in Step 5 as well as any other child Tasks that became `Completed` as a result of this rework round.
+6. **Move the work item back to `Code Review`** via `wit_work_item_write` (action `update`):
    - **path**: `/fields/System.State`
    - **value**: `Code Review`
 
    Rework is triggered by reviewer feedback, so the item was likely in `Active` / `In Progress` / `Rework` while the fixes were being made. Pushing the rework hands it back to the reviewer, so it belongs in `Code Review` again.
 
    If the project's process template does not have a `Code Review` state (the update call returns an invalid-state error), fall back in this order: `Resolved` → `In Review` → leave the current state and warn the user. Do not silently swallow the error.
-6. **Remove the ticket's worktree** — Step 13, once everything above is done.
+7. **Remove the ticket's worktree** — Step 13, once everything above is done.
 
 > **PR completion closes the Task only.** When the PR is later completed/merged, only the child **Task** may be closed — never the parent User Story or Bug. Azure DevOps's "Complete associated work items" option transitions *every* linked work item (including the parent the PR is linked to), so do **not** enable it when completing the PR. Close the child Task explicitly instead; the parent stays in `Code Review` until it is promoted through `dev → test → staging → prod` (see **Work Item States ↔ Environments** in CLAUDE.md).
 
