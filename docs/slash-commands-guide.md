@@ -46,7 +46,7 @@ Looks good. Also make sure the amount column is formatted as currency
 with 2 decimal places, and exclude voided payments from the export.
 ```
 
-**Claude creates the branch** (`story/AB#4521-admin-can-export-payment-history`) and **explores the codebase**, then presents the plan:
+**Claude explores the codebase** in the ticket's own worktree, `../YourProject-AB4521`. It set that up before reading the work item, so other sessions in the same repo aren't disturbed. Then it presents the plan:
 
 ```
 ## Implementation Plan for AB#4521
@@ -84,7 +84,7 @@ Approve this plan? (yes / no / suggest changes)
 yes
 ```
 
-Claude implements, runs tests/lint/build, then presents the UAT checklist:
+Claude creates the branch (`story/AB#4521-admin-can-export-payment-history`) in the worktree, implements, runs tests/lint/build, then presents the UAT checklist:
 
 ```
 Automated checks passed and the UAT checklist is ready.
@@ -111,7 +111,9 @@ Did manual testing pass?
 testing passed
 ```
 
-Claude creates the PR targeting `main`, links AB#4521, closes the child Task with its hours, and moves the story to `Code Review`. Merging that PR deploys nothing — the story reaches Dev when `main` is promoted (`/promote main dev`).
+Claude creates the PR targeting `main`, links AB#4521, closes the child Task with its hours, and moves the story to `Code Review`. Then it removes `../YourProject-AB4521` — the branch is safe on origin, and `/rework AB#4521` recreates the worktree from it. Merging that PR deploys nothing — the story reaches Dev when `main` is promoted (`/promote main dev`).
+
+To skip the worktree and work in the current folder as before, add **work in place**: `/implement AB#4521 work in place`.
 
 ---
 

@@ -10,10 +10,120 @@ This command **can** orchestrate its analysis phases with the `Workflow` tool, b
 When recommending a default in the Step 2 prompt, suggest **yes** for multi-subsystem / multi-AC work and **no** for trivial changes.
 
 The remaining rules apply whenever Ultracode is in use:
-- **Never fan out an interactive gate or a write.** Every user prompt (Steps 2, 3-approval, 8-decisions, 9) and every git / work-item mutation (Steps 4, 5, 10) stays in the **main loop**. Workflow agents here are **read-only analysts** — they use MCP read tools, `Read`, and `Grep`, and return structured findings. They do not write code, create/close work items, switch branches, or ask the user anything.
+- **Never fan out an interactive gate or a write.** Every user prompt (Steps 2, 3-approval, 8-decisions, 9) and every git / work-item mutation (Steps 0, 4, 5, 10, 11) stays in the **main loop**. Workflow agents here are **read-only analysts** — they use MCP read tools, `Read`, and `Grep`, and return structured findings. They do not write code, create/close work items, switch branches, or ask the user anything.
+- **Give every Workflow agent the ticket's worktree path** (Step 0) — that is where the code under analysis lives, not the folder the session started in.
 - **Stay in the loop between phases** — one short workflow per phase, read its results, present/await the user, then continue.
 
 If the `Workflow` tool is unavailable, run each phase sequentially in the main loop — the output is identical, just slower.
+
+## Step 0: Set Up the Ticket's Workspace
+
+Developers run several Claude Code sessions against the same repo at once, one per ticket. If every session `git checkout`s in the folder it started in, they clobber each other's working tree. So each ticket gets its own **git worktree** in a sibling folder, `../{repo}-AB{id}` (e.g. `../CSIPay-AB5373`), and every later step runs there. The folder the session started in is never checked out, committed to, or edited.
+
+This step runs **first** — it needs only the ticket id — and before any git or file change. It is setup, not a gate: it prompts only where a case below says so.
+
+**Opt-out.** If the user says **"work in place"** or **"no worktree"** — in the invocation (`/implement 1234 work in place`; strip the phrase before reading the id) or at any point before Step 4 — skip this step, skip Step 11, and ignore every worktree note below: the command runs exactly as it did before worktrees, branching in the current folder with `BASE_BRANCH` captured by Step 4's in-place rule. If Step 0 has already run, give back the worktree it made (it has no branch and no changes yet): `git worktree unlock "{WT}"`, then `git worktree remove "{WT}"`, then carry on in place.
+
+Shell variables do not survive between Bash calls. Resolve each value once, then write the **literal absolute paths and branch names** into every later command.
+
+### 0a. Resolve the repo and fetch
+
+```bash
+git worktree list --porcelain | sed -n '1s/^worktree //p'   # MAIN — the main checkout
+git fetch --prune origin
+git worktree prune
+```
+
+- **`MAIN`** is the first entry of `git worktree list` — the main checkout, even when the session started in a subfolder or inside another ticket's worktree (`--show-toplevel` would return that worktree, and the new one would land at `CSIPay-AB5375-AB5380`).
+- **`REPO`** is `basename` of `MAIN`; **`WT`** is `{dirname of MAIN}/{REPO}-AB{id}` — always the absolute path.
+- **`--prune`** matters: without it a remote branch deleted after its PR merged still looks alive locally, and 0c's "deleted on the remote" check never fires.
+- **`git worktree prune`** forgets worktrees whose folders were deleted by hand, so a stale leftover can be recreated cleanly.
+
+### 0b. Pick `BASE_BRANCH` — the branch this ticket is cut from and its PR targets
+
+```bash
+git symbolic-ref --quiet --short HEAD   # CURRENT — empty on a detached HEAD
+```
+
+- **`CURRENT` is empty, or starts with a ticket prefix** — `feature/`, `story/`, `bugfix/`, `hotfix/`, `work/`, `cherry-pick/`, `release/`, `revert/` → **don't use it.** This folder was left on another ticket's branch; cutting from it would put that ticket's commits in this PR and aim the PR at the wrong branch. Use the PR target the project's CLAUDE.md names (e.g. CSIPay: "PRs always target `main`"). If CLAUDE.md doesn't name one, ask:
+
+  ```
+  This folder is on {CURRENT}, another ticket's branch. Which branch should AB#{id}
+  be cut from, and its PR target? (suggested: {origin's default branch — `git symbolic-ref --short refs/remotes/origin/HEAD`})
+  ```
+- **Otherwise** `BASE_BRANCH` is `CURRENT` — the same rule as before worktrees (start on `prod` for a production hot fix, and so on).
+
+`origin/{BASE_BRANCH}` must exist — the worktree is cut from the remote branch, not from the local one, which may be behind or carry unpushed commits. If it doesn't, say so and ask.
+
+### 0c. Tidy other tickets' worktrees
+
+Look at every **other** worktree in `git worktree list --porcelain` whose folder is named `{REPO}-AB*`. Never touch `MAIN`, this ticket's `WT`, a worktree on this ticket's branch (`*/AB#{id}-*` — 0d reuses it), or any folder outside that naming pattern.
+
+- **Locked → skip it.** A lock means another session is working in it right now; 0d locks every worktree it hands out.
+- **Otherwise remove it only if all three hold:**
+  1. **Nothing uncommitted** — `git -C "{path}" status --porcelain` prints nothing.
+  2. **Nothing unpushed** — its branch has an upstream, and either `git -C "{path}" rev-list --count '@{u}..HEAD'` prints `0`, or the upstream is **gone** (`git -C "{path}" for-each-ref --format='%(upstream:track)' "refs/heads/{branch}"` prints `[gone]` — its PR merged and the remote branch was deleted). For a gone upstream, also confirm nothing was committed after the last push: find the branch's pull request (`repo_pull_request`, by source branch, any status) and check its `lastMergeSourceCommit` equals `git -C "{path}" rev-parse HEAD`. A branch that was **never pushed** (no upstream), a detached HEAD, a HEAD that differs from what the PR merged, or no PR found — all fail this check.
+  3. **Merged, or deleted on the remote** — the upstream is `[gone]`, or `git -C "{MAIN}" merge-base --is-ancestor "{branch}" "origin/{BASE_BRANCH}"` succeeds.
+
+  Remove with `git -C "{MAIN}" worktree remove "{path}"`, then `git -C "{MAIN}" branch -D "{branch}"`. **Never `--force`, never `rm` the folder.** If a removal fails because another session removed it first, ignore that and move on.
+- **Anything else stays.** List what was kept in one line, with the reason — `Kept: ../CSIPay-AB5301 (2 uncommitted files), ../CSIPay-AB5310 (locked — another session, or abandoned: git worktree unlock "{path}")`.
+
+### 0d. Create or reuse the ticket's worktree
+
+Take the first case that matches:
+
+1. **A worktree is already on this ticket's branch** — a `branch refs/heads/*/AB#{id}-*` line in `git worktree list --porcelain` → use that worktree as `WT`, wherever it is (a hand-made folder, or even `MAIN` itself). Don't create a second one, and don't fail because the branch is checked out elsewhere.
+2. **`WT` is already a worktree** (an earlier run stopped before Step 4 and left it detached) → reuse it.
+3. **`WT` exists but git doesn't know it** (not in the list even after 0a's prune) → stop and ask the user to delete or rename it. Its contents aren't in git, so there is no way to tell whether anything in it is worth keeping.
+4. **A local branch `*/AB#{id}-*` exists** but isn't checked out anywhere → `git -C "{MAIN}" worktree add "{WT}" "{branch}"` (this is the old "if the branch already exists, switch to it" rule). If more than one branch matches, list them and ask which.
+5. **Otherwise** create it **detached** at the base — the branch itself is created in Step 4, after the plan is approved, same as before worktrees:
+
+   ```bash
+   git -C "{MAIN}" worktree add --detach "{WT}" "origin/{BASE_BRANCH}"
+   ```
+
+Then **lock it** so another session's 0c leaves it alone — a new, clean worktree with no commits would otherwise pass every tidy check:
+
+```bash
+git -C "{MAIN}" worktree lock --reason "AB#{id} — /implement in progress" "{WT}"
+```
+
+Skip the lock when `WT` is `MAIN` (the main checkout can't be locked, and 0c never touches it). If the worktree is **already locked**, another session may still be working this ticket. Say so in one line — `AB#{id}'s worktree is locked ({reason}) — if another session is still on this ticket, both will edit the same files` — and carry on in it.
+
+### 0e. Copy the local files git doesn't carry
+
+A new worktree has only tracked files. Copy in `.claude/settings.local.json` (the user's local permission rules) and every gitignored `.env.local` / `*.local.json`. Copy nothing that already exists in the worktree:
+
+```bash
+cd "{MAIN}" && {
+  [ -f .claude/settings.local.json ] && echo .claude/settings.local.json
+  git ls-files --others --ignored --exclude-standard -- ':(glob)**/.env.local' ':(glob)**/*.local.json' ':(exclude,glob)**/node_modules/**'
+} | sort -u | while IFS= read -r f; do
+  [ -e "{WT}/$f" ] || { mkdir -p "{WT}/$(dirname "$f")" && cp "$f" "{WT}/$f"; }
+done
+```
+
+**None of these may ever be committed.** The `.env.local` / `*.local.json` files are gitignored by construction. `.claude/settings.local.json` may not be, so if `git -C "{WT}" check-ignore -q .claude/settings.local.json` fails, append `.claude/settings.local.json` to `{MAIN}/.git/info/exclude`. That file is local and shared by every worktree of the repo, so the exclude covers them all and is itself never committed.
+
+`node_modules` is not copied. Step 5 installs it, only when the plan touches the frontend.
+
+### 0f. Work only in the ticket's worktree
+
+- **Every later step runs in `WT`** — exploration, implementation, build, tests, lint, commits, review. Claude Code can reset the shell to the session's folder between calls, so run git as `git -C "{WT}" …`, run everything else as `cd "{WT}" && …`, and use absolute paths for `Read`/`Edit`/`Write`.
+- **Pass `WT` to every subagent and Workflow agent**, in so many words: `The code for AB#{id} is in {WT}. Read, edit, build, and test only there — never in {MAIN}.`
+- **Diff against `origin/{BASE_BRANCH}`**, not `{BASE_BRANCH}`, wherever a later step compares with the base. The worktree was cut from the remote branch, and the local one may be behind.
+- **Quote every branch name** — the `#` in `story/AB#5373-…` starts a comment or a glob in some shells.
+- `WT` is outside the folder the session started in, so Claude Code asks before the first edit there. Tell the user once, in the report below.
+- Sessions sharing a repo still share **local ports and the Dev database**. If this ticket's dev server or integration tests collide with another session's, run them one at a time.
+
+Report the workspace in one short block, then go on to Step 1:
+
+```
+Workspace for AB#{id}: {WT}
+  {new, detached at origin/{BASE_BRANCH} | reused, on {branch}}    PR target: {BASE_BRANCH}
+  Tidied: {removed worktrees, or "nothing to tidy"}    Kept: {kept worktrees + reason, or omit}
+  Edits there need approval once — run `/add-dir {WT}` to allow them for this session.
+```
 
 ## Step 1: Read the Work Item
 
@@ -161,7 +271,7 @@ Approve this plan? (yes / no / suggest changes)
 
 Only create the branch after the plan is approved.
 
-Capture the current branch as the PR target — do NOT hardcode any branch name:
+Capture the PR target — do NOT hardcode any branch name. **In a worktree** (the default), `BASE_BRANCH` is the branch Step 0b picked. **Working in place**, capture the current branch:
 
 ```bash
 BASE_BRANCH=$(git symbolic-ref --short HEAD)
@@ -181,12 +291,17 @@ Construct the branch name as `{prefix}AB#{id}-{sanitized-title}`:
 - Sanitize the title: lowercase, replace non-alphanumeric characters (except hyphens) with hyphens, collapse consecutive hyphens, truncate to 50 characters, trim leading/trailing hyphens
 - Example: Feature AB#1234 "Add Payment History Export" → `feature/AB#1234-add-payment-history-export`
 
-Create and switch to the branch:
+Create and switch to the branch. **In a worktree** — Step 0 left it detached at `origin/{BASE_BRANCH}`, so the branch starts there, with no upstream until Step 10 pushes it:
 ```bash
-git checkout -b <branch-name>
+git -C "{WT}" switch -c "<branch-name>"
 ```
 
-If the branch already exists, switch to it with `git checkout <branch-name>` instead of failing.
+**Working in place:**
+```bash
+git checkout -b "<branch-name>"
+```
+
+If the branch already exists, switch to it with `git checkout "<branch-name>"` instead of failing. In a worktree, Step 0d has already put the worktree on an existing branch for this ticket — there is nothing to create.
 
 Remember the `BASE_BRANCH` — you will need it for the PR step.
 
@@ -289,7 +404,9 @@ Remember the Task ID. Step 10 closes it.
 
 ## Step 5: Implement
 
-1. **Implement** using backend and/or frontend agents according to the approved plan
+**In a worktree**, install frontend dependencies first — only if the approved plan touches the frontend. A new worktree has no `node_modules`, so run `npm install` in its client folder (`cd "{WT}/{client folder}" && npm install`). A backend-only plan skips the install; `dotnet build` restores its own packages. Steps 6–7 then skip the uninstalled client folder and report it as `frontend skipped — untouched by this change, not installed in the worktree` rather than failing on it.
+
+1. **Implement** using backend and/or frontend agents according to the approved plan — each agent is told to work only in `WT` (Step 0f)
 2. **Write the unit tests** listed in the plan's "Unit Tests" section alongside the implementation — not after
 3. **Generate mockup** if there are UI changes
 
@@ -387,7 +504,7 @@ Wait for the user's response before proceeding. Do NOT create a PR until confirm
 
 ## Step 10: Push, Create PR, and Update Work Item
 
-1. Push the branch: `git push -u origin HEAD`
+1. Push the branch: `git push -u origin HEAD` (in a worktree: `git -C "{WT}" push -u origin HEAD`)
 2. Create a PR via Azure DevOps MCP:
    - **sourceRefName**: `refs/heads/{branch-name}`
    - **targetRefName**: `refs/heads/{BASE_BRANCH}` (the branch captured in Step 4)
@@ -401,6 +518,7 @@ Wait for the user's response before proceeding. Do NOT create a PR until confirm
    - **value**: `Code Review`
 
    If the project's process template does not have a `Code Review` state (the update call returns an invalid-state error), fall back in this order: `Resolved` → `In Review` → leave the current state and warn the user that the state could not be advanced automatically. Do not silently swallow the error.
+7. **Remove the ticket's worktree** — Step 11, once everything above is done.
 
 > **Only the Task ever gets closed — never the parent.** The child Task is closed here, at PR creation (step 5 above). When the PR is later completed/merged, do **not** enable Azure DevOps's "Complete associated work items" option: it transitions *every* linked work item, including the parent this PR is linked to. The parent User Story or Bug stays in `Code Review`: merging this PR into `main` deploys nothing, and promoting to `dev` deploys the code but **leaves the state alone** — the developer moves it to `Ready for Testing` once they have checked it on Dev. From there `/promote` and `/deploy-release` advance it to `Testing` → `Staging` → `Deployed` across `test → staging → prod` (see **Work Item States ↔ Environments** in CLAUDE.md).
 
@@ -479,6 +597,33 @@ Confirm with a summary line per task: `Closed AB#xxxx — {hours}h logged (estim
 
 **The Task closes now, at PR creation — not at merge.** The work is done and the hours are known; waiting until merge means the hours get logged days later, or not at all.
 
+## Step 11: Remove the Ticket's Worktree
+
+Skip this step when working in place.
+
+This runs **last**: after the PR exists and every Step 10 prompt, the Task-closing ones included, is answered. A failed push therefore never loses work, and the attachment and diff steps still have the worktree to read from. The branch is safe on origin now, and `/rework AB#{id}` recreates the worktree from it.
+
+1. **Unlock it** — this session is done with it: `git -C "{MAIN}" worktree unlock "{WT}"`. Unlock even if step 3 ends up keeping it, so a later Step 0c can tidy it once it's clean, pushed, and merged.
+2. **Check it's safe to remove:**
+
+   ```bash
+   git -C "{WT}" status --porcelain              # must print nothing
+   git -C "{WT}" rev-list --count '@{u}..HEAD'   # must print 0
+   ```
+3. **Both pass** → remove the worktree, then the local branch:
+
+   ```bash
+   git -C "{MAIN}" worktree remove "{WT}"
+   git -C "{MAIN}" branch -D "{branch}"
+   ```
+
+   Report: `Removed {WT} and local branch {branch} — the branch is on origin; /rework AB#{id} brings it back.`
+
+   **Either fails** → keep it, and say exactly what's left: the `git -C "{WT}" status --short` lines, or the unpushed commits (`git -C "{WT}" log --oneline '@{u}..HEAD'`). **Never `--force`, never `rm` the folder.**
+4. **Never remove a worktree the session is standing in.**
+   - If the folder this session started in is `WT` or inside it, don't remove it — that would pull the folder out from under the session. Print the command for the user to run from another folder instead: `git -C "{MAIN}" worktree remove "{WT}" && git -C "{MAIN}" branch -D "{branch}"`.
+   - If `WT` is `MAIN` (Step 0d reused a branch already checked out there), there is nothing to remove.
+
 ## Feature Workflow (ordered story waves)
 
 Used when the work item passed to `/implement` is a **Feature**. The Feature's child User Stories are implemented in **waves** driven by the custom order field (`Custom.Order`): all stories sharing the same order value run **in parallel** (one implementation agent each), and waves run sequentially in ascending order — wave 2 starts only after wave 1 is merged, built, and green, so later stories can build on earlier ones.
@@ -526,7 +671,7 @@ Include the Step 2 reasoning-effort recommendation (a multi-story Feature is alm
 
 ### F3: Create the Feature Branch
 
-Capture `BASE_BRANCH` and create `feature/AB#{feature-id}-{sanitized-title}` per Step 4 rules. All story work merges into this branch; the single PR in F7 targets `BASE_BRANCH`.
+Capture `BASE_BRANCH` and create `feature/AB#{feature-id}-{sanitized-title}` per Step 4 rules. Step 0 ran with the **Feature's** id, so the Feature has its own ticket worktree, `../{repo}-AB{feature-id}`, and the feature branch is created there. All story work merges into this branch; the single PR in F7 targets `BASE_BRANCH`.
 
 ### F4: Execute Waves
 
@@ -547,16 +692,16 @@ For each wave in ascending order:
 
      Create these? (yes / edit N / skip N / skip all)
      ```
-   - **Single-story wave** → implement directly on the feature branch in the main loop (Step 5).
-   - **Multi-story wave** → isolate each story in its own worktree so parallel agents never clobber each other:
+   - **Single-story wave** → implement directly on the feature branch, in the Feature's worktree, in the main loop (Step 5).
+   - **Multi-story wave** → isolate each story in its own worktree so parallel agents never clobber each other. These branch from the feature worktree's branch and live in the scratchpad, not beside the repo, so Step 0c's tidy never touches them:
 
      ```bash
-     git worktree add "{scratchpad}/wt-{story-id}" -b "story/AB#{story-id}-{sanitized-title}" "{feature-branch}"
+     git -C "{WT}" worktree add "{scratchpad}/wt-{story-id}" -b "story/AB#{story-id}-{sanitized-title}" "{feature-branch}"
      ```
 
      Launch **one implementation agent per story, all in a single message** so they run concurrently (`backend`/`frontend`/`general-purpose` per the approved plan; if a story needs both backend and frontend work, give one agent the whole story rather than splitting it). Each agent's prompt must include: the approved plan for its story, the story's full AC, its worktree path, and these rules — work **only** inside your worktree, implement the plan plus its unit tests, run the tests you added, commit to the story branch, and report what you changed. Agents never push, never create PRs, never touch work items, and never ask the user anything.
-   - **Merge back (main loop):** merge each story branch into the feature branch (`git merge --no-ff`), resolving conflicts yourself using both stories' plans as the guide. Then `git worktree remove` and delete the story branch. Merge in `Custom.Order`-then-ID order so conflict resolution is deterministic.
-3. **Wave gate:** run Step 6 (build validation) and Step 7.1–7.2 (full test suite + lint) on the merged feature branch. Fix failures before starting the next wave — the next wave branches from this merged, green state.
+   - **Merge back (main loop):** merge each story branch into the feature branch in the Feature's worktree (`git -C "{WT}" merge --no-ff "story/…"`), resolving conflicts yourself using both stories' plans as the guide. Then `git worktree remove` and delete the story branch. Merge in `Custom.Order`-then-ID order so conflict resolution is deterministic.
+3. **Wave gate:** run Step 6 (build validation) and Step 7.1–7.2 (full test suite + lint) on the merged feature branch, in the Feature's worktree. Fix failures before starting the next wave — the next wave branches from this merged, green state.
 
 ### F5: Feature-Level Quality and Review
 
@@ -578,3 +723,7 @@ Present **one combined UAT checklist grouped by story** (Step 9 rules). Wait for
 4. Run **Closing Related Tasks** (Step 10) once, covering the child Tasks of every implemented story — one combined table, then the usual per-task hour prompts. Every story that got a Task in F4 has one to close here; a story whose Task creation was skipped gets one created and closed now, as in Step 10.
 5. Move each implemented story to `Code Review` (same fallback rules as Step 10). **Do not change the Feature's state** — the Feature is a parent container; it advances only when its child stories are verified/closed, not when the PR goes up for review.
 6. The Step 10 closing rule applies unchanged: only child **Tasks** are ever closed — here at PR creation, never the stories and never the Feature. Don't enable "Complete associated work items" when the PR is merged; it would transition the stories and the Feature along with the Tasks.
+
+### F8: Remove the Feature's Worktree
+
+Run Step 11 on the Feature's worktree, `../{repo}-AB{feature-id}`, once F7 is done and its Task-closing prompts are answered. Same checks, same rules: remove it only if it's clean and fully pushed, otherwise keep it and say what's left, and never use `--force`. The per-story worktrees are already gone; F4 removes each one at merge-back.

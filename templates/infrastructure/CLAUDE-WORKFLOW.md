@@ -97,7 +97,7 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 ### Development Workflow
 
 1. **Pick a work item** from Azure DevOps (or describe what you need)
-2. **Claude implements** using `/implement AB#<id>` (auto-creates branch)
+2. **Claude implements** using `/implement AB#<id>` — in the ticket's own worktree, on an auto-created branch
 3. **Hooks guard** against secrets and bad patterns automatically
 4. **PR merges** into `main` — the compare branch. **Nothing deploys yet.** The work item stays in `Code Review` until it is promoted
 5. **Promote or release** — `/promote main dev` carries everything on `main` to Dev; `/create-release <N>` groups work items so `/deploy-release <N> test` → `staging` → `prod` can carry just those
@@ -106,6 +106,8 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 8. **Test** using Playwright MCP for browser testing
 9. **Track** work items via the Azure DevOps MCP server
 10. **Learn** — Claude saves what worked for next time
+
+**One worktree per ticket.** `/implement` and `/rework` never check out in the folder the session started in. Each ticket gets a sibling git worktree, `../{repo}-AB{id}` (e.g. `../CSIPay-AB5373`), where every build, test, and commit happens. It is removed once the branch is pushed, or kept with a note if anything is uncommitted or unpushed. That lets several sessions work different tickets in the same repo at once. Say **"work in place"** (or "no worktree") to opt a run out. Sessions sharing a repo still share **local ports and the Dev database** — two dev servers on one port, or two integration runs against Dev, will still collide.
 
 ### Story Points & Dev Ready Policy
 
@@ -308,7 +310,7 @@ This runs pre-flight checks, commits, pushes the current branch, and triggers th
 
 #### Branch Naming Convention
 
-When `/implement AB#<id>` is run, a branch is created off the current branch based on the Azure DevOps work item type:
+When `/implement AB#<id>` is run, a branch is created in the ticket's worktree (`../{repo}-AB{id}`, removed again once the branch is pushed — "work in place" opts out). It is cut off the current branch, or off the project's PR target when the current branch is another ticket's (see **PR Targeting**). The prefix comes from the Azure DevOps work item type:
 
 | Work Item Type | Branch Prefix | Example |
 |---|---|---|
@@ -326,13 +328,15 @@ Format: `{prefix}AB#{id}-{sanitized-title}` (title lowercased, special chars rep
 
 PRs always target the branch you were on when `/implement` was invoked. The base branch is captured dynamically at the start — no assumptions about branch names.
 
+**Exception — another ticket's branch.** If that branch starts with a ticket prefix (`feature/`, `story/`, `bugfix/`, `hotfix/`, `work/`, `cherry-pick/`, `release/`, `revert/`), the new ticket is **not** cut from it. `/implement` uses the PR target this CLAUDE.md names instead, or asks. Without the exception, a folder left on one ticket's branch would put that ticket's commits in the next ticket's PR, and aim the PR at the wrong branch.
+
 #### Hot Fix Workflow
 
 Hot Fix work items follow the same automated checks (build, lint, tests, review) but skip manual UAT. An abbreviated confirmation is shown instead. Hot Fix PRs get a `hotfix` label. Hot Fixes target the current branch — for a production hot fix, start on `prod` so the PR merges (and deploys) straight there. **Then bring the fix back to `main`:** open a second PR from the same hotfix branch into `main` (or `/cherry-pick AB#<id> main`) so the next `main → dev` promotion doesn't overwrite it. A hot fix that lives only on `prod` is lost on the next release.
 
 #### Feature Workflow (ordered story waves)
 
-Running `/implement` on a **Feature** implements its child User Stories in **waves** driven by the `Custom.Order` field: stories sharing the same order value are implemented **in parallel** (one agent per story, each in an isolated git worktree), and waves run sequentially in ascending order so later stories build on earlier ones. All work merges into a single `feature/AB#<id>-...` branch; quality checks, code review, UAT, and one PR happen at the feature level, and every implemented story is linked to that PR. Stories without a `Custom.Order` value run in a final catch-all wave (flagged for confirmation first).
+Running `/implement` on a **Feature** implements its child User Stories in **waves** driven by the `Custom.Order` field: stories sharing the same order value are implemented **in parallel** (one agent per story, each in an isolated git worktree), and waves run sequentially in ascending order so later stories build on earlier ones. All work merges into a single `feature/AB#<id>-...` branch; quality checks, code review, UAT, and one PR happen at the feature level, and every implemented story is linked to that PR. Stories without a `Custom.Order` value run in a final catch-all wave (flagged for confirmation first). The Feature itself gets one ticket worktree, `../{repo}-AB{feature-id}`; the per-story worktrees branch from it and are removed as each story merges back.
 
 **Work item states:** `/implement` moves the work item to `Active` when implementation starts — for a single work item (User Story, Bug, Hot Fix) right after the branch is created; for a Feature, each child story goes `Active` as its wave begins. When the PR is created, each implemented child **User Story** moves to `Code Review` — the **Feature's state is never changed**. The Feature is a parent container; it advances only as its child stories are verified/closed. Only child **Tasks** are ever closed — never the stories or the Feature. From `Code Review` onward the stories follow the **Work Item States ↔ Environments** table above as they are promoted.
 

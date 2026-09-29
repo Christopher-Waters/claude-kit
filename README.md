@@ -495,15 +495,18 @@ git checkout main
 ```
 
 Claude will:
-1. Read the work item from Azure DevOps (extracts type, title, acceptance criteria)
-2. **Summarize the work item** and ask you to confirm understanding. You can add context or corrections here
-3. Create a branch automatically (e.g., `story/AB#1234-user-can-view-history`)
+1. Set up the ticket's own git worktree next to your project (`../your-project-AB1234`). Every later step runs there, so other Claude sessions in the same repo aren't disturbed
+2. Read the work item from Azure DevOps (extracts type, title, acceptance criteria)
+3. **Summarize the work item** and ask you to confirm understanding. You can add context or corrections here
 4. Explore the codebase and **present an implementation plan** showing which files will be created, modified, or deleted
 5. **Wait for your approval** before writing any code
-6. Implement using backend and/or frontend agents
+6. Create the branch (e.g., `story/AB#1234-user-can-view-history`) and implement using backend and/or frontend agents
 7. Run all quality checks (build, lint, tests, review)
 8. Generate a UAT checklist and **pause for you to manually test**
 9. After you confirm "testing passed", create a PR targeting `main`, close the child Task with its hours, and move the work item to `Code Review`
+10. Remove the worktree once the branch is pushed. It's kept, with a note, if anything is uncommitted or unpushed. `/rework` recreates it from the branch
+
+Say `/implement AB#1234 work in place` to skip the worktree and work in the current folder, as before.
 
 The PR merges into `main`. **That merge deploys nothing** — `main` is the compare branch. The work reaches Dev when `main` is promoted:
 
