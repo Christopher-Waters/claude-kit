@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.3 — 2026-10-02
+
+No changes from 2.3.2. Republished so npm's `latest` points at the current release again. A stale `v2.3.0` tag was pushed alongside `v2.3.2` and published one second later, which moved `latest` back to 2.3.0. Projects on 2.3.1 would never have auto-updated, because the update check only moves forward.
+
 ## 2.3.2 — 2026-10-02
 
 ### Work items are always created through `/create-work-item`
