@@ -27,7 +27,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 |-----------|-------|----------------|-------------|
 | **Global Agents** | 10 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), mockup, reviewer, test-runner, build-validator, lint-checker, azure-ops, security-auditor |
 | **Project Agents** | 2 | `.claude/agents/` (in the project) | deployer, db-admin |
-| **Hooks** | 9 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, UAT reminder, self-improve |
+| **Hooks** | 10 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, work item intent, UAT reminder, self-improve |
 | **Slash Commands** | 24 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/track`, `/plan-backlog`, `/plan-sprint`, `/quote-backlog`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain`, `/create-work-item`, `/edit-work-item` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | **Azure DevOps** (work items, repos, pipelines, wiki), Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
@@ -105,7 +105,7 @@ npx @chris1807/claude-kit init --all
 This installs:
 - ✅ Global agents (backend, frontend, legacy, mockup, reviewer, test-runner, build-validator, lint-checker, azure-ops, security-auditor)
 - ✅ Project agents (deployer, db-admin)
-- ✅ All 9 hooks
+- ✅ All 10 hooks
 - ✅ All 13 slash commands
 - ✅ MCP servers: Playwright, Teams, Azure CLI (+ your DB choice)
 - ✅ Settings, CLAUDE.md workflow, .gitignore
@@ -201,6 +201,7 @@ your-project/                      ← Project-specific
 │   │   ├── protected-files.sh     # BLOCKS/warns on critical file edits
 │   │   ├── auto-format.sh         # Auto-runs formatters after edits
 │   │   ├── test-on-change.sh      # Suggests related tests after edits
+│   │   ├── work-item-intent.sh    # Routes "create a bug/story" prompts to /create-work-item
 │   │   ├── uat-reminder.sh        # Reminds to run UAT after features
 │   │   └── self-improve.sh        # Saves learnings after each session
 │   │
@@ -691,7 +692,7 @@ Claude reviews for:
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, bugs in `New` (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Also audits the drop-out queue — tagged bugs and stories bounced to Design Review — for items whose creator answered but which nobody returned to the sweep |
 | `/quote` | `/quote AB#1234` | Estimate a work item in story points (senior-calibrated Fibonacci rubric) |
 | `/explain` | `/explain AB#1234` | Summarize and explain a work item in plain language |
-| `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Feature, Bug, User Story, or Hot Fix — proposes story points (user must agree), creates pointed items in Dev Ready; on a Feature, also drafts its child stories with `Custom.Order` waves |
+| `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Feature, Bug, User Story, or Hot Fix — proposes story points (user must agree), creates pointed items in Dev Ready; on a Feature, also drafts its child stories with `Custom.Order` waves. Runs automatically for any plain-language request to create a work item |
 | `/edit-work-item` | `/edit-work-item AB#1234 [what to change]` | Revise an existing work item field-by-field. On a Feature, cascades into its child stories — updates, adds, retires, and re-sequences `Custom.Order` waves — with a safety gate on anything already past Dev Ready |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged feature/work branches |
 | `/close-orphan-tasks` | `/close-orphan-tasks --dry-run` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |
@@ -707,6 +708,7 @@ These run automatically — no action needed:
 | **Before** any Bash command | `sensitive-data-blocker.sh` | Blocks `mongosh` commands that reference sensitive PII fields (TIN, SSN, bank accounts). **Blocks the command.** |
 | **Before** any MCP database tool | `sensitive-data-mcp-blocker.sh` | Blocks MongoDB/MSSQL/Postgres MCP tool calls that reference PII fields. **Blocks the call.** |
 | **After** any Bash/MCP/Read/Grep | `sensitive-data-output-blocker.sh` | Scans output for PII field names in JSON, C#, YAML formats — catches broad queries, seed data, test fixtures, log files, and git diffs. **Blocks the output.** |
+| **When you send a prompt** | `work-item-intent.sh` | Spots plain-language requests to create a work item ("log a bug…", "make a story…") and tells Claude to run `/create-work-item` instead of creating it directly. Never blocks; slash-command prompts are skipped. |
 | **Before** any file write | `secret-blocker.sh` | Scans for hardcoded credentials (MongoDB URIs, AWS keys, Stripe keys, passwords). **Blocks the write.** |
 | **Before** any file edit | `protected-files.sh` | Blocks edits to production/staging configs. Warns on critical files (CLAUDE.md, pipelines, Program.cs). |
 | **After** any file edit | `auto-format.sh` | Runs `dotnet format` on .cs files, `eslint --fix` on .ts/.tsx files |

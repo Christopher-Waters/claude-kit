@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.3.2 — 2026-10-02
+
+### Work items are always created through `/create-work-item`
+
+Asking Claude in plain words to "log a bug", "make a story", or "open a ticket" now runs `/create-work-item`, the same as typing the command. That means the prior-art and duplicate checks, the title prefix, the AC field, proposed points, and the user's approval of the draft all apply. Claude no longer creates the item with a direct `wit_work_item_write` call.
+
+- **New `UserPromptSubmit` hook, `work-item-intent.sh`.** When a prompt reads like a creation request, it adds a note telling Claude to run `/create-work-item` through the Skill tool. It never blocks. It skips prompts that start with `/`, and it ignores "feature flag" and "feature branch". The note is conditional, so a false positive is simply ignored.
+- **`/create-work-item`'s description** now says to use it for any work-item creation request, so Claude picks it up even without the hook. If the request already names the type ("log a **bug**…"), Step 1 doesn't ask for it again. The type is shown in the Step 2 confirmation instead.
+- **CLAUDE.md workflow** gains a "Creating Work Items" rule. It covers items Claude decides to raise itself. It also carves out work items a command creates as one of its own steps, such as child Tasks from `/implement`, `/rework`, and `/plan-backlog`, and child stories from `/create-work-item` and `/edit-work-item`.
+
+Existing installs get the hook through the normal settings merge. User-added hooks are kept.
+
 ## 2.3.1 — 2026-09-29
 
 The first published release of this work. 2.3.0 was tagged locally but never published.

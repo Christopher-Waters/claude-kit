@@ -108,6 +108,16 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/work-item-intent.sh"
+          }
+        ]
+      }
     ]
   }
 }

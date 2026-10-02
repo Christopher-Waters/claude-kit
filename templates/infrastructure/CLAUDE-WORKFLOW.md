@@ -68,6 +68,7 @@ These run automatically — no action needed:
 | **Before any Bash command** | Sensitive data blocker prevents database queries that reference TIN, SSN, or other PII fields |
 | **Before any MCP database tool** | Sensitive data MCP blocker prevents MCP database queries that reference PII fields |
 | **After any Bash/MCP/Read/Grep command** | Sensitive data output blocker scans results for PII field names and blocks exposure |
+| **When you send a prompt** | Work item intent check — a plain-language request to create a work item is routed to `/create-work-item` |
 | **Before any file write** | Secret blocker scans for hardcoded credentials and blocks them |
 | **Before any file edit** | Protected files guard warns/blocks edits to production configs |
 | **After any file edit** | Auto-formatter runs (dotnet format for .cs, eslint --fix for .ts) |
@@ -108,6 +109,14 @@ Claude maintains persistent memory across sessions in `~/.claude/projects/.../me
 10. **Learn** — Claude saves what worked for next time
 
 **One worktree per ticket.** `/implement` and `/rework` never check out in the folder the session started in. Each ticket gets a sibling git worktree, `../{repo}-AB{id}` (e.g. `../CSIPay-AB5373`), where every build, test, and commit happens. It is removed once the branch is pushed, or kept with a note if anything is uncommitted or unpushed. That lets several sessions work different tickets in the same repo at once. Say **"work in place"** (or "no worktree") to opt a run out. Sessions sharing a repo still share **local ports and the Dev database** — two dev servers on one port, or two integration runs against Dev, will still collide.
+
+### Creating Work Items — Always Through `/create-work-item`
+
+Every Feature, User Story, Bug, or Hot Fix Claude creates goes through `/create-work-item`, whether or not the user typed the command. "Log a bug that the export 500s", "make a story for bulk assign", "open a ticket for this" all mean: invoke `create-work-item` with the Skill tool, passing the request text as the arguments. Never create one with a direct `wit_work_item_write` call. That skips the prior-art and duplicate checks, the title prefix, the AC field, the proposed points, and the user's approval of the draft. The `work-item-intent.sh` hook adds a reminder to any prompt that reads like a creation request.
+
+This includes items Claude decides to raise itself, such as a defect found mid-task or out-of-scope work. Propose it, and if the user agrees, run `/create-work-item` with what you found.
+
+Work items a command creates as one of its own steps keep that command's flow: child Tasks from `/implement`, `/rework`, `/plan-backlog`, and `/plan-sprint`, and child stories from `/create-work-item` and `/edit-work-item`. A new Bug or Story requested in the middle of one of those commands still goes through `/create-work-item`.
 
 ### Story Points & Dev Ready Policy
 
@@ -365,7 +374,7 @@ All deployment and release operations are available as slash commands:
 | `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, **bugs in `New`** (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Pointed items move to Dev Ready; stories that can't be quoted move back to **Design Review**, bugs that can't be quoted get a **`needs-info`** tag, so the next sweep skips them. Every run also audits the drop-out queue (tagged bugs **and** stories bounced to Design Review) and reports any whose creator answered but which nobody returned to the sweep — neither mechanism expires, so those are otherwise invisible forever |
 | `/quote` | `/quote AB#1234` | Estimate story points for one work item; on approval, sets the points and moves the item to Dev Ready. If it can't be estimated, offers to send a story back to **Design Review** or tag a bug **`needs-info`** |
-| `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Feature, Bug, User Story, or Hot Fix — proposes story points (user must agree) and creates pointed items in Dev Ready; on a Feature, also drafts its child stories with `Custom.Order` waves |
+| `/create-work-item` | `/create-work-item [description]` | Interactively draft and create a Feature, Bug, User Story, or Hot Fix — proposes story points (user must agree) and creates pointed items in Dev Ready; on a Feature, also drafts its child stories with `Custom.Order` waves. Runs automatically for any plain-language request to create a work item |
 | `/edit-work-item` | `/edit-work-item AB#1234 [what to change]` | Revise an existing work item field-by-field. On a Feature, cascades the change into its child stories — updates, adds, retires, and re-sequences `Custom.Order` waves — with a safety gate on anything already past Dev Ready |
 | `/cleanup-branches` | `/cleanup-branches` | Delete merged branches |
 | `/close-orphan-tasks` | `/close-orphan-tasks [scope] [--dry-run]` | Close open Tasks whose parent is Ready to Deploy / Deployed / Closed |

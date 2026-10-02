@@ -1,12 +1,14 @@
-Create a new Azure DevOps work item interactively. Usage: `/create-work-item`
+Create a new Azure DevOps work item (Bug, User Story, Feature, or Hot Fix) interactively. Use this whenever the user asks to create, log, file, open, or raise a work item, ticket, bug, story, feature, or hot fix, whether or not they typed the command. Usage: `/create-work-item [description]`
 
 This command walks the user through creating a Feature, Bug, User Story, or Hot Fix, develops an acceptance-criteria-ready plan, optionally embeds a UI mockup in the description, and creates the item in the chosen Azure DevOps project. For a Feature it can also draft and create the child User Stories that make the Feature implementable.
 
 Treat `$ARGUMENTS` as an optional rough description that the user may have typed inline (e.g. `/create-work-item users should be able to export payments`). If provided, skip the initial "describe your requirements" prompt in Step 2 and use it as the starting requirements text — but still confirm with the user before proceeding.
 
+**This command is the only way Claude creates a Feature, Bug, User Story, or Hot Fix.** A plain-language request ("log a bug that the export button 500s", "make a story for bulk assign") runs this command even when the user didn't type it. Claude invokes it through the Skill tool with the request text as `$ARGUMENTS`, and the `work-item-intent.sh` hook adds a reminder whenever a prompt reads like one. Every step below applies the same way to an invoked run: prior art, duplicate check, draft approval, and proposed points. Never skip ahead to a direct `wit_work_item_write` create.
+
 ## Step 1: Choose Work Item Type
 
-Ask the user:
+If `$ARGUMENTS` already names the type unambiguously (`bug`, `user story` / `story`, `feature`, `hot fix` / `hotfix`), use it and skip the question. Name the type in the Step 2 confirmation so the user can correct it. Otherwise, ask the user:
 
 ```
 What type of work item do you want to create?
