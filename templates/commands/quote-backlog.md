@@ -15,8 +15,9 @@ For each qualifying item:
 2. **Checks whether the work is already implemented** — in the codebase, in commits, or under another ticket.
 3. **Looks at the code when it makes sense** — to validate the described approach and suggest changes.
 4. **Proposes a story point estimate** — using the same senior-calibrated rubric as `/quote`.
-5. **Drafts a comment for the item's creator** when issues are found.
-6. **Suggests a rewrite of the description, and of existing acceptance criteria,** when they need work — offered to the creator in the comment, or applied directly if the user chooses.
+5. **Proposes an Investment Category and Impact** when the item has none — the classification `/create-work-item` Step 3 defines.
+6. **Drafts a comment for the item's creator** when issues are found.
+7. **Suggests a rewrite of the description, and of existing acceptance criteria,** when they need work — offered to the creator in the comment, or applied directly if the user chooses.
 
 **Never author acceptance criteria from nothing.** The rewrite improves AC that are *already there* — it never fills an empty AC field. If the item has no acceptance criteria, the deliverable is a comment telling the creator the AC are missing and the item can't be estimated without them. Rewriting someone's AC is editing their intent; writing AC for a blank field is inventing it.
 
@@ -24,7 +25,7 @@ For each qualifying item:
 
 **Nothing is written to Azure DevOps — no points, no comments — until the user has seen the full batch and approved.** This command never modifies code and never reassigns items. It makes exactly three kinds of change, all in Step 5:
 
-- an item that **gets points** moves to **Dev Ready**;
+- an item that **gets points** moves to **Dev Ready**, and gets an Investment Category and Impact if it had none;
 - a **User Story** that **can't be quoted** because information is missing moves back to **Design Review**, so the next sweep doesn't pick it up again while the creator is still working on it;
 - a **Bug** that can't be quoted gets a **`needs-info` tag** instead — its state stays `New`. `New` is the bottom of the Bug workflow, so there is no earlier state to send it back to; the tag is what drops it out of the next sweep. The Step 2 query excludes tagged items, and removing the tag re-queues the bug.
 
@@ -59,6 +60,7 @@ Numbers refer to the `#` column of the summary table, not to AB# ids — so `1,2
 
 **What approval writes:**
 - **Story Points** on items that got a number — each also moves to **Dev Ready**
+- **Investment Category and Impact** on pointed items that had neither set — a value someone already chose is never overwritten
 - **Design Review** on **User Stories** that couldn't be quoted — anything blocked on missing information goes back to the creator's queue so the next sweep skips it
 - A **`needs-info` tag** on **Bugs** that couldn't be quoted — a Bug has no design state to return to, so the tag is what keeps the next sweep off it. Existing tags are preserved; the state stays `New`
 - **Comments** to the creators of items where something was found
@@ -203,7 +205,7 @@ For each item in the batch, do all of 3a–3e before presenting anything. Collec
 
 ### 3a. Fetch the full work item
 
-Fetch with `mcp__azure-devops__wit_work_item` (action `get`) expanding `relations`. Capture: title, type, description, acceptance criteria, tags, `System.CreatedBy` (display name + unique name — needed for the comment draft), child items, and any linked PRs, commits, or branches.
+Fetch with `mcp__azure-devops__wit_work_item` (action `get`) expanding `relations`. Capture: title, type, description, acceptance criteria, tags, `Custom.InvestmentCategory` and `Custom.Impact`, `System.CreatedBy` (display name + unique name — needed for the comment draft), child items, and any linked PRs, commits, or branches.
 
 ### 3b. Completeness review
 
@@ -282,6 +284,14 @@ Two cases are the exception — no state change and no tag, because nothing is m
 - **Needs to be split** (the work is understood, it's just too big) — the item keeps its current state; the deliverable is the split proposal.
 - The user chooses to leave it alone at the Step 4 gate.
 
+### 3e2. Propose the classification (pointed items with it unset)
+
+For every item that gets a number in 3e, check `Custom.InvestmentCategory` and `Custom.Impact`. Where **either is unset**, propose a value from the tables in `/create-work-item` Step 3, with a one-line reason from what 3a–3d established. Impact is the difference the item makes, not its size.
+
+- **Never overwrite a value someone set.** A set value is shown as-is; if it looks clearly wrong, note it in the item's detail block for the user — don't propose writing over it.
+- Items that get **no points** (blocking gaps, duplicates, split candidates) get no classification either — nothing about them is written except the drop-out and the comment.
+- **Only where the process has the fields.** Check `get_type` once per sweep; if the types don't carry `Custom.InvestmentCategory` / `Custom.Impact`, skip this step and leave the column out of Step 4.
+
 ### 3f. Draft the creator comment (only if issues were found)
 
 If 3b–3d surfaced anything — gaps, a duplicate, a suggested approach change — draft a comment addressed to the item's creator (`System.CreatedBy`). Format:
@@ -321,7 +331,7 @@ The rewrite is a *suggestion*: by default it travels inside the creator comment 
 
 ### Ultracode mode (optional fan-out)
 
-Only when **ultracode is on** (a system-reminder confirms it, or the user typed `ultracode`): the analysis in 3a–3g is independent per item, so fan out **one agent per item** with the `Workflow` tool. Each agent does the full 3a–3g pass and returns a structured result (item id, creator, completeness verdict, duplicate findings, code notes, proposed points, draft comment, suggested rewrite) — use a `schema` so each agent returns validated JSON.
+Only when **ultracode is on** (a system-reminder confirms it, or the user typed `ultracode`): the analysis in 3a–3g is independent per item, so fan out **one agent per item** with the `Workflow` tool. Each agent does the full 3a–3g pass and returns a structured result (item id, creator, completeness verdict, duplicate findings, code notes, proposed points, proposed classification, draft comment, suggested rewrite) — use a `schema` so each agent returns validated JSON.
 
 **Never fan out Step 4 or Step 5** — presentation, approval, and every write stay sequential in the main loop. If ultracode is off, analyze the batch one item at a time; the output is identical either way.
 
@@ -333,15 +343,17 @@ Show the whole batch **before writing anything**. Start with the summary table:
 Quote sweep — {project} backlog, unpointed (Stories: Design Approved · Bugs: New)
 Batch: {n} of {total} qualifying items{ — run /quote-backlog again for the next 10}
 
-| #  | ID       | Type  | Title                              | Completeness  | Points | Outcome          | Comment | Rewrite |
-|----|----------|-------|------------------------------------|---------------|--------|------------------|---------|---------|
-| 1  | AB#4611  | Story | COM - Payment reminder emails      | Complete      |   5    | → Dev Ready      | —       | —       |
-| 2  | AB#4614  | Story | COM - Bulk close inactive accounts | Minor gaps    |   8    | → Dev Ready      | yes     | —       |
-| 3  | AB#4617  | Story | PAY - Refund webhook handling      | Blocking gaps |   —    | → Design Review  | yes     | yes     |
-| 4  | AB#4619  | Bug   | PAY - Duplicate refund email       | Complete      |   3    | → Dev Ready      | —       | —       |
-| 5  | AB#4620  | Bug   | COM - Audit log export 500s        | Blocking gaps |   —    | + needs-info tag | yes     | —       |
-| 6  | AB#4623  | Story | COM - Rebuild the reporting module | Too large     |  split | unchanged        | yes     | —       |
+| #  | ID       | Type  | Title                              | Completeness  | Points | Category · Impact          | Outcome          | Comment | Rewrite |
+|----|----------|-------|------------------------------------|---------------|--------|----------------------------|------------------|---------|---------|
+| 1  | AB#4611  | Story | COM - Payment reminder emails      | Complete      |   5    | Quick Win · Large          | → Dev Ready      | —       | —       |
+| 2  | AB#4614  | Story | COM - Bulk close inactive accounts | Minor gaps    |   8    | Maintenance · Medium (set) | → Dev Ready      | yes     | —       |
+| 3  | AB#4617  | Story | PAY - Refund webhook handling      | Blocking gaps |   —    | —                          | → Design Review  | yes     | yes     |
+| 4  | AB#4619  | Bug   | PAY - Duplicate refund email       | Complete      |   3    | Risk Mitigation · Small    | → Dev Ready      | —       | —       |
+| 5  | AB#4620  | Bug   | COM - Audit log export 500s        | Blocking gaps |   —    | —                          | + needs-info tag | yes     | —       |
+| 6  | AB#4623  | Story | COM - Rebuild the reporting module | Too large     |  split | —                          | unchanged        | yes     | —       |
 ```
+
+**Category · Impact** shows the proposal for pointed items that had none, and `(set)` where the item already carried a value that will be left alone.
 
 The **Type** column matters — it decides the outcome, so show it. The **Outcome** column is what will actually be written: `→ Dev Ready` for pointed items of either type, `→ Design Review` for **User Stories** that can't be quoted until the creator supplies something, `+ needs-info tag` for **Bugs** in the same situation (state stays `New` — a Bug has no design state to return to), and `unchanged` for anything else (a split proposal, or an item already past Dev Ready).
 
@@ -359,7 +371,7 @@ Approve? (all / numbers e.g. "1,2,4" / edit N / skip N / apply rewrite N / cance
 
 - `all` → apply every proposed write (points, state changes, tags, and comments) in Step 5; rewrites stay inside the comments as suggestions
 - `1,2,4` → apply only those items; the rest are recorded as skipped
-- `edit N` → ask what to change on item N (points value, comment text, or rewrite text), revise, re-show that item, ask again
+- `edit N` → ask what to change on item N (points value, Investment Category / Impact, comment text, or rewrite text), revise, re-show that item, ask again
 - `apply rewrite N` → write item N's rewrite directly onto the work item in Step 5 (instead of only suggesting it in the comment). This covers the description, the title if the rewrite included one, and rewritten AC **only where the item already had AC** — an empty AC field is never populated, under this or any other option
 - `skip N` → drop item N, re-ask for the rest. A skipped item gets **nothing** written — no comment, no state change, no tag — so it keeps its current state (`Design Approved` for a Story, `New` for a Bug) and will reappear in the next sweep. Say that out loud when confirming a skip, so the user isn't surprised to see it again
 - `cancel` → stop with **zero changes** to Azure DevOps
@@ -368,7 +380,7 @@ Approve? (all / numbers e.g. "1,2,4" / edit N / skip N / apply rewrite N / cance
 
 Only for approved items, in batch order:
 
-1. **Set Story Points and move to Dev Ready** (items with a proposed number): in one `mcp__azure-devops__wit_work_item_write` (action `update`) call, set `Microsoft.VSTS.Scheduling.StoryPoints` **and** `System.State` = `Dev Ready`. The state change applies only to `User Story`, `Bug`, and `Hot Fix` types, and never moves an item backward — if an item is somehow already past Dev Ready, set the points only and note it. Touch no other field — assignee, iteration, and tags stay as they are.
+1. **Set Story Points and move to Dev Ready** (items with a proposed number): in one `mcp__azure-devops__wit_work_item_write` (action `update`) call, set `Microsoft.VSTS.Scheduling.StoryPoints` **and** `System.State` = `Dev Ready` — plus the proposed `Custom.InvestmentCategory` / `Custom.Impact`, only for the ones that were unset. The state change applies only to `User Story`, `Bug`, and `Hot Fix` types, and never moves an item backward — if an item is somehow already past Dev Ready, set the points only and note it. Touch no other field — assignee, iteration, and tags stay as they are.
 2. **Send unquotable User Stories back to Design Review** (approved `User Story` items with **no** proposed points, where the blocker is missing information): set `System.State` = `Design Review` via `mcp__azure-devops__wit_work_item_write` (action `update`). Do this **before** posting the comment in step 4, so the creator's notification arrives with the item already back in their queue. Rules:
 
    - **`User Story` only.** Do not attempt this on a `Bug` or a `Hot Fix` — those types have no `Design Review` state, so the update fails at runtime in the middle of the batch. They take step 3 instead.
@@ -402,6 +414,7 @@ If a write fails, report the failure and ask whether to continue with the remain
 Items analyzed:    {n} (of {total} qualifying — {remaining} left for the next run)
                    {n_stories} stories (Design Approved) · {n_bugs} bugs (New)
   ✓ Points set:    {n_pointed}  (total {sum} pts — each moved to Dev Ready)
+  ✓ Classified:    {n_classified} given an Investment Category and Impact
   ↩ Design Review: {n_design_review} stories not quoted — moved back to the creator, out of the next sweep
   ⚑ needs-info:    {n_tagged} bugs not quoted — tagged, state left at New, out of the next sweep
   ✓ Comments:      {n_comments} posted to creators
@@ -411,8 +424,8 @@ Items analyzed:    {n} (of {total} qualifying — {remaining} left for the next 
   ⚑ Stale drop-outs: {n_stale} answered since leaving the sweep — still excluded ({n_stale_bugs} tagged bugs, {n_stale_stories} bounced stories)
 
 Pointed items:
-- AB#4611: 5 pts
-- AB#4614: 8 pts (comment posted)
+- AB#4611: 5 pts · Quick Win · Large
+- AB#4614: 8 pts (comment posted) · classification already set
 - ...
 
 Moved back to Design Review (stories, no points — waiting on the creator):
@@ -437,4 +450,4 @@ Next steps:
   /quote AB#{id}             — re-estimate a single item after the creator responds
 ```
 
-Do not create tasks or assign items — those are downstream decisions. Pointed items are now Dev Ready, so `/plan-backlog` picks them up on its next run. Stories moved to Design Review and bugs tagged `needs-info` are both out of the Step 2 query, so the next `/quote-backlog` run reaches genuinely new items instead of re-reviewing the ones still waiting on their creator — re-quote one with `/quote AB#{id}` once they respond, or let them move the story back to Design Approved / drop the bug's tag themselves. Make no change other than the three described in Step 5 — **Step 2b's audit is read-only**, and it never clears a tag on the creator's behalf.
+Do not create tasks or assign items — those are downstream decisions. Pointed items are now Dev Ready, so `/plan-backlog` picks them up on its next run. Stories moved to Design Review and bugs tagged `needs-info` are both out of the Step 2 query, so the next `/quote-backlog` run reaches genuinely new items instead of re-reviewing the ones still waiting on their creator — re-quote one with `/quote AB#{id}` once they respond, or let them move the story back to Design Approved / drop the bug's tag themselves. Make no change other than the ones described in Step 5 — **Step 2b's audit is read-only**, and it never clears a tag on the creator's behalf.

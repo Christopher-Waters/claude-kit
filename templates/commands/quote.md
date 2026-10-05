@@ -8,7 +8,7 @@ Read the work item from Azure DevOps using the project from the current repo's C
 
 If the work item is not found, report the error and stop.
 
-Capture: title, type, description, acceptance criteria, repro steps (on a Bug), attached child items, any existing `Story Points` / `Effort` field value, and the item's **full current tag list** — both the tags that hint at scope (e.g. `spike`, `research`, `infra`) and the rest, because Step 5b appends to that list and must not clobber it.
+Capture: title, type, description, acceptance criteria, repro steps (on a Bug), attached child items, any existing `Story Points` / `Effort` field value, the current `Custom.InvestmentCategory` and `Custom.Impact` (User Story, Bug, Hot Fix), and the item's **full current tag list** — both the tags that hint at scope (e.g. `spike`, `research`, `infra`) and the rest, because Step 5b appends to that list and must not clobber it.
 
 ## Step 2: Size the Work
 
@@ -63,6 +63,14 @@ If the item has child items, size each child as well and present the parent's to
 
 **If the item can't be estimated at all, don't guess a number.** An item is *not estimable* when the gap is information only its creator can close — no acceptance criteria (or, on a Bug, no repro steps), a description that contradicts itself, scope you can't bound, or work that looks like it may already be done under another ticket. Report it as **needs more information**, list exactly what's missing, and go to Step 5 instead of Step 4. This is different from **needs to be split**: a split candidate is understood work that's simply too big, and it keeps its current state.
 
+### Classify it too, when nobody has
+
+User Stories, Bugs and Hot Fixes carry an **Investment Category** (`Custom.InvestmentCategory`) and an **Impact** (`Custom.Impact`) — restricted picklists that Serena's reports rank work by. When the item you're sizing has **either one unset**, propose a value for it from the tables in `/create-work-item` Step 3, with a one-line reason drawn from the same reading you just did. Impact is the difference the item makes, not its size: a 2-point item can be Strategic.
+
+- **Never overwrite a value a person set.** If both are already set, show them as they are. If one looks clearly wrong in light of what you read, say so in a line, but don't propose writing it — that's an `/edit-work-item` change.
+- **Not for a Feature or a Task** — neither type has the fields.
+- **Only where the process has them.** If `get_type` for the item's type doesn't list `Custom.InvestmentCategory` / `Custom.Impact`, skip this section entirely.
+
 ## Step 3: Display the Estimate
 
 Output a compact estimate — not a quote block. Format:
@@ -77,6 +85,8 @@ Output a compact estimate — not a quote block. Format:
 - {bullet on test/doc burden}
 
 **Comparable to:** {one-line analogy to a similar past story, or "no obvious comparable in recent work"}
+
+**Classification:** {Investment Category} · {Impact} — {proposed: one-line reason | already set}
 ```
 
 If child items were sized, append:
@@ -107,14 +117,15 @@ If the item isn't estimable, report that instead of a number:
 
 This step applies when you produced a **number**. If the item was reported as *needs more information*, skip to Step 5.
 
-After displaying the estimate, ask the user: *"Want me to set Story Points = {n} on AB#{id}? (This will also move it to Dev Ready.)"*
+After displaying the estimate, ask the user: *"Want me to set Story Points = {n} on AB#{id}? (This will also move it to Dev Ready.)"* When you proposed a classification, name it in the same question — *"…and Investment Category = {category}, Impact = {impact}?"* — and accept a changed value or "points only" as the answer.
 
 Only update the work item if the user explicitly says yes. Do not modify anything otherwise.
 
 When the user agrees, in the **same** `wit_work_item_write` (action `update`) call:
 
 1. Set `Microsoft.VSTS.Scheduling.StoryPoints` to the agreed value (the user's number wins if they adjusted it).
-2. Set `System.State` to `Dev Ready` — **but only if** the work item type is `User Story`, `Bug`, or `Hot Fix` **and** the item is not already past Dev Ready in the workflow (e.g. `Active`, `Code Review`, `Testing`, `Staging`, `Ready to Deploy`). Never move an item backward — if it's already past Dev Ready, set the points only and mention the state was left alone.
+2. Set `Custom.InvestmentCategory` / `Custom.Impact` to the agreed values — only the ones you proposed because they were unset, and only if the user didn't decline them.
+3. Set `System.State` to `Dev Ready` — **but only if** the work item type is `User Story`, `Bug`, or `Hot Fix` **and** the item is not already past Dev Ready in the workflow (e.g. `Active`, `Code Review`, `Testing`, `Staging`, `Ready to Deploy`). Never move an item backward — if it's already past Dev Ready, set the points only and mention the state was left alone.
 
 **Never change the state of a Feature or a Task** — if the sized item is a Feature, persist points only (or per-child points on the children, each of which does get Dev Ready if it qualifies).
 

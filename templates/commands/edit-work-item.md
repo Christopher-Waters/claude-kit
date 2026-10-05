@@ -1,6 +1,6 @@
 Edit an existing Azure DevOps work item. Usage: `/edit-work-item <work-item-id> [what to change]`
 
-This command revises a work item that already exists — title, description, acceptance criteria, points, priority/severity, order. On a **Feature** it treats the Feature and its child User Stories as **one unit**: a change to the Feature's scope cascades into the children, new stories are drafted for new scope, stories that fell out of scope are retired, and `Custom.Order` is re-sequenced so the implementation waves still make sense.
+This command revises a work item that already exists — title, description, acceptance criteria, points, priority/severity, Investment Category / Impact, order. On a **Feature** it treats the Feature and its child User Stories as **one unit**: a change to the Feature's scope cascades into the children, new stories are drafted for new scope, stories that fell out of scope are retired, and `Custom.Order` is re-sequenced so the implementation waves still make sense.
 
 Parse `$ARGUMENTS`:
 - **Work item ID** — accept `AB#1234`, `#1234`, or `1234`. Required. If missing, ask for it and stop.
@@ -14,6 +14,7 @@ Read the work item with `expand: Relations` so links and children come back. Col
 - `System.Title`, `System.WorkItemType`, `System.State`, `System.AssignedTo`, `System.Tags`
 - `System.Description`, `Microsoft.VSTS.Common.AcceptanceCriteria`
 - `Microsoft.VSTS.Scheduling.StoryPoints`, `Custom.Order`
+- For User Stories, Bugs and Hot Fixes: `Custom.InvestmentCategory` and `Custom.Impact` — the classification `/create-work-item` Step 3 defines (skip both if the process doesn't have them)
 - For Bugs / Hot Fixes: `Microsoft.VSTS.TCM.ReproSteps`, `Microsoft.VSTS.Common.Priority`, `Microsoft.VSTS.Common.Severity`
 - For Bugs: `Microsoft.VSTS.TCM.SystemInfo` — the Bug form's second rendered field, where the environment belongs
 - Parent, children, and **linked pull requests** (`ArtifactLink` relations)
@@ -23,7 +24,7 @@ If the work item is not found, report the error and stop.
 
 ### If the item is a Feature
 
-Also fetch every child via `wit_work_item` `get_batch` with fields `System.Id`, `System.Title`, `System.WorkItemType`, `System.State`, `System.AssignedTo`, `Custom.Order`, `Microsoft.VSTS.Scheduling.StoryPoints`, `System.Description`, `Microsoft.VSTS.Common.AcceptanceCriteria`. Children are the `System.LinkTypes.Hierarchy-Forward` relations. You need their full text — you cannot judge whether a story still fits the revised scope from its title alone.
+Also fetch every child via `wit_work_item` `get_batch` with fields `System.Id`, `System.Title`, `System.WorkItemType`, `System.State`, `System.AssignedTo`, `Custom.Order`, `Microsoft.VSTS.Scheduling.StoryPoints`, `Custom.InvestmentCategory`, `Custom.Impact`, `System.Description`, `Microsoft.VSTS.Common.AcceptanceCriteria`. Children are the `System.LinkTypes.Hierarchy-Forward` relations. You need their full text — you cannot judge whether a story still fits the revised scope from its title alone.
 
 ## Step 2: Show the Current Item
 
@@ -33,6 +34,7 @@ Present what exists today, so the user is editing against reality and not memory
 ## AB#{id}: {title}
 
 **Type:** {type}   **State:** {state}   **Points:** {n | not set}   **Assigned:** {name | unassigned}
+**Investment Category:** {value | not set}   **Impact:** {value | not set}   (User Story, Bug, Hot Fix)
 **Linked PRs:** {#id (status), ... | none}
 
 ### Description
@@ -110,6 +112,7 @@ Produce a **field-level diff**, not a rewritten item. For every field you propos
   + 4. {added criterion}
 
 **Story Points:** {n} → {m}   ({one-line rationale})
+**Investment Category / Impact:** {old} → {new}   ({one-line reason})
 **Priority / Severity:** {n} → {m}   (Bugs only)
 
 **Unchanged:** {list the fields you deliberately left alone}
@@ -121,7 +124,8 @@ Rules for the draft:
 - **Keep both halves true.** Every item has two readers (rules in `/create-work-item` Step 3). The PM reads the plain-English **Summary** at the top. The developer and Claude Code read the **Technical Details** below it, grounded in real paths and names from the code. If the change moves what the item does, revise both in this change set: the Summary in plain English, and the Technical Details against the code. If the item lacks either one, propose it here. Either way it shows in the diff like any other field change.
 - **Points follow the `/quote` rubric** — modified Fibonacci (`1, 2, 3, 5, 8, 13, 21`), calibrated for a senior developer working with Claude assistance. Only propose a change if the scope actually moved. If the revised item now looks bigger than 21 points, recommend splitting it into a Feature instead of writing the number.
 - **Prior art moves the number too, and it can move it *down*.** Added scope normally raises points, but scope that turns out to be a second or third consumer of something already built often costs less than the first one did — sometimes less than the raise it would otherwise earn. If the Step 3 search found precedent, say so in the points rationale rather than pricing the addition as new work.
-- **Never point a Feature** and never change a Feature's `System.State`.
+- **Keep the classification true.** If the change moves *why* the item exists or *how much it matters* — new scope that makes it part of an initiative, a fix that turns out to protect payment data, scope cut down to a one-off — propose new `Investment Category` / `Impact` values from the tables in `/create-work-item` Step 3, with a one-line reason. If either field is unset, propose it. A value a person already chose changes only when the edit gives a reason to; a wording tweak never does.
+- **Never point a Feature** and never change a Feature's `System.State`. A Feature carries no Investment Category or Impact either — they live on its child stories.
 - **Prefix rule holds** — if the title changes, it keeps its `PREFIX - ` prefix from the project's CLAUDE.md table.
 
 ### If the item is a Feature — cascade to the children
@@ -132,7 +136,7 @@ This is the point of the command. After drafting the Feature's own changes, eval
 |---------|---------|--------|
 | **Unchanged** | Still correct under the new scope | Leave it entirely alone |
 | **Update** | Still belongs, but its title / description / AC / points no longer match | Draft a field-level diff for it |
-| **Add** | The revised scope introduces work no existing story covers | Draft a new User Story (`/create-work-item` Step 3 shape) with proposed points |
+| **Add** | The revised scope introduces work no existing story covers | Draft a new User Story (`/create-work-item` Step 3 shape) with proposed points, Investment Category and Impact — normally the same pair as its sibling stories |
 | **Retire** | The revised scope no longer includes this work | Propose `System.State` = `Removed`, or unlinking from the Feature — user picks |
 | **Split** | The story now carries two independently shippable slices | Propose narrowing the existing story and adding a sibling |
 
@@ -232,8 +236,8 @@ Render every Markdown section to HTML first — Azure DevOps description and acc
 Apply writes in this order, so a failure partway through leaves the most useful state behind:
 
 1. **Update the parent item** — one `mcp__azure-devops__wit_work_item_write` (action `update`) call with every changed field. Never include `System.State` for a Feature.
-2. **Update existing children** (verdict `Update`) — one call per story, points and `Custom.Order` in the same call as the text changes. If points were set on a story still at or before `Dev Ready`, set `System.State` = `Dev Ready` in that same call.
-3. **Create added children** — `mcp__azure-devops__wit_work_item_write` (action `create`) with description, acceptance criteria, `Custom.Order`, agreed `Microsoft.VSTS.Scheduling.StoryPoints`, and `System.AssignedTo` copied from the Feature if it has an assignee. Then link each to the Feature as a child via `mcp__azure-devops__wit_work_item_link_write` (`System.LinkTypes.Hierarchy-Reverse`), then move pointed ones to `Dev Ready` in a follow-up call.
+2. **Update existing children** (verdict `Update`) — one call per story, points, `Custom.Order` and any classification change in the same call as the text changes. If points were set on a story still at or before `Dev Ready`, set `System.State` = `Dev Ready` in that same call.
+3. **Create added children** — `mcp__azure-devops__wit_work_item_write` (action `create`) with description, acceptance criteria, `Custom.Order`, agreed `Microsoft.VSTS.Scheduling.StoryPoints`, the approved `Custom.InvestmentCategory` and `Custom.Impact`, and `System.AssignedTo` copied from the Feature if it has an assignee. Then link each to the Feature as a child via `mcp__azure-devops__wit_work_item_link_write` (`System.LinkTypes.Hierarchy-Reverse`), then move pointed ones to `Dev Ready` in a follow-up call.
 4. **Re-order** any story whose only change is `Custom.Order` — one call each, touching that field alone.
 5. **Retire** stories the user approved — set `System.State` = `Removed`, or remove the parent link, whichever the user chose. **Never delete a work item.**
 6. **Post comments** (if the user said yes) via `mcp__azure-devops__wit_work_item_comment_write` — one short comment per edited item saying what changed and why, and naming the Feature edit that drove it (e.g. `Scope updated via edit of AB#6240: acceptance criteria 2 reworded to cover SSO; re-ordered from wave 3 to wave 2.`).
@@ -249,6 +253,7 @@ Updated AB#{id}: {title}
   Type: {type}
   Fields changed: {list}
   Points: {n → m | unchanged}
+  Classification: {Investment Category · Impact} {(was … → now …) | (unchanged)}
   State: {state} {(unchanged — Features are never moved) | (→ Dev Ready)}
   URL: {work item URL}
 

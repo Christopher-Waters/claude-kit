@@ -187,7 +187,18 @@ Create the approved task with `mcp__azure-devops__wit_work_item_write` (action `
   - `System.AreaPath` — copy from the parent
   - `System.AssignedTo` — copy from the parent (pass the parent's `uniqueName` / email if its `System.AssignedTo` value is an identity object). If the parent is unassigned, leave this field unset rather than failing.
 
-Then link the new task as a child of the parent with `mcp__azure-devops__wit_work_item_write` (action `add_child`) (or fall back to `wit_work_item_link_write` (action `link`) with link type `System.LinkTypes.Hierarchy-Forward` from parent → task).
+Then link the new task to its parent story — `updates` is an array, so a whole batch of stories can be linked in one call:
+
+```
+mcp__azure-devops__wit_work_item_link_write
+  action:  "link"
+  project: "{project}"
+  updates: [ { id: {storyId}, linkToId: {taskId}, type: "child" } ]
+```
+
+`type: "child"` from the story is what produces `System.LinkTypes.Hierarchy-Forward`. The parameter is a closed enum of friendly names — the literal `System.LinkTypes.Hierarchy-Forward` string is **not** accepted.
+
+**Do not create the Task with `mcp__azure-devops__wit_work_item_write` `action: "add_child"`.** Its `items[]` accepts only `{title, description, format, areaPath, iterationPath}` — there is no slot for `OriginalEstimate`, `RemainingWork`, or `System.AssignedTo`, so a Task created that way silently loses the hour estimate this command exists to set. Create the Task with `action: "create"`, then link it.
 
 If the create or link call fails, report the failure and ask the user whether to continue with the next story or abort the loop.
 

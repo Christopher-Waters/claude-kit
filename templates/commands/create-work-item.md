@@ -51,7 +51,7 @@ You can paste as much detail as you want — I'll structure it.
 Scan the user's response for:
 
 - Direct image URLs (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`)
-- Azure DevOps attachment URLs (e.g. `https://dev.azure.com/.../_apis/wit/attachments/...`)
+- Azure DevOps attachment URLs (e.g. `https://dev.azure.com/.../_apis/wit/attachments/...`) — to look at one before drafting, fetch it with `mcp__azure-devops__wit_work_item_attachment` (the attachment GUID and file name come out of that URL)
 - Markdown image syntax (`![alt](url)`)
 - Pasted screenshot blob paths or local file paths to images
 
@@ -120,14 +120,14 @@ The **Technical Details** section replaces a plain-language description. It and 
 {The feature-level technical shape. Cover the architecture or approach, the layers and
 existing components it touches (real paths), data-model changes, integrations, and the
 shared foundation the child stories build on. Note any sequencing constraint: what must
-land first sets `Custom.Order` in Step 9. Leave per-story detail to the stories.}
+land first sets `Custom.Order` in Step 3F. Leave per-story detail to the stories.}
 
 ### Business Value
 {Why this is worth building — the problem it removes or the opportunity it opens.}
 
 ### Scope
 - {each coherent, independently shippable chunk of work — these become the
-  child User Stories in Step 9}
+  child User Stories in Step 3F}
 - ...
 
 ### Out of Scope
@@ -232,7 +232,7 @@ triggers it.}
 A Hot Fix uses the same draft shape as a Bug. Two differences:
 
 - **Severity and Priority are constrained.** A Hot Fix is by definition urgent — propose Priority `1` (or `2` at the loosest) and Severity `1 - Critical` or `2 - High`. If the requirements don't support that, the item is probably a Bug; say so before drafting.
-- **Add a `### Production Impact` section** naming what is broken right now, which environment, and roughly who is affected. On an out-of-band change, this is the section the reviewer reads right after the Summary.
+- **Add a `### Production Impact` section** directly after `### Summary`, naming what is broken right now, which environment, and roughly who is affected. On an out-of-band change, this is the section the reviewer reads right after the Summary. It does not replace the Summary or the Technical Details — the Summary stays plain English for the PM, the Technical Details stay the developer's.
 
 **Inferring Priority and Severity for Bugs and Hot Fixes:**
 
@@ -254,9 +254,82 @@ Propose initial values based on the requirements, then let the user override dur
 
 Severity describes user impact; Priority describes scheduling urgency. They are independent — a Sev 2 can be Priority 3 if a workaround exists.
 
+### Investment Category and Impact (every type)
+
+Every User Story, Bug and Hot Fix gets an **Investment Category** (`Custom.InvestmentCategory`) and an **Impact** (`Custom.Impact`). Both are restricted picklists on the `Agile - CSI` process, and Serena's Monthly Executive and Backlog Grooming reports rank work by them. Propose both from the requirements, show them directly under the draft title with a one-line reason, and let the user change either. A Feature gets one pair that every child story inherits — the Feature type itself has neither field, so never write them to the Feature.
+
+| Investment Category | Choose it when |
+|---------------------|----------------|
+| **Strategic Initiative** | part of a named initiative, launch, or client commitment (e.g. C2Q, the AI Assistant, Rotary) |
+| **Quick Win** | small (about 3 points or fewer) with value out of proportion to that |
+| **Risk Mitigation** | mainly reduces compliance, security, PII, data-integrity, or payment/financial risk |
+| **Maintenance** | anything else that keeps the product working or improves it. The default |
+
+| Impact | Choose it when |
+|--------|----------------|
+| **Strategic** | advances a company-level goal or a client commitment |
+| **Large** | materially changes outcomes for many users or for a client |
+| **Medium** | meaningfully improves a recurring workflow |
+| **Small** | a minor improvement for a limited audience |
+| **Tiny/One-off** | cosmetic, an edge case, or a one-time fix |
+
+Impact is the difference the item makes, not its size. Spell the values exactly as above (`Tiny/One-off` included): Azure DevOps rejects anything else. Serena's Teams wizard chooses from the same tables, so an item reads the same whichever way it was created.
+
+**Only where the process has the fields.** Every project on the `Agile - CSI` process has them (CSI Development, CST Development and the rest). Confirm once per session with `mcp__azure-devops__wit_work_item` (`action: get_type`) for the type being created; if `Custom.InvestmentCategory` and `Custom.Impact` aren't in its `fields`, leave both out of the draft, the confirmation, and the create call — writing a field the process doesn't define fails the create.
+
 ### Title Prefix
 
 The title MUST start with one of the product prefixes from the project's CLAUDE.md (e.g. `COM`, `CDA`, `PAY`, `AUD`, `SER`, `PSSF`, `TPS`, `MTG`). If the project CLAUDE.md does not define a prefix table, ask the user which prefix to use before drafting. Format is `PREFIX - Title Here`.
+
+### Step 3F: Decompose the Feature into child stories (Features only)
+
+Directly under the Feature draft, in the same message, present the decomposition as a table — one row per proposed child User Story:
+
+```
+### Decomposition Plan — {n} child stories
+
+| # | Order | Proposed title | Summary (one line) | Points | Mockup |
+|---|-------|----------------|--------------------|--------|--------|
+| 1 |   1   | {Prefix} - …   | …                  |   3    | yes    |
+| 2 |   1   | {Prefix} - …   | …                  |   2    | no     |
+| 3 |   2   | {Prefix} - …   | …                  |   5    | yes    |
+
+**Sequencing:** Order 1 (#1, #2) ships first and the two are independent.
+Order 2 (#3) needs #1's endpoint before it can render.
+
+Total: {sum} points across {n} stories.
+```
+
+The Order column comes first on purpose — it matches the wave table `/implement` prints for a Feature (`implement.md`, "Execution Waves (Custom.Order)"), so the two commands produce visually identical artifacts.
+
+**Each child is a full User Story draft.** Start from the Feature's **Scope** bullets — each one is a candidate child; if a bullet is really two stories, split it. Draft every child with the User Story shape above: its own plain-English Summary, Technical Details specific to that story (drawn from the Feature's Technical Details and the code), and testable acceptance criteria. The table's Summary column is a one-line version of that child's plain-English Summary — the same no-code rule applies, and it is the text that opens the child's description.
+
+**Every child carries the same prefix as its parent Feature.** Validate all titles up front: an unprefixed child fails at create time, after the Feature already exists.
+
+**Sizing baseline (state it in the draft, above or below the table):**
+
+```
+Story points assume a **senior developer working with Claude** — override any
+value you disagree with.
+```
+
+> **Assume a senior developer working with Claude is the implementer.** Discount for what Claude removes — boilerplate, test scaffolding, mechanical wiring, codebase search. Do NOT discount for ambiguous AC, product decisions, data migrations, cross-team coordination, or verification needing a running environment.
+
+That is the same baseline `/quote`, `/quote-backlog` and `/plan-backlog` estimate against, so a `/quote` run against a story created here should land on the same number. If the two disagree, one of them is wrong — reconcile it rather than explaining the gap away.
+
+Use the modified Fibonacci scale `1, 2, 3, 5, 8`. **No child story may be larger than 8** — a 13 means the decomposition is wrong and that child must be split again.
+
+**Count limits.** Between 2 and 10 child stories. Fewer than 2 means this should have been a User Story — say so and offer to switch the type instead of creating a one-child Feature. More than 10 means the Feature is too big — do NOT silently truncate; offer to (i) merge the smallest related stories or (ii) split this into two Features.
+
+**Order validation — run it as a check, not a vibe:**
+
+1. Orders are positive integers starting at 1, contiguous, no gaps.
+2. For every dependency "story A needs story B", require `order(B) < order(A)`. **Equal orders with a dependency between them is an error**, and so is a dependency pointing at a *higher* order.
+3. Every story at order N must be buildable against the merged state of orders 1..N-1 only — that is what "stories sharing an order are mutually independent" means.
+4. If a check fails, do not present the plan: bump the dependent story's order, renumber, and re-validate first.
+5. Render the result as the plain-language **Sequencing** paragraph shown above.
+
+**Mockups are decided per child, not per Feature.** The Feature itself never gets a mockup. Use the same UI heuristic as Step 5 (a screen, a form, a button, a workflow) to set the Mockup column. Non-UI children are marked `No mockup — non-UI work`.
 
 ### Approval
 
@@ -268,9 +341,19 @@ Approve this draft? (yes / suggest changes / cancel)
 
 **Wait for the user.** If they suggest changes, revise the draft and present it again — repeat until they approve or cancel. Do NOT proceed to story points, mockup, or project selection until approved.
 
+For a **Feature**, that one gate approves the ENTIRE plan — the Feature and every child. Alongside ordinary wording changes, `suggest changes` covers these child-level edits:
+
+- `edit 3: <what to change>` — retitle, re-summarize, re-point, or flip the mockup flag on child 3
+- `add: <description>` — append a child, give it an order, and re-validate
+- `remove 2` — drop a child; re-check that nothing depended on it and renumber the orders to close any gap
+- `reorder 3 -> 1` — move a child between waves and re-run every ordering rule
+- `split 4` / `merge 2,3` — the two most common reactions to a decomposition
+
+After ANY of these: re-run the order validation, re-render the whole table, and re-ask the gate. Never accept approval of part of the plan.
+
 ## Step 4: Propose Story Points
 
-**Skip this step entirely for a Feature.** A Feature's size is the sum of its child stories — the Feature itself gets no `StoryPoints` value and stays in `New`. Its stories are pointed in Step 9. Go to Step 5.
+**Skip this step entirely for a Feature.** A Feature's size is the sum of its child stories — the Feature itself gets no `StoryPoints` value and stays in `New`. Its stories were pointed in Step 3F. Go to Step 5.
 
 For a **Bug**, **User Story**, or **Hot Fix**, every work item this command creates gets a story point estimate — proposed automatically, applied only with the user's agreement.
 
@@ -361,8 +444,9 @@ Before creating anything in Azure DevOps, present a final summary and ask for on
 **Production Impact:** {one line}
 {end for Hot Fixes}
 {for Features:}
-**Scope items:** {count} — offered as child stories after creation
+**Child stories:** {n} ({sum} points) — created with the Feature, per the approved Decomposition Plan
 {end for Features}
+**Investment Category · Impact:** {category} · {impact}{for Features: — on every child story}
 **Story Points:** {n (agreed) | skipped | n/a — Features aren't pointed}
 **Initial State:** {Dev Ready (pointed) | New (no points) | New (Feature)}
 **Mockup:**    {Embedded | Not requested | Skipped (non-UI)}
@@ -374,7 +458,7 @@ Create this work item now? (yes / edit / cancel)
 
 **Wait for the user.**
 - `yes` → proceed to Step 8
-- `edit` → ask which field to revise (title, summary, technical details, AC, priority, severity, story points, project, mockup), revise it, then re-show this summary
+- `edit` → ask which field to revise (title, summary, technical details, AC, priority, severity, production impact, investment category, impact, story points, project, mockup), revise it, then re-show this summary
 - `cancel` → abort with no work item created and confirm "Cancelled — no work item created."
 
 ## Step 8: Render to HTML and Create
@@ -406,7 +490,7 @@ A description that is one long paragraph of plain prose is not acceptable — ev
 - **Lists** are used instead of comma-separated prose whenever the draft contains 2+ parallel items (steps, files, references, acceptance criteria).
 - **Section headings** *inside a field's own content* are kept — they become `<h3>` and structure the rendered output. The draft's **top-level** section headings are different: they are routing labels, not content, and the heading is dropped when its section becomes its own field (see below).
 
-Apply this pass to every section (Technical Details, Acceptance Criteria, Steps to Reproduce, Expected/Actual Behavior, Environment/Scope, Open Questions). Apply it equally to Bugs, Hot Fixes, and User Stories. **The Summary is the exception:** it gets no code spans and no identifiers (Step 3), only an optional bolded outcome.
+Apply this pass to every section (Technical Details, Production Impact, Acceptance Criteria, Steps to Reproduce, Expected/Actual Behavior, Environment/Scope, Prior Art, Open Questions). Apply it equally to Bugs, Hot Fixes, User Stories, Features, and every child story. **The Summary is the exception:** it gets no code spans and no identifiers (Step 3), only an optional bolded outcome.
 
 ### Split the draft into fields — acceptance criteria never go in the description
 
@@ -441,7 +525,7 @@ Do **not** send `Microsoft.VSTS.Common.AcceptanceCriteria` on a Bug. Still *writ
 | `### Summary`, `### Production Impact`, `### Technical Details`, `### Prior Art`, `### Open Questions` | `System.Description`, in that order |
 | `### Steps to Reproduce`, `### Expected Behavior`, `### Actual Behavior`, `### Environment / Scope` | `Microsoft.VSTS.TCM.ReproSteps` |
 
-**Feature** — everything renders into `System.Description`, with `### Summary` first (see the Features bullet under *Call the create API*).
+**Feature** — everything renders into `System.Description`, with `### Summary` first (see the Features bullet under *Call the create API*, and Phase 1 below for where the Decomposition block goes).
 
 **The Summary always leads** the field the form displays and keeps its `<h3>Summary</h3>` heading, because it shares that field with other sections. It is never omitted.
 
@@ -457,21 +541,38 @@ This applies to **User Story**. It does **not** apply to Bug or Hot Fix: neither
 
 ### Call the create API
 
-Call `mcp__azure-devops__wit_work_item_write` (action `create`) with:
+Call `mcp__azure-devops__wit_work_item_write` with `action: "create"`:
 
 - **project**: the chosen project
 - **workItemType**: `Feature`, `Bug`, `User Story`, or `Hot Fix` (two words, exact casing)
-- **title**: the approved title (with prefix)
-- **fields**: a JSON Patch document setting:
-  - `System.Description` — the rendered HTML description (with embedded mockup `<img>` and any user-supplied images). On a **Bug** this is the labelled duplicate of the composed body, not the description alone
+- **fields**: an **array of `{name, value, format}` objects** — *not* a JSON Patch document. The title is one of them (`System.Title`), not a separate parameter. Every large-text field needs `format: "Html"` or Azure DevOps may interpret it as Markdown. Every `value` is a **string**, so numerics are stringified (`"2"`, `"3"`, `"1"`).
+
+```
+mcp__azure-devops__wit_work_item_write
+  action:       "create"
+  project:      "{project}"
+  workItemType: "User Story"
+  fields: [
+    { name: "System.Title",                             value: "{Prefix} - {title}" },
+    { name: "System.Description",                       value: "<h3>Summary</h3><p>…</p><h3>Technical Details</h3>…", format: "Html" },
+    { name: "Microsoft.VSTS.Common.AcceptanceCriteria", value: "<ol>…</ol>", format: "Html" }
+  ]
+```
+
+The example above is a **User Story**. Other types carry different fields, and getting this wrong is invisible: **Azure DevOps accepts a write to a field a work item type does not have.** The value persists and reads back over the API while no form ever renders it — nothing raises, nothing logs. Confirm with `mcp__azure-devops__wit_work_item` (`action: get_type`) rather than assuming.
+
+The fields to set:
+  - `System.Title` — the approved title, with its prefix
+  - `System.Description` — the rendered HTML: the `<h3>Summary</h3>` block first, then the Technical Details, the embedded mockup `<img>` and any user-supplied images, then the remaining sections per the routing tables above. On a **Bug** this is the labelled duplicate of the composed body, not unique content
   - `Microsoft.VSTS.Common.AcceptanceCriteria` — **User Story only.** The rendered criteria list and **only** the criteria (no `<h3>Acceptance Criteria</h3>` wrapper, and no copy of it in `System.Description`); writing it is what clears the process template's placeholder tip. **Do not send this field on a Bug or a Hot Fix** — neither type has it
   - `Microsoft.VSTS.Scheduling.StoryPoints` — the points agreed in Step 4 (omit entirely if the user skipped, and **always** for a Feature)
+  - `Custom.InvestmentCategory` and `Custom.Impact` — the approved values, on a User Story, Bug or Hot Fix. **Never on a Feature**; its pair goes on each child story instead. If a project's process rejects them, retry without them and say so in the confirmation
   - For Features:
-    - Render `Summary` first, then `Technical Details`, `Business Value`, `Scope`, `Out of Scope`, and `Success Criteria`, into the description. Put `Success Criteria` in `Microsoft.VSTS.Common.AcceptanceCriteria` **only if** the process template exposes that field on Feature — if the create call rejects it, fold the block into the description and retry rather than dropping it.
+    - Render `Summary` first, then `Technical Details`, `Business Value`, `Scope`, `Out of Scope`, `Success Criteria`, and `Prior Art`, into the description. Put `Success Criteria` in `Microsoft.VSTS.Common.AcceptanceCriteria` **only if** the process template exposes that field on Feature — if the create call rejects it, fold the block into the description and retry rather than dropping it.
     - `Microsoft.VSTS.Common.BusinessValue` — only if the user supplied a number. Never invent one.
     - Omit `Microsoft.VSTS.Scheduling.StoryPoints` entirely.
   - For Bugs:
-    - `Microsoft.VSTS.TCM.ReproSteps` — the **whole composed body**: summary, technical details, steps, expected behavior, actual behavior, acceptance criteria and open questions, each under its own `<h3>`. This is the Bug's field of record; its form shows no Description control.
+    - `Microsoft.VSTS.TCM.ReproSteps` — the **whole composed body**: summary, technical details, steps, expected behavior, actual behavior, acceptance criteria, prior art and open questions, each under its own `<h3>`. This is the Bug's field of record; its form shows no Description control. The acceptance criteria are folded in here because the Bug type has no Acceptance Criteria field.
     - `Microsoft.VSTS.TCM.SystemInfo` — the `Environment / Scope` section. Omit the field entirely when there is no environment to record, rather than writing an empty value that leaves a blank box on the form.
     - `Microsoft.VSTS.Common.Priority` — the chosen Priority (1–4)
     - `Microsoft.VSTS.Common.Severity` — the chosen Severity (`1 - Critical`, `2 - High`, `3 - Medium`, `4 - Low`)
@@ -482,52 +583,75 @@ Call `mcp__azure-devops__wit_work_item_write` (action `create`) with:
 
 If the `Open Questions` section is non-empty, append it as a clearly-labeled HTML block (`<h3>Open Questions</h3><ul>...</ul>`) **to the field that work item type displays** — the composed `ReproSteps` body on a **Bug**, `System.Description` on a **User Story**, **Hot Fix**, or **Feature**. Putting it in the description of a Bug hides it from every reader.
 
+### Call the create API (Feature — three phases)
+
+A Feature and its children are created in one run, in this order. Nothing is created until the Step 3F plan was approved.
+
+**Phase 1 — the Feature, first.** One `mcp__azure-devops__wit_work_item_write` `action: "create"` with `workItemType: "Feature"` and the `fields[]` shape above. Capture the returned id as `{fid}`.
+
+The Feature's description is assembled in this order: the `<h3>Summary</h3>` block, then `<h3>Technical Details</h3>`, `<h3>Business Value</h3>`, and the other sections from the Features bullet above, then a `<h3>Decomposition</h3>` block, then any open questions. The Decomposition block carries the Step 3F plan **onto the work item** — an HTML `<table>` with one row per child (Order, Story, Points, Depends on, Mockup) followed by the **Sequencing** paragraph rendered as HTML. Without it the ordering rationale exists only in this chat; `/implement` re-derives the waves from `Custom.Order`, but the reviewer reading the Feature in Azure DevOps needs to see *why* the waves are ordered the way they are. (Child AB# ids do not exist yet in Phase 1 — the table names children by title.)
+
+**If Phase 1 fails, stop — create nothing else.** Creating the Feature first is precisely what makes this failure harmless.
+
+**Phase 2 — the children, in ascending execution order.** One `create` per child (`workItemType: "User Story"`), so the AB# sequence matches the wave sequence:
+
+```
+mcp__azure-devops__wit_work_item_write
+  action:       "create"
+  project:      "{project}"
+  workItemType: "User Story"
+  fields: [
+    { name: "System.Title",                             value: "{Prefix} - …" },
+    { name: "System.Description",                       value: "<h3>Summary</h3><p>…</p><h3>Technical Details</h3>…", format: "Html" },
+    { name: "Microsoft.VSTS.Common.AcceptanceCriteria", value: "<ol>…</ol>", format: "Html" },
+    { name: "Microsoft.VSTS.Scheduling.StoryPoints",    value: "3" },
+    { name: "Custom.Order",                             value: "1" },
+    { name: "Custom.InvestmentCategory",                value: "Strategic Initiative" },
+    { name: "Custom.Impact",                            value: "Large" }
+  ]
+```
+
+Each child is rendered and routed exactly like a standalone User Story: its own `<h3>Summary</h3>` block first, then its Technical Details, then either the mockup `<img>` from Step 5 or the `No mockup — non-UI work` note, with its criteria in `Microsoft.VSTS.Common.AcceptanceCriteria` only.
+
+**`Custom.Order` rejection fallback.** `Custom.Order` comes from an inherited process and may be absent from the User Story form in some projects; `Microsoft.VSTS.Scheduling.StoryPoints` is absent from some templates. If the `create` is rejected because of either, retry that child once *without* both fields, then set them with a follow-up `action: "update"`:
+
+```
+mcp__azure-devops__wit_work_item_write
+  action:  "update"
+  project: "{project}"
+  id:      {childId}
+  updates: [ { op: "add", path: "/fields/Custom.Order", value: "1" } ]
+```
+
+If that also fails, report the child as created *without* an execution order — do not leave it silently unordered. `/implement` treats a child with no `Custom.Order` as a final catch-all wave, so **every** child must end up with a value.
+
+**Phase 3 — link every child to the Feature in ONE call.** `updates` is an array, so this is a single call, not one per child:
+
+```
+mcp__azure-devops__wit_work_item_link_write
+  action:  "link"
+  project: "{project}"
+  updates: [
+    { id: {fid}, linkToId: {story1Id}, type: "child" },
+    { id: {fid}, linkToId: {story2Id}, type: "child" }
+  ]
+```
+
+`type: "child"` from the Feature is what produces `System.LinkTypes.Hierarchy-Forward` — the link type parameter is a closed enum of friendly names and the literal `System.LinkTypes.Hierarchy-Forward` string is **not** accepted.
+
+**Do NOT use `mcp__azure-devops__wit_work_item_write` `action: "add_child"`.** Its `items[]` accepts only `{title, description, format, areaPath, iterationPath}` — there is no slot for AcceptanceCriteria, StoryPoints, or `Custom.Order`, so children created that way cannot satisfy the field requirements above.
+
+**Partial-failure policy.** Never leave orphans and never roll back — this command has no delete path and must not grow one. If a child create fails mid-run: report which items already exist by AB#, then ask whether to retry the failed child or stop and leave the rest for manual creation. If Phase 3 fails after the children exist, report the ids and the exact link call to retry.
+
 ### Move to Dev Ready (pointed items only)
 
-If story points were agreed in Step 4, set `System.State` to `Dev Ready` via `mcp__azure-devops__wit_work_item_write` (action `update`) **after** the item is created (a separate call — new items start in `New`, and some process templates reject a non-initial state in the create call). If the state transition is rejected, report the error and leave the state as-is — don't silently retry through intermediate states. Items created without points stay in `New`.
+If story points were agreed in Step 4, set `System.State` to `Dev Ready` via `mcp__azure-devops__wit_work_item_write` with `action: "update"` (`id` plus `updates: [ { op: "add", path: "/fields/System.State", value: "Dev Ready" } ]`) **after** the item is created (a separate call — new items start in `New`, and some process templates reject a non-initial state in the create call). If the state transition is rejected, report the error and leave the state as-is — don't silently retry through intermediate states. Items created without points stay in `New`.
+
+The same applies to each child story of a Feature: every child was pointed in Step 3F, so each one gets the same `update` once Phase 3 has linked it.
 
 **Features are never moved.** A Feature stays in `New` and advances only as its child stories are verified and closed — the same rule `/implement` follows.
 
-## Step 9: Offer Child User Stories (Features only)
-
-Skip this step for Bugs and User Stories.
-
-A Feature is a container — `/implement AB#{id}` on a Feature implements its **child User Stories in `Custom.Order` waves**, so a Feature with no children can't be worked. After the Feature is created, ask:
-
-```
-Draft child user stories for this feature now? (yes / no — I'll add them later)
-```
-
-**Wait for the user.** On `no`, skip to Step 10 and point them at `/plan-backlog` for later.
-
-On `yes`:
-
-1. Turn each bullet from the Feature's **Scope** section into a candidate User Story using the User Story draft shape from Step 3: its own plain-English Summary, Technical Details specific to that story (drawn from the Feature's Technical Details and the code), and testable acceptance criteria. Keep each one independently shippable; if a bullet is really two stories, split it.
-2. Assign each story a **`Custom.Order`** value. Stories that can be built in parallel share the same number; a story that depends on an earlier one gets a higher number. Start at `1` and increment per wave. This field drives the wave ordering in `/implement` — a story with no value lands in a catch-all wave, so set it on every story.
-3. Propose story points for each using the Step 4 rubric.
-4. Present the whole set for approval at once:
-
-   | # | Order | Proposed Title | Points | Summary |
-   |---|-------|----------------|--------|---------|
-
-   The Summary column is the story's plain-English Summary, the same text that will open its description.
-
-   ```
-   Approve these child stories? (yes / change N / drop N / cancel)
-   ```
-
-   **Wait for the user.** Revise and re-present until approved. Do not create anything before approval.
-5. On approval, create each story with `mcp__azure-devops__wit_work_item_write` (action `create`) in the same project, setting:
-   - `System.Description` and `Microsoft.VSTS.Common.AcceptanceCriteria` — rendered to HTML per the Step 8 rules, Summary first
-   - `Custom.Order` — the wave number
-   - `Microsoft.VSTS.Scheduling.StoryPoints` — the agreed points
-   - `System.AssignedTo` — copied from the Feature if the Feature has an assignee; otherwise leave unset
-6. Link each story to the Feature as a child via `mcp__azure-devops__wit_work_item_link_write` (`System.LinkTypes.Hierarchy-Reverse` from the story to the Feature).
-7. Move each pointed story to `Dev Ready` in a follow-up update, per the Step 8 rule. **The Feature's state is never changed.**
-
-If a story fails to create or link, report which ones succeeded and which didn't — don't roll back the Feature.
-
-## Step 10: Confirm
+## Step 9: Confirm
 
 **Read the item back first**, and check the fields that type actually renders — a write to a field the type lacks *succeeds*, so reading back the wrong field proves nothing.
 
@@ -538,15 +662,15 @@ For a **User Story**, fetch `System.Description` and `Microsoft.VSTS.Common.Acce
 
 For a **Bug**, fetch `Microsoft.VSTS.TCM.ReproSteps` and `Microsoft.VSTS.TCM.SystemInfo`:
 
-1. `ReproSteps` carries every section — description, steps, expected, actual, acceptance criteria — each under its own heading.
+1. `ReproSteps` carries every section — summary, technical details, steps, expected, actual, acceptance criteria — each under its own heading.
 2. The environment is in `SystemInfo`.
 3. No section appears **only** in `System.Description`, which the Bug form does not display.
 
-For a **Hot Fix**, fetch `System.Description` and `Microsoft.VSTS.TCM.ReproSteps`, and confirm the narrative is in the former and the reproduction detail in the latter.
+For a **Hot Fix**, fetch `System.Description` and `Microsoft.VSTS.TCM.ReproSteps`, and confirm the narrative — Summary, then Production Impact, then Technical Details — is in the former and the reproduction detail in the latter.
 
-On **every** type, the displayed field (`System.Description`, or `ReproSteps` on a Bug) opens with the `<h3>Summary</h3>` block, and that block contains no `<code>`. A `Technical Details` block follows it. Check each child story created in Step 9 too.
+On **every** type, the displayed field (`System.Description`, or `ReproSteps` on a Bug) opens with the `<h3>Summary</h3>` block, and that block contains no `<code>`. A `Technical Details` block follows it. For a **Feature**, also confirm its description carries the `<h3>Decomposition</h3>` block, and check every child story created in Phase 2 the same way as a User Story, plus its `Custom.Order`.
 
-If a check fails the write didn't take — fix it with `wit_work_item_write` (action `update`) before reporting success. Don't report a created item you haven't read back.
+If a check fails the write didn't take — fix it with `mcp__azure-devops__wit_work_item_write` `action: "update"` before reporting success. Don't report a created item you haven't read back.
 
 After creation, report:
 
@@ -572,13 +696,15 @@ Next steps:
   /implement AB#{id}   — start working on it
 ```
 
-For a **Feature**, use these next steps instead:
+For a **Feature**, use these next steps instead — `{fid}` is the Feature's id, not a child's:
 
 ```
 Next steps:
-  /explain AB#{id}     — re-read the feature in plain language
-  /plan-backlog        — propose child Tasks for the Dev Ready stories
-  /implement AB#{id}   — implement the child stories in Custom.Order waves
+  /explain AB#{fid}     — re-read the feature in plain language
+  /plan-backlog         — propose child Tasks for the Dev Ready stories
+  /implement AB#{fid}   — implement the child stories in Custom.Order waves
 ```
+
+`/quote` is not offered for a Feature: its size is the sum of its children, which are already pointed.
 
 Do not assign the work item, set an iteration, or add tags unless the user explicitly asks — those are downstream decisions.

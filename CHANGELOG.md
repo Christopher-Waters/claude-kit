@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.3.5 — 2026-10-05
+
+### Work items get an Investment Category and an Impact
+
+User Stories, Bugs and Hot Fixes on the `Agile - CSI` process now have two restricted picklists. Serena's Monthly Executive and Backlog Grooming reports rank work by them:
+
+- **Investment Category** (`Custom.InvestmentCategory`): Strategic Initiative, Quick Win, Risk Mitigation, Maintenance.
+- **Impact** (`Custom.Impact`): Strategic, Large, Medium, Small, Tiny/One-off.
+
+The kit now sets and maintains them like story points: Claude proposes, the user agrees.
+
+- **`/create-work-item`** proposes both, with a one-line reason, under the draft title and in the final confirmation. It writes them on create. A Feature gets one pair that each child story inherits; the Feature itself never carries them.
+- **`/quote`** and **`/quote-backlog`** propose both for items that have neither set, and write them in the same update as the points. `/quote-backlog` gets a Category · Impact column. They never overwrite a value someone already chose.
+- **`/edit-work-item`** shows both, and keeps them accurate when an edit changes why an item exists or how much it matters. It proposes them when they're missing.
+- **CLAUDE.md workflow** gains a "Work Item Classification" rule. It covers what each value means, that Priority is not impact, and that projects whose process lacks the fields skip them.
+
+### `/create-work-item` and `/plan-backlog` brought up to date
+
+Projects had been carrying fixes these two templates didn't have, so every kit update reverted those fixes. The templates now include them:
+
+- **`/create-work-item`**:
+  - Feature decomposition (Step 3F: the Decomposition Plan, order validation, and per-child mockups) happens **before** the Feature is created, so its description carries the plan.
+  - The create call passes `fields` as an array of `{name, value, format}`. The old text described a JSON Patch document, which the MCP server doesn't accept.
+  - Features are created in three phases: the Feature, then its children with points and `Custom.Order`, then one call to link them.
+  - There is an explicit warning against `add_child`, which has no slot for AC, points or `Custom.Order`.
+  - Step 9 reads the created item back to confirm it.
+- **`/plan-backlog`** creates the Task and then links it with `type: "child"`. It no longer uses `add_child`, which silently dropped the hour estimate.
+
 ## 2.3.4 — 2026-10-05
 
 ### Work items serve two readers: a plain-English Summary for the PM, Technical Details for the developer
