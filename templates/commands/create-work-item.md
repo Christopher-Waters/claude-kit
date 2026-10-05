@@ -77,7 +77,34 @@ If you find nothing, say so in one line rather than omitting the section — "no
 
 ## Step 3: Develop the Plan
 
-Translate the user's free-form requirements into a structured work item draft. The shape depends on the type:
+Translate the user's free-form requirements into a structured work item draft. The shape depends on the type, but every type serves **two readers**:
+
+- **The PM** reads the **Summary** at the top: plain English, no code.
+- **The developer and Claude Code** read everything below it: **technical**, specific, and grounded in the actual codebase. It should be enough to plan and implement the change without rediscovering where it lives.
+
+Neither part substitutes for the other. A plain-English item is unimplementable, and an item that is only technical leaves the PM guessing.
+
+### The Summary — every type, always first
+
+Every work item starts with a **plain-English Summary** written for someone who has never seen the code: a PM, a stakeholder, a support lead. It is the first section of the draft and the first thing on the work item form (Step 8 routes it).
+
+- **2–4 sentences** covering what is changing (or what is broken), who notices, and why it matters. On a Bug or Hot Fix, say what people see go wrong, who is affected, and what "fixed" looks like to them.
+- **No technical vocabulary.** That means no code identifiers, file, field, or endpoint names, framework or database names, status codes, or unexplained acronyms. Name things the way a user sees them: the screen, the button, the report, the email. Write "The **Export** button on the Payments page shows an error instead of downloading the file," not "`GET /api/payments/export` returns 500."
+- **No code spans.** If a sentence seems to need one, rewrite the sentence. Bold the one key outcome if it helps; the rest is plain prose.
+- **Not a copy of the Technical Details.** The Summary is what a PM could repeat in a meeting. The sections below it carry the detail the team needs.
+
+Check it before showing the draft: could a PM understand every word without asking a developer? If not, rewrite it.
+
+### Technical Details — everything below the Summary
+
+The **Technical Details** section replaces a plain-language description. It and the sections after it (acceptance criteria, repro steps, prior art) are written for the developer and for Claude Code running `/implement`. Use the real vocabulary:
+
+- **Ground it in the code.** Start from what Step 2's codebase search found, then read enough of the relevant code to name what changes. Use real file paths, components, classes, services, endpoints and routes, collections or tables, fields, enums, and config keys, all in code spans. Never invent a path or a name. If you couldn't confirm something, mark it **(unverified)**.
+- **Say what changes and where, layer by layer.** Cover the UI (screens, components, routes), the API (endpoints, request and response shape, validation), services and business rules, data (new or changed fields, indexes, migrations or backfills), permissions and roles, and integrations or background jobs. Skip a layer the work doesn't touch.
+- **Name the rules and constraints.** Include business rules, edge cases, error handling, backward compatibility, and performance or security concerns, plus anything the implementer must not break.
+- **It is not the implementation plan.** Name what changes, where, and under which rules. Leave step-by-step code to `/implement`, which plans from this section.
+- **No working codebase in the session?** Then say **"Not verified against the code"** at the top of the section and write only what the user told you. Never fill the gap with guessed paths.
+- **Sensitive data policy applies.** Never put a PII value or a credential in a work item. Refer to a sensitive field by its purpose ("the tax ID field").
 
 ### For a Feature:
 
@@ -86,9 +113,14 @@ Translate the user's free-form requirements into a structured work item draft. T
 
 **Type:** Feature
 
-### Description
-{2–4 sentences describing the capability being delivered and who it serves.
-A Feature is a container — describe the outcome, not the implementation.}
+### Summary
+{2–4 plain-English sentences for a non-technical reader — see "The Summary" above.}
+
+### Technical Details
+{The feature-level technical shape. Cover the architecture or approach, the layers and
+existing components it touches (real paths), data-model changes, integrations, and the
+shared foundation the child stories build on. Note any sequencing constraint: what must
+land first sets `Custom.Order` in Step 9. Leave per-story detail to the stories.}
 
 ### Business Value
 {Why this is worth building — the problem it removes or the opportunity it opens.}
@@ -123,9 +155,15 @@ A Feature carries **no story points** and **never moves to `Dev Ready`** — siz
 
 **Type:** User Story
 
-### Description
-{2–4 sentences in plain language. Explain the user-facing behavior and the
-business or user value. Avoid implementation detail — that lives in tasks.}
+### Summary
+{2–4 plain-English sentences for a non-technical reader — see "The Summary" above.}
+
+### Technical Details
+{What changes and where, layer by layer: the UI components and routes, API endpoints
+(with request/response shape and validation), services and business rules, data fields
+and migrations, and permissions. Use real paths and names from the code. Include the
+rules, edge cases, and constraints the implementer must respect. This is what
+`/implement` plans from, and it never moves to the Task.}
 
 ### Acceptance Criteria
 1. {Given/When/Then or numbered behavior — must be testable}
@@ -153,8 +191,15 @@ business or user value. Avoid implementation detail — that lives in tasks.}
 **Priority:** {1 | 2 | 3 | 4}
 **Severity:** {1 - Critical | 2 - High | 3 - Medium | 4 - Low}
 
-### Description
-{1–2 sentences describing the observed problem in plain language.}
+### Summary
+{2–4 plain-English sentences for a non-technical reader — see "The Summary" above.}
+
+### Technical Details
+{The failing code path: the screen or component, the endpoint and the request that
+fails, and the exact error message, status, log line, or stack trace if known. Name
+the likely root cause and where it lives (real file and method), marked
+**(suspected)** unless you confirmed it in the code. Include the data condition that
+triggers it.}
 
 ### Steps to Reproduce
 1. ...
@@ -187,7 +232,7 @@ business or user value. Avoid implementation detail — that lives in tasks.}
 A Hot Fix uses the same draft shape as a Bug. Two differences:
 
 - **Severity and Priority are constrained.** A Hot Fix is by definition urgent — propose Priority `1` (or `2` at the loosest) and Severity `1 - Critical` or `2 - High`. If the requirements don't support that, the item is probably a Bug; say so before drafting.
-- **Add a `### Production Impact` section** naming what is broken right now, which environment, and roughly who is affected. This is the section the reviewer reads first on an out-of-band change.
+- **Add a `### Production Impact` section** naming what is broken right now, which environment, and roughly who is affected. On an out-of-band change, this is the section the reviewer reads right after the Summary.
 
 **Inferring Priority and Severity for Bugs and Hot Fixes:**
 
@@ -307,6 +352,7 @@ Before creating anything in Azure DevOps, present a final summary and ask for on
 **Title:**     {Prefix} - {title}
 **Type:**      {Feature | Bug | User Story | Hot Fix}
 **Project:**   {project}
+**Summary:**   {the plain-English Summary, in full}
 {for Bugs and Hot Fixes:}
 **Priority:**  {n}
 **Severity:**  {n - Label}
@@ -328,7 +374,7 @@ Create this work item now? (yes / edit / cancel)
 
 **Wait for the user.**
 - `yes` → proceed to Step 8
-- `edit` → ask which field to revise (title, description, AC, priority, severity, story points, project, mockup), revise it, then re-show this summary
+- `edit` → ask which field to revise (title, summary, technical details, AC, priority, severity, story points, project, mockup), revise it, then re-show this summary
 - `cancel` → abort with no work item created and confirm "Cancelled — no work item created."
 
 ## Step 8: Render to HTML and Create
@@ -360,7 +406,7 @@ A description that is one long paragraph of plain prose is not acceptable — ev
 - **Lists** are used instead of comma-separated prose whenever the draft contains 2+ parallel items (steps, files, references, acceptance criteria).
 - **Section headings** *inside a field's own content* are kept — they become `<h3>` and structure the rendered output. The draft's **top-level** section headings are different: they are routing labels, not content, and the heading is dropped when its section becomes its own field (see below).
 
-Apply this pass to every section (Description, Acceptance Criteria, Steps to Reproduce, Expected/Actual Behavior, Environment/Scope, Open Questions). Apply it equally to Bugs, Hot Fixes, and User Stories.
+Apply this pass to every section (Technical Details, Acceptance Criteria, Steps to Reproduce, Expected/Actual Behavior, Environment/Scope, Open Questions). Apply it equally to Bugs, Hot Fixes, and User Stories. **The Summary is the exception:** it gets no code spans and no identifiers (Step 3), only an optional bolded outcome.
 
 ### Split the draft into fields — acceptance criteria never go in the description
 
@@ -374,14 +420,15 @@ Verify with `mcp__azure-devops__wit_work_item` (`action: get_type`) rather than 
 
 | Draft section | Goes to |
 |---|---|
-| `### Description` | `System.Description` — plus the mockup `<img>`, user-supplied images, `Out of Scope`, `Prior Art`, `Open Questions` |
+| `### Summary` | `System.Description` — the **first** block, under its own `<h3>Summary</h3>` |
+| `### Technical Details` | `System.Description`, after the Summary, followed by the mockup `<img>`, user-supplied images, `Out of Scope`, `Prior Art`, and `Open Questions` |
 | `### Acceptance Criteria` | `Microsoft.VSTS.Common.AcceptanceCriteria` — **never** also in the description |
 
 **Bug** — its form renders only **Repro Steps** and **System Info**. It has **no Acceptance Criteria field**, and `System.Description` has **no control on the Bug form**, so anything routed there is invisible to a human reader:
 
 | Draft section | Goes to |
 |---|---|
-| `### Description`, `### Steps to Reproduce`, `### Expected Behavior`, `### Actual Behavior`, `### Acceptance Criteria`, `### Prior Art`, `### Open Questions` | `Microsoft.VSTS.TCM.ReproSteps` — composed into one document, each under its own `<h3>`, in that order |
+| `### Summary`, `### Technical Details`, `### Steps to Reproduce`, `### Expected Behavior`, `### Actual Behavior`, `### Acceptance Criteria`, `### Prior Art`, `### Open Questions` | `Microsoft.VSTS.TCM.ReproSteps` — composed into one document, each under its own `<h3>`, in that order |
 | `### Environment / Scope` | `Microsoft.VSTS.TCM.SystemInfo` |
 | (the same composed body) | `System.Description` — a labelled **duplicate**, for tools that read it without checking the type. Never unique content. |
 
@@ -391,8 +438,12 @@ Do **not** send `Microsoft.VSTS.Common.AcceptanceCriteria` on a Bug. Still *writ
 
 | Draft section | Goes to |
 |---|---|
-| `### Description`, `### Production Impact`, `### Prior Art`, `### Open Questions` | `System.Description` |
+| `### Summary`, `### Production Impact`, `### Technical Details`, `### Prior Art`, `### Open Questions` | `System.Description`, in that order |
 | `### Steps to Reproduce`, `### Expected Behavior`, `### Actual Behavior`, `### Environment / Scope` | `Microsoft.VSTS.TCM.ReproSteps` |
+
+**Feature** — everything renders into `System.Description`, with `### Summary` first (see the Features bullet under *Call the create API*).
+
+**The Summary always leads** the field the form displays and keeps its `<h3>Summary</h3>` heading, because it shares that field with other sections. It is never omitted.
 
 **Omit an empty section entirely** — never emit a bare `<h3>` with nothing under it. A heading with no body reads as content that went missing.
 
@@ -416,17 +467,17 @@ Call `mcp__azure-devops__wit_work_item_write` (action `create`) with:
   - `Microsoft.VSTS.Common.AcceptanceCriteria` — **User Story only.** The rendered criteria list and **only** the criteria (no `<h3>Acceptance Criteria</h3>` wrapper, and no copy of it in `System.Description`); writing it is what clears the process template's placeholder tip. **Do not send this field on a Bug or a Hot Fix** — neither type has it
   - `Microsoft.VSTS.Scheduling.StoryPoints` — the points agreed in Step 4 (omit entirely if the user skipped, and **always** for a Feature)
   - For Features:
-    - Render `Business Value`, `Scope`, `Out of Scope`, and `Success Criteria` into the description. Put `Success Criteria` in `Microsoft.VSTS.Common.AcceptanceCriteria` **only if** the process template exposes that field on Feature — if the create call rejects it, fold the block into the description and retry rather than dropping it.
+    - Render `Summary` first, then `Technical Details`, `Business Value`, `Scope`, `Out of Scope`, and `Success Criteria`, into the description. Put `Success Criteria` in `Microsoft.VSTS.Common.AcceptanceCriteria` **only if** the process template exposes that field on Feature — if the create call rejects it, fold the block into the description and retry rather than dropping it.
     - `Microsoft.VSTS.Common.BusinessValue` — only if the user supplied a number. Never invent one.
     - Omit `Microsoft.VSTS.Scheduling.StoryPoints` entirely.
   - For Bugs:
-    - `Microsoft.VSTS.TCM.ReproSteps` — the **whole composed body**: description, steps, expected behavior, actual behavior, acceptance criteria and open questions, each under its own `<h3>`. This is the Bug's field of record; its form shows no Description control.
+    - `Microsoft.VSTS.TCM.ReproSteps` — the **whole composed body**: summary, technical details, steps, expected behavior, actual behavior, acceptance criteria and open questions, each under its own `<h3>`. This is the Bug's field of record; its form shows no Description control.
     - `Microsoft.VSTS.TCM.SystemInfo` — the `Environment / Scope` section. Omit the field entirely when there is no environment to record, rather than writing an empty value that leaves a blank box on the form.
     - `Microsoft.VSTS.Common.Priority` — the chosen Priority (1–4)
     - `Microsoft.VSTS.Common.Severity` — the chosen Severity (`1 - Critical`, `2 - High`, `3 - Medium`, `4 - Low`)
   - For Hot Fixes:
     - `Microsoft.VSTS.TCM.ReproSteps` — steps, expected behavior, actual behavior and `Environment / Scope` (this type has no System Info field). If the `Hot Fix` type in this process template doesn't expose `ReproSteps`, fold them into `System.Description` rather than dropping them.
-    - Render the `Production Impact` section into `System.Description` as an `<h3>` block above the description body.
+    - Render the `Production Impact` section into `System.Description` as an `<h3>` block between the Summary and the Technical Details.
     - No Priority/Severity — a Hot Fix is urgent by definition.
 
 If the `Open Questions` section is non-empty, append it as a clearly-labeled HTML block (`<h3>Open Questions</h3><ul>...</ul>`) **to the field that work item type displays** — the composed `ReproSteps` body on a **Bug**, `System.Description` on a **User Story**, **Hot Fix**, or **Feature**. Putting it in the description of a Bug hides it from every reader.
@@ -451,7 +502,7 @@ Draft child user stories for this feature now? (yes / no — I'll add them later
 
 On `yes`:
 
-1. Turn each bullet from the Feature's **Scope** section into a candidate User Story using the User Story draft shape from Step 3 — plain-language description plus testable acceptance criteria. Keep each one independently shippable; if a bullet is really two stories, split it.
+1. Turn each bullet from the Feature's **Scope** section into a candidate User Story using the User Story draft shape from Step 3: its own plain-English Summary, Technical Details specific to that story (drawn from the Feature's Technical Details and the code), and testable acceptance criteria. Keep each one independently shippable; if a bullet is really two stories, split it.
 2. Assign each story a **`Custom.Order`** value. Stories that can be built in parallel share the same number; a story that depends on an earlier one gets a higher number. Start at `1` and increment per wave. This field drives the wave ordering in `/implement` — a story with no value lands in a catch-all wave, so set it on every story.
 3. Propose story points for each using the Step 4 rubric.
 4. Present the whole set for approval at once:
@@ -459,13 +510,15 @@ On `yes`:
    | # | Order | Proposed Title | Points | Summary |
    |---|-------|----------------|--------|---------|
 
+   The Summary column is the story's plain-English Summary, the same text that will open its description.
+
    ```
    Approve these child stories? (yes / change N / drop N / cancel)
    ```
 
    **Wait for the user.** Revise and re-present until approved. Do not create anything before approval.
 5. On approval, create each story with `mcp__azure-devops__wit_work_item_write` (action `create`) in the same project, setting:
-   - `System.Description` and `Microsoft.VSTS.Common.AcceptanceCriteria` — rendered to HTML per the Step 8 rules
+   - `System.Description` and `Microsoft.VSTS.Common.AcceptanceCriteria` — rendered to HTML per the Step 8 rules, Summary first
    - `Custom.Order` — the wave number
    - `Microsoft.VSTS.Scheduling.StoryPoints` — the agreed points
    - `System.AssignedTo` — copied from the Feature if the Feature has an assignee; otherwise leave unset
@@ -490,6 +543,8 @@ For a **Bug**, fetch `Microsoft.VSTS.TCM.ReproSteps` and `Microsoft.VSTS.TCM.Sys
 3. No section appears **only** in `System.Description`, which the Bug form does not display.
 
 For a **Hot Fix**, fetch `System.Description` and `Microsoft.VSTS.TCM.ReproSteps`, and confirm the narrative is in the former and the reproduction detail in the latter.
+
+On **every** type, the displayed field (`System.Description`, or `ReproSteps` on a Bug) opens with the `<h3>Summary</h3>` block, and that block contains no `<code>`. A `Technical Details` block follows it. Check each child story created in Step 9 too.
 
 If a check fails the write didn't take — fix it with `wit_work_item_write` (action `update`) before reporting success. Don't report a created item you haven't read back.
 

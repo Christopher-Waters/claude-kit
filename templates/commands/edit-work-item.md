@@ -118,6 +118,7 @@ Produce a **field-level diff**, not a rewritten item. For every field you propos
 Rules for the draft:
 
 - **Preserve, don't regenerate.** Keep existing wording that the change request doesn't touch. Never drop existing `<img>` tags, attachment URLs, or reference links.
+- **Keep both halves true.** Every item has two readers (rules in `/create-work-item` Step 3). The PM reads the plain-English **Summary** at the top. The developer and Claude Code read the **Technical Details** below it, grounded in real paths and names from the code. If the change moves what the item does, revise both in this change set: the Summary in plain English, and the Technical Details against the code. If the item lacks either one, propose it here. Either way it shows in the diff like any other field change.
 - **Points follow the `/quote` rubric** — modified Fibonacci (`1, 2, 3, 5, 8, 13, 21`), calibrated for a senior developer working with Claude assistance. Only propose a change if the scope actually moved. If the revised item now looks bigger than 21 points, recommend splitting it into a Feature instead of writing the number.
 - **Prior art moves the number too, and it can move it *down*.** Added scope normally raises points, but scope that turns out to be a second or third consumer of something already built often costs less than the first one did — sometimes less than the raise it would otherwise earn. If the Step 3 search found precedent, say so in the points rationale rather than pricing the addition as new work.
 - **Never point a Feature** and never change a Feature's `System.State`.
@@ -211,7 +212,7 @@ Default the comment question to **yes** for any item past `New`, and **no** for 
 
 ## Step 7: Apply
 
-Render every Markdown section to HTML first — Azure DevOps description and acceptance criteria fields do not render Markdown. Use the conversion table and the **emphasis and code spans** rules from `/create-work-item` Step 8: bold the noun phrase carrying each claim, wrap identifiers in `<code>`, use lists for 2+ parallel items, keep `### Headings` as `<h3>`. Preserve existing `<img>` tags exactly.
+Render every Markdown section to HTML first — Azure DevOps description and acceptance criteria fields do not render Markdown. Use the conversion table and the **emphasis and code spans** rules from `/create-work-item` Step 8: bold the noun phrase carrying each claim, wrap identifiers in `<code>` (never in the Summary, which has none), use lists for 2+ parallel items, keep `### Headings` as `<h3>`. The Summary stays the first block of the field the form displays. Preserve existing `<img>` tags exactly.
 
 **Route each section to its own field, per work item type** — use the routing tables in `/create-work-item` Step 8. Editing is the moment routing gets silently undone: it is easy to render the whole reviewed document into the description and leave the real fields as they were. And a wrong field does not announce itself — **Azure DevOps accepts a write to a field a type does not carry**, so the value persists, reads back over the API, and renders nowhere.
 

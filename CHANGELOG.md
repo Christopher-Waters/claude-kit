@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.3.4 — 2026-10-05
+
+### Work items serve two readers: a plain-English Summary for the PM, Technical Details for the developer
+
+Every work item now has two parts. The **Summary** at the top is for the PM: plain English, no code. **Technical Details** below it are for the developer and Claude Code: technical, specific, and grounded in the actual codebase. This applies whether `/create-work-item` was typed or Claude ran it from a plain-language request.
+
+- **`/create-work-item`** drafts both on every type: Feature, User Story, Bug, Hot Fix, and each child story it creates for a Feature.
+  - **Summary:** 2–4 sentences on what is changing or broken, who notices, and why it matters. Things are named the way users see them, with no code identifiers, endpoints, field names, or jargon. It leads the field the form actually shows: `System.Description`, or `ReproSteps` on a Bug. On a Hot Fix it sits above Production Impact. It also appears in the final confirmation.
+  - **Technical Details** replaces the old plain-language Description. It covers what changes and where, layer by layer: UI components and routes, API endpoints and validation, services and business rules, data fields and migrations, and permissions. It also lists the rules and constraints. It uses real paths and names read from the code, and marks anything unconfirmed *(unverified)*. On a Bug it names the failing code path, the error, and the *(suspected)* root cause. On a Feature it gives the architecture and the shared foundation the child stories build on. A session without the code says "Not verified against the code" instead of guessing.
+  - **Fixed:** the User Story draft used to say "avoid implementation detail — that lives in tasks." But `/implement` and `/plan-backlog` create Tasks with no description, so that detail lived nowhere.
+- **`/edit-work-item`** keeps both parts current when an edit changes what the item does, and proposes either one when it's missing. They show in the change-set diff like any other field.
+- **`/rework`'s Task** Summary is now plain English. Code identifiers stay in its Fix section.
+- **CLAUDE.md workflow:** the "Creating Work Items" rule now describes the two-reader layout.
+
 ## 2.3.3 — 2026-10-02
 
 No changes from 2.3.2. Republished so npm's `latest` points at the current release again. A stale `v2.3.0` tag was pushed alongside `v2.3.2` and published one second later, which moved `latest` back to 2.3.0. Projects on 2.3.1 would never have auto-updated, because the update check only moves forward.

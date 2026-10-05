@@ -358,7 +358,7 @@ If the user provided hours (suggested or overridden):
 
        ```html
        <h3>Summary</h3>
-       <p>{1–2 sentences describing the problem the rework addresses. Bold key terms, values, and outcomes with <strong>...</strong>.}</p>
+       <p>{1–2 plain-English sentences a PM could follow: what the tester found and what will change, named the way a user sees it. No code identifiers (those go under Fix). Bold the key outcome with <strong>...</strong>.}</p>
        <h3>Fix</h3>
        <ul>
          <li>{What changes. Wrap code identifiers, method names, fields, file paths, and literal values in <code>...</code>.}</li>
@@ -370,7 +370,7 @@ If the user provided hours (suggested or overridden):
        </ul>
        ```
 
-       Render any code identifiers (method names, fields, file paths, hashes, literal values) inside `<code>` spans, and emphasize the key claim/value in each sentence with `<strong>`. Do not submit a wall of plain prose — every rework task must have at least the `Summary` and `Fix` sections in this shape.
+       In Fix and Reference, render any code identifiers (method names, fields, file paths, hashes, literal values) inside `<code>` spans, and emphasize the key claim/value in each sentence with `<strong>`. Do not submit a wall of plain prose — every rework task must have at least the `Summary` and `Fix` sections in this shape.
      - `Microsoft.VSTS.Scheduling.OriginalEstimate` — the agreed hours
      - `Microsoft.VSTS.Scheduling.RemainingWork` — the agreed hours
      - `System.AreaPath` — same as the parent
