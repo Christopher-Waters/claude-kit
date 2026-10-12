@@ -688,7 +688,7 @@ Claude reviews for:
 | `/track` | `/track release 24` | Check status of a release, pipeline, work item, or environment; flags work items whose state lags their environment |
 | `/qa` | `/qa AB#1234 [env]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in as a test account → full regression of the screens the story touched → pass/fail comment on the work item (never a state change). Environments: `local`, `dev`, `test`, `staging` |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose one child task with hours per story |
-| `/plan-sprint` | `/plan-sprint [project]` | Sweep the current sprint for stories/bugs with no child tasks → propose one child task with hours per item |
+| `/plan-sprint` | `/plan-sprint [project] [--next]` | Sweep the current sprint (or the next one with `--next`) for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, bugs in `New` (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Also audits the drop-out queue — tagged bugs and stories bounced to Design Review — for items whose creator answered but which nobody returned to the sweep |
 | `/quote` | `/quote AB#1234` | Estimate a work item in story points (senior-calibrated Fibonacci rubric) |
 | `/explain` | `/explain AB#1234` | Summarize and explain a work item in plain language |

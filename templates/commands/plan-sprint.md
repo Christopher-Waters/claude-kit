@@ -1,10 +1,14 @@
-Sweep the **current sprint** for user stories and bugs without child tasks and propose a single implementation task per item with an hour estimate. Usage: `/plan-sprint [project]`
+Sweep the **current sprint** (or the **next sprint** with `--next`) for user stories and bugs without child tasks and propose a single implementation task per item with an hour estimate. Usage: `/plan-sprint [project] [--next]`
 
-This command finds every **User Story** and **Bug** in the current sprint of a chosen Azure DevOps project that **has no child tasks yet**, and — item by item — proposes **one child Task** with an hour estimate (points set the band, complexity sets where in the band it lands) for the user to approve before any work items are created. Exactly one task per work item — never a multi-task breakdown.
+This command finds every **User Story** and **Bug** in the target sprint of a chosen Azure DevOps project that **has no child tasks yet**, and — item by item — proposes **one child Task** with an hour estimate (points set the band, complexity sets where in the band it lands) for the user to approve before any work items are created. Exactly one task per work item — never a multi-task breakdown.
 
-This is the sprint-planning counterpart of `/plan-backlog`. Use `/plan-backlog` to groom the unscheduled backlog; use `/plan-sprint` after items are pulled into the sprint to make sure each has its implementation task and hours.
+This is the sprint-planning counterpart of `/plan-backlog`. Use `/plan-backlog` to groom the unscheduled backlog; use `/plan-sprint` after items are pulled into the sprint to make sure each has its implementation task and hours. Use `/plan-sprint --next` during sprint planning, once items have been pulled into the upcoming sprint but before it starts.
 
-Treat `$ARGUMENTS` as an optional project name (e.g. `/plan-sprint CSI Development`). If provided, skip the project prompt in Step 1.
+Parse `$ARGUMENTS`:
+- If it contains `--next` or the standalone word `next`, the **target sprint** is the next sprint — the first iteration that starts after the current one. Otherwise the target sprint is the current sprint.
+- Any remaining text is an optional project name (e.g. `/plan-sprint CSI Development --next`). If provided, skip the project prompt in Step 1.
+
+Below, `{sprint}` means the target sprint's name.
 
 ## Step 1: Choose the Azure DevOps Project
 
@@ -27,20 +31,42 @@ Or specify a different project name, or "list" to see all projects.
 
 If the user types `list`, call `mcp__azure-devops__core_list_projects` and present the names, then re-prompt. **Wait for the user's response.** Validate the chosen project name exists (call `core_list_projects` if uncertain).
 
-## Step 2: Resolve the Current Sprint
+## Step 2: Resolve the Target Sprint
 
-Resolve the team's **current iteration** — do not guess the iteration path:
+Resolve the target sprint from the team's iterations — do not guess the iteration path:
 
 1. Determine the team. Most projects have a default team named after the project; if `mcp__azure-devops__core_list_project_teams` shows multiple teams and it isn't obvious which one runs the sprint, ask the user which team to use.
-2. Fetch the current iteration via `mcp__azure-devops__work_list_team_iterations` (or the equivalent `work` tool) with `timeframe: current` and capture its full **iteration path** and date range.
+2. Fetch the current iteration via `mcp__azure-devops__work` (action `list_team_iterations`) with `timeframe: current` and capture its full **iteration path** and date range.
 
-If no current iteration exists (no sprint with today's date in range), report:
+**Current sprint (default):** the iteration from step 2 is the target. If no current iteration exists (no sprint with today's date in range), report:
 
 ```
 {project} has no active sprint (no iteration covers today). Nothing to plan.
+Run /plan-sprint --next to plan the upcoming sprint instead.
 ```
 
 and stop.
+
+**Next sprint (`--next`):** the API only filters on `current`, so find the next one yourself:
+
+3. Fetch **all** the team's iterations via `mcp__azure-devops__work` (action `list_team_iterations`) with no `timeframe`.
+4. Drop iterations with no start or finish date, and any named like `Release #N` — those are release groupings from `/create-release`, not sprints.
+5. Of the rest, the target is the iteration with the **earliest start date after the current sprint's finish date**. If there is no current sprint, take the earliest start date after today.
+
+If no such iteration exists, report:
+
+```
+{project} has no next sprint scheduled (no iteration starts after {current sprint or today}).
+Create the next iteration in Azure DevOps and assign it to the team, then re-run.
+```
+
+and stop.
+
+Capture the target sprint's full **iteration path** and date range, and state which sprint you resolved before querying:
+
+```
+Planning {sprint} ({start} – {finish}) — the {current | next} sprint for {team}.
+```
 
 ## Step 3: Query the Sprint
 
@@ -53,7 +79,7 @@ SELECT [System.Id], [System.Title], [System.State],
 FROM WorkItems
 WHERE [System.TeamProject] = '{project}'
   AND [System.WorkItemType] IN ('User Story', 'Bug')
-  AND [System.IterationPath] UNDER '{current sprint iteration path}'
+  AND [System.IterationPath] UNDER '{target sprint iteration path}'
   AND [System.State] NOT IN ('Closed', 'Removed', 'Done', 'Resolved', 'Code Review', 'Ready for Testing', 'Testing', 'Ready for Staging', 'Staging', 'Ready to Deploy', 'Deployed')
 ORDER BY [Microsoft.VSTS.Common.StackRank] ASC
 ```
@@ -65,7 +91,7 @@ Unlike `/plan-backlog`, **Story Points are not required** — an unpointed item 
 If the query returns zero items, report:
 
 ```
-No open stories or bugs found in {current sprint} of {project}.
+No open stories or bugs found in {sprint} of {project}.
 Nothing to plan.
 ```
 
@@ -83,14 +109,14 @@ Skipped {n} items that already have child tasks:
   - ...
 ```
 
-If after filtering there are zero items left, report "Every open story and bug in {current sprint} already has a task — nothing to plan." and stop.
+If after filtering there are zero items left, report "Every open story and bug in {sprint} already has a task — nothing to plan." and stop.
 
 ## Step 5: Present the Working List
 
 Show the remaining items the user is about to walk through:
 
 ```
-Found {n} items in {current sprint} ({date range}) with no child tasks:
+Found {n} items in {sprint} ({date range}) with no child tasks:
 
 | #  | ID       | Type       | Title                                    | State     | Points |
 |----|----------|------------|------------------------------------------|-----------|--------|
@@ -204,7 +230,7 @@ Create the approved task with `mcp__azure-devops__wit_work_item_write` (action `
 - **fields**:
   - `Microsoft.VSTS.Scheduling.OriginalEstimate` — the hour estimate (as a number)
   - `Microsoft.VSTS.Scheduling.RemainingWork` — the same hour estimate
-  - `System.IterationPath` — copy from the parent (the parent is in the current sprint, so the task lands on the sprint taskboard)
+  - `System.IterationPath` — copy from the parent (the parent is in the target sprint, so the task lands on that sprint's taskboard)
   - `System.AreaPath` — copy from the parent
   - `System.AssignedTo` — copy from the parent (pass the parent's `uniqueName` / email if its `System.AssignedTo` value is an identity object). If the parent is unassigned, leave this field unset rather than failing.
 
@@ -225,7 +251,7 @@ Then move to the next item.
 Once the loop ends (all items handled, or user said `cancel-all`):
 
 ```
-## Sprint Planning Complete — {project} / {current sprint}
+## Sprint Planning Complete — {project} / {sprint}
 
 Items planned:      {n_planned}
   ✓ Tasks created:  {n_tasks_total} — one per item ({hours_total} hrs)
