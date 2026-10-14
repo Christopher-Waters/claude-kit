@@ -28,7 +28,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 | **Global Agents** | 10 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), mockup, reviewer, test-runner, build-validator, lint-checker, azure-ops, security-auditor |
 | **Project Agents** | 2 | `.claude/agents/` (in the project) | deployer, db-admin |
 | **Hooks** | 10 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, work item intent, UAT reminder, self-improve |
-| **Slash Commands** | 24 | `.claude/commands/` (in the project) | `/implement`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/track`, `/plan-backlog`, `/plan-sprint`, `/quote-backlog`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain`, `/create-work-item`, `/edit-work-item` |
+| **Slash Commands** | 26 | `.claude/commands/` (in the project) | `/implement`, `/autopilot`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/track`, `/plan-backlog`, `/plan-sprint`, `/quote-backlog`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain`, `/create-work-item`, `/edit-work-item` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | **Azure DevOps** (work items, repos, pipelines, wiki), Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
 | **Settings** | 1 | `.claude/settings.json` (in the project) | Registers all hooks and MCP servers |
@@ -207,6 +207,7 @@ your-project/                      ← Project-specific
 │   │
 │   ├── commands/
 │   │   ├── implement.md           # /implement AB#1234
+│   │   ├── autopilot.md           # /autopilot AB#1234
 │   │   ├── review.md              # /review 142
 │   │   ├── deploy.md              # /deploy "commit message"
 │   │   ├── create-release.md      # /create-release 23
@@ -283,6 +284,16 @@ Claude automatically:
 10. **Attaches any hand-run deployment script** to the work item, with the run command in the attachment comment, so `/promote`, `/cherry-pick`, and `/deploy-release` list it for every environment. Data fixes are planned as run-once migrations the app applies by itself wherever the project has that mechanism; a hand-run script is the fallback and the plan says why
 
 **Implementing a whole Feature:** point `/implement` at a Feature work item and it implements the child User Stories in waves driven by the `Custom.Order` field — stories with the same order value are implemented in parallel (one agent per story, each in an isolated git worktree), and the next order value starts only after the previous wave is merged and green. Everything lands on one `feature/` branch with a single review, UAT pass, and PR that links every story.
+
+### Implement Without Stopping
+
+```
+/autopilot AB#1234
+```
+
+Runs every step of `/implement` — plan, architect review, branch, Task, implementation, build, tests, lint, code review, PR — but never stops to ask. Where `/implement` would wait for you, Claude makes the call and logs it. An independent architect-review agent stands in for your plan approval, and the verified find → refute review stands in for your fix decisions. The PR is where you come in: it's labeled `autopilot`, its first comment thread holds the plan and every decision, and its description carries the UAT checklist nobody has run yet. Autopilot never merges, deploys, or moves an item past `Code Review`.
+
+It only stops before writing code (item not found, already has a PR, nothing to build, worktree locked by another session). If it can't get the build, tests, or review clean in three rounds, it opens a **draft** PR with what's left and leaves the item `Active`. Set `/effort` before starting, and run in auto mode (or `/add-dir` the worktree) so Claude Code's own permission prompts don't stall it.
 
 ### Review a Pull Request
 
@@ -674,6 +685,7 @@ Claude reviews for:
 | Command | Usage | What It Does |
 |---------|-------|-------------|
 | `/implement` | `/implement AB#1234` | Read work item → summarize → approve plan → implement → quality checks → UAT → PR. On a Feature: implements child stories in `Custom.Order` waves, same-order stories in parallel |
+| `/autopilot` | `/autopilot AB#1234` | `/implement` with no approval gates — Claude decides, logs every decision to the PR, and stops at the PR. Never merges or deploys. Draft PR if it can't finish cleanly |
 | `/review` | `/review 142` | Full code review on a PR with inline comments |
 | `/deep-review` | `/deep-review 142` | Deep, Ultracode-orchestrated review: checks out the branch, builds/tests it, verifies every requirement, checks for regressions, flags out-of-scope changes, then comments + votes |
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |

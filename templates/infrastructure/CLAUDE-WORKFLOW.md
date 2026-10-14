@@ -53,6 +53,8 @@ Short, single-query operations (`/track`, `/explain`, `/close-orphan-tasks`) do 
 
 **`/implement` uses ultracode scaled to the change** — its code review always fans out (find → adversarially-verify), but exploration and per-AC coverage fan out only for non-trivial / full-stack stories; a one-line config change runs lean. It's the daily driver, so it doesn't blanket-fan-out like `/rework`.
 
+**`/autopilot` always uses it**, at `/implement`'s scale — invoking the command is the opt-in. With no human approving the plan or choosing review fixes, the independent Architect Review agent and the find → adversarially-verify review are what stand in for that scrutiny.
+
 **`/plan-backlog`, `/plan-sprint`, and `/quote-backlog` use it opt-in** — only when ultracode is on.
 
 ### Sensitive Data Policy
@@ -381,6 +383,7 @@ All deployment and release operations are available as slash commands:
 | Command | Usage | What It Does |
 |---|---|---|
 | `/implement` | `/implement AB#1234` | Summarize work item → approve plan → ensure an open child Task with hours → implement → PR (closes the Task, logs hours). On a Feature: child stories in `Custom.Order` waves, same-order stories in parallel |
+| `/autopilot` | `/autopilot AB#1234` | `/implement` end to end with no approval gates: Claude plans, runs an independent architect review, implements, fixes verified review findings, and opens the PR (labeled `autopilot`) with every decision logged in a PR thread and the UAT checklist for the reviewer. Never merges or deploys. Hard-stops only before code is written; if it can't finish cleanly, it opens a draft PR and leaves the item `Active` |
 | `/review` | `/review 142` | Automated code review on a PR |
 | `/resolve-feedback` | `/resolve-feedback 142` | Address unresolved PR comment threads, push fixes, reply + resolve threads |
 | `/deploy` | `/deploy "commit message"` | Commit, push, trigger pipeline (only on `dev`/`test`/`staging`/`prod` — never on `main`) |

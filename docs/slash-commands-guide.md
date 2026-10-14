@@ -178,6 +178,62 @@ PR is created targeting `prod` with a `hotfix` label. No manual UAT required. Me
 
 ---
 
+## /autopilot — Implement Without Stopping for Approval
+
+`/autopilot` runs every step of `/implement`, but it never waits for you. Wherever `/implement` would ask, Claude makes the call, logs it, and keeps going. You come in at the PR.
+
+### Example: Building a New Feature Unattended
+
+Feature AB#4700, "Payment reminders", has three child stories with `Custom.Order` 1, 1, and 2. You set your effort level, switch to auto mode, and type:
+
+```
+/effort xhigh
+/autopilot AB#4700
+```
+
+**Claude opens with:**
+```
+## Autopilot — AB#4700
+Running /implement end to end with no approval gates. Every decision is logged and posted to the PR.
+I stop only on a hard stop; the PR is where you review.
+Claude Code's own permission prompts can still appear. Edits in the ticket's worktree (../CSIPay-AB4700)
+prompt once unless you've added it with /add-dir or are in auto mode.
+```
+
+Then it works through the run, printing a line per step instead of asking:
+
+```
+▶ Step 0 — worktree ../CSIPay-AB4700, PR target main
+▶ F2 — 3 stories in 2 waves (AB#4701 + AB#4702 in parallel, then AB#4703)
+▶ F4 wave 1 — plan: 9 files, 11 tests; architect review changed 1 thing (reused NotificationService)
+▶ F4 wave 1 — Tasks created: AB#4710 (6h), AB#4711 (3h); merged, build + suite green
+▶ F4 wave 2 — plan: 5 files, 6 tests; architect review: no changes
+▶ F5 — AC 9/9 covered; review round 1: 2 must-fix fixed; round 2: clean
+▶ F7 — PR #312 created, 3 stories → Code Review, 3 Tasks closed
+```
+
+**And finishes with:**
+```
+## Autopilot finished — AB#4700: Payment reminders
+
+PR #312 → main   ready for review
+Work item: stories in Code Review   Tasks AB#4710–4712: closed, 15h logged (the estimate; edit it if actual differs)
+Decisions: 14 (in the PR thread)   Open items: 3
+
+Next: review the PR and run its UAT checklist. Once it's on Dev, run /qa AB#4700.
+```
+
+The PR is labeled `autopilot`. Its description lists the **Open Items** (here, a `ReminderApi:BaseUrl` value to supply for test, staging, and prod, plus one assumption about who can turn reminders off) and the unchecked **UAT Checklist**. Its first comment thread holds the plan, the architect review, AC coverage, and all 14 decisions.
+
+### What it decides, and what it won't
+
+- **Decides:** the plan (after an independent architect-review agent checks it), the Task and its hours, which verified review findings to fix, gaps in the requirements (latest comment wins, then codebase convention, then the smallest reading of the AC, and access questions fail closed).
+- **Won't:** merge, approve, or deploy; move anything past `Code Review`; change the Feature's state; invent environment-specific or secret config values; edit `appsettings.Staging.json` / `appsettings.Production.json`.
+- **Stops** only before writing code: the work item is missing, closed, or already has a PR (use `/rework`), there's nothing to build, or another session holds the worktree.
+- **Draft PR** if the build, the test suite, or must-fix review findings aren't clean after three rounds. The item stays `Active` and the Task stays open, so the board doesn't claim it's ready.
+
+---
+
 ## /deploy — Quick Commit and Push
 
 ### Example: Small fix on a feature branch
@@ -856,6 +912,7 @@ After the fix is verified through test and staging, add it to the release and ch
 | I want to... | Command |
 |--------------|---------|
 | Build a work item from scratch | `/implement AB#1234` |
+| Build it with no approval stops — review at the PR | `/autopilot AB#1234` |
 | Quick commit and push | `/deploy "message"` |
 | Group work items for deployment | `/create-release 24` |
 | Add a forgotten item to a release | `/add-to-release 24 AB#4599` |
