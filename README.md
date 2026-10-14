@@ -181,7 +181,7 @@ The installer automatically **skips global agents** that are already installed (
 ├── mockup.md                      # HTML mockup designer
 ├── reviewer.md                    # Code reviewer (read-only)
 ├── test-runner.md                 # Test executor — xUnit, Vitest, Playwright (read-only)
-├── qa.md                          # Browser QA on a deployed environment (read-only)
+├── qa.md                          # Browser QA + bug repro on a running environment (read-only)
 ├── build-validator.md             # Build checker (read-only)
 ├── lint-checker.md                # ESLint + dotnet format checker
 ├── azure-ops.md                   # Azure infrastructure management
@@ -698,7 +698,8 @@ Claude reviews for:
 | `/promote` | `/promote main dev` | PR to promote all code to the next branch in the chain (`main → dev → test → staging → prod`) → ask who verifies → advance + assign on a green pipeline |
 | `/rollback` | `/rollback AB#1234 prod` | Revert specific commits on an environment via PR |
 | `/track` | `/track release 24` | Check status of a release, pipeline, work item, or environment; flags work items whose state lags their environment |
-| `/qa` | `/qa AB#1234 [env]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in as a test account → full regression of the screens the story touched → pass/fail comment on the work item (never a state change). Environments: `local`, `dev`, `test`, `staging` |
+| `/qa` | `/qa AB#1234 [env] [--as=<user>]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in (app login form, or Microsoft — you sign in once in the browser window) and optionally impersonate a user → full regression of the screens the story touched → pass/fail comment on the work item (never a state change). Environments: `local`, `dev`, `test`, `staging` |
+| `/repro` | `/repro AB#1234 [env] [--as=<user>] [--verify]` | Follow a bug's repro steps in a real browser. Before a fix: confirm it reproduces (with intermittency counts) and list the code to read. After the fix is deployed: prove it's gone, checked against a control run on a build without the fix. Mode is picked from where the fix commits are; posts a result comment (never a state change) |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose one child task with hours per story |
 | `/plan-sprint` | `/plan-sprint [project] [--next]` | Sweep the current sprint (or the next one with `--next`) for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, bugs in `New` (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points + creator comments (10 at a time, approval-gated). Also audits the drop-out queue — tagged bugs and stories bounced to Design Review — for items whose creator answered but which nobody returned to the sweep |
@@ -752,11 +753,14 @@ export STRIPE_SECRET_KEY="sk_test_..."
 # Azure CLI (no env var needed — just log in)
 az login
 
-# QA test accounts (required for /qa — browser testing on a deployed environment).
-# One pair per role. The variable NAMES go in your project's `## Environment URLs`
-# section; the VALUES live only here. Use throwaway least-privilege QA accounts.
-export COMPASS_QA_ADMIN_USERNAME="qa-admin@example.com"
+# QA sign-in for /qa and /repro — OPTIONAL, per developer. Leave unset and you sign
+# in yourself in the browser window (recommended for your own admin account, since a
+# password the agent types lands in the local session transcript). The NAMES come
+# from your project's `## Environment URLs` section; _TEST / _DEV / _LOCAL / _STAGING
+# versions override the plain one on that environment.
+export COMPASS_QA_ADMIN_USERNAME="you@caresolutions.com"
 export COMPASS_QA_ADMIN_PASSWORD="..."
+export COMPASS_QA_ADMIN_PASSWORD_TEST="..."   # only if your test password differs
 
 # Microsoft Teams (no env vars needed — uses Microsoft Graph device-code auth;
 # first invocation prints a code + URL to sign in)

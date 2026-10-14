@@ -924,6 +924,10 @@ After the fix is verified through test and staging, add it to the release and ch
 | Promote all staging code to production | `/promote staging prod` |
 | Revert a bad deploy | `/rollback AB#1234 prod` |
 | See where a work item is deployed | `/where AB#4521` |
+| Test a story in the browser on Dev | `/qa AB#4521 dev` |
+| Test it as another user (impersonation) | `/qa AB#4521 test --as=Provider` |
+| Confirm a bug reproduces before fixing it | `/repro AB#4589 test` |
+| Prove a deployed fix worked | `/repro AB#4589 dev` |
 | Revert the last deploy | `/rollback last staging` |
 | Review a PR | `/review 142` |
 | Check what's in a release | `/track release 24` |

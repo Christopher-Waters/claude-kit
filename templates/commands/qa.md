@@ -1,10 +1,12 @@
-Regression-test a work item in a real browser against a running environment. Usage: `/qa <work-item-id> [environment] [--role=<role>] [--screens=/a,/b]`
+Regression-test a work item in a real browser against a running environment. Usage: `/qa <work-item-id> [environment] [--role=<role>] [--as=<persona-or-user>] [--as-role=<role>] [--screens=/a,/b]`
 
 Parse `$ARGUMENTS` to extract the work item ID. Accept formats like `AB#1234`, `#1234`, or just `1234`. If no ID is provided, report the error and stop.
 
 - **Environment**: optional — `local`, `dev`, `test`, or `staging`. Defaults to `dev`.
 - **`--role=<role>`**: optional — which test account to sign in as. Defaults to the row marked `Default` in the Environment URLs table, else the first row.
-- **`--screens=/a,/b`**: optional — skip the affected-screen scoping in Step 5 and test exactly these routes.
+- **`--as=<persona-or-user>`**: optional — after signing in, **impersonate** this user, using the app's own impersonation feature. A name from the project's persona table picks a QA test user. Anything else — an email, a username, or a name — is searched for literally, as an **ad-hoc user**. Requires an `**Impersonation:**` block in the project's `## Environment URLs`.
+- **`--as-role=<role>`**: optional — the role to impersonate a multi-role ad-hoc user as. A persona's role comes from its row.
+- **`--screens=/a,/b`**: optional — skip the affected-screen scoping in Step 6 and test exactly these routes.
 
 **`prod` and `production` are refused.** An unattended regression pass signs in and clicks through live member data. Say so and stop.
 
@@ -37,7 +39,7 @@ Read the **Environment URLs** table from the current repo's `CLAUDE.md`:
 | test | Test | https://test.myapp.example.com | https://test.api.myapp.example.com |
 ```
 
-Capture the target row's App URL and API URL, the `**Sign-in:**` descriptor, the test-account table, and — for the differential re-check in Step 7 — the **App URL of the row immediately below the target**. That row serves the pre-change build, which is what lets a failure be attributed rather than guessed at.
+Capture the target row's App URL and API URL, the `**Sign-in:**` descriptor, the test-account table, the `**Impersonation:**` block and its persona table if present, and — for the differential re-check in Step 7 — the **App URL of the row immediately below the target**. That row serves the pre-change build, which is what lets a failure be attributed rather than guessed at.
 
 If the section is missing, or the target environment has no row, report:
 
@@ -57,7 +59,8 @@ everything below that heading is replaced on the next kit update:
 | dev | Dev | https://… | {inferred, or …} |
 | test | Test | https://… | {inferred, or …} |
 
-**Sign-in:** form at `/login`. Signed-in landing: `/dashboard`.
+**Sign-in:** `form` at `/login`. Signed-in landing: `/dashboard`.
+  (or `microsoft` — Entra ID redirect; sign-in button "…". Signed-in marker: …)
 
 **Test accounts** — values live in environment variables; never write a password here.
 
@@ -91,40 +94,84 @@ so I can't open a browser. /qa cannot run.
  browser binaries may be missing — npx playwright install chromium}
 ```
 
-## Step 4: Gate — Credentials and Sign-in Method
+## Step 4: Gate — Sign-in Method, Credentials, Impersonation
 
-Resolve the role: `--role=<x>`, else the row marked `Default`, else the first row. Then check **presence only**. Never read a credential value in this step — the agent does that, inside its own transcript:
+Read the **sign-in method** from the `**Sign-in:**` line, which starts with `` `form` `` or `` `microsoft` ``. An older descriptor may name neither. Treat it as `microsoft` only if it says sign-in **goes through** Microsoft, Entra ID, Azure AD, or MSAL. A line that says "no SSO, no MFA" is `form` — match the meaning, not the keywords. If the line is ambiguous, ask. Either way, say in the report that the descriptor should name its method.
+
+Resolve the role: `--role=<x>`, else the row marked `Default`, else the first row. With `--as`, 4c overrides this.
+
+### 4a. Method `form`
+
+Credentials are **per developer**. Each developer exports their own account's credentials on their own machine, under the variable names the table declares. The same person's account often has a different password on each environment, because test usually has its own database. So each variable resolves **per environment**: `{VAR}_{ENV}` first, then `{VAR}`. `{ENV}` is `LOCAL`, `DEV`, `TEST`, or `STAGING`. For example, `COMPASS_QA_ADMIN_PASSWORD_TEST` wins over `COMPASS_QA_ADMIN_PASSWORD` on test.
+
+Check **presence only**. Never read a credential value in this step — the agent does that, inside its own transcript:
 
 ```bash
 for v in {PROJECT}_QA_ADMIN_USERNAME {PROJECT}_QA_ADMIN_PASSWORD; do
-  [ -n "${!v}" ] && echo "$v SET" || echo "$v MISSING"
+  e="${v}_{ENV}"
+  if   [ -n "$(printenv "$e")" ]; then echo "$e SET"
+  elif [ -n "$(printenv "$v")" ]; then echo "$v SET"
+  else echo "$v MISSING"; fi
 done
 ```
 
-Any `MISSING`:
+Use `printenv`, not `${!v}`. Indirect expansion is bash-only and fails with `bad substitution` in zsh, the default macOS shell. The value is captured, never printed.
+
+Pass the agent the **resolved** names: whichever of each pair was `SET`.
+
+**Both set** → **unattended**: the agent signs in itself.
+
+**Either missing** → this is not an error. It means the developer hasn't stored credentials, so offer the **hand-off** instead:
 
 ```
 AB#{id}: {title}
 
-Missing test-account credentials for the {role} role:
-  - {PROJECT}_QA_ADMIN_PASSWORD
+No stored credentials for the {role} role on {environment}
+({PROJECT}_QA_ADMIN_USERNAME / {PROJECT}_QA_ADMIN_PASSWORD, or their _{ENV} versions).
 
-/qa signs in unattended, so these must be exported before it can run:
+  sign in → you sign in yourself, in the browser window Playwright opens, once the
+            plan is approved. Your password never passes through Claude.
+  stop    → set them first, for unattended runs:
+              export {PROJECT}_QA_ADMIN_USERNAME="you@example.com"
+              export {PROJECT}_QA_ADMIN_PASSWORD="…"
+              export {PROJECT}_QA_ADMIN_PASSWORD_TEST="…"   # if test differs
+            (add them to ~/.zshrc, then restart Claude Code)
 
-  export {PROJECT}_QA_ADMIN_USERNAME="qa-admin@example.com"
-  export {PROJECT}_QA_ADMIN_PASSWORD="…"
-
-Use a throwaway QA account with least privilege, never a personal login. Never put
-the password in CLAUDE.md, .env, or any file in the repo.
+Your own account is fine, as long as it holds the {role} role on {environment}. Never put
+a password in CLAUDE.md, .env, or any file in the repo.
 ```
 
-If the `**Sign-in:**` descriptor says the app uses SSO or Entra ID with MFA, stop here:
+**What a hand-off costs.** The session belongs to the person who signed in, in that one browser tab. The agent can't sign in anywhere else on its own. That rules out three things:
 
-```
-{environment} sign-in goes through {provider} with MFA, which can't be completed
-unattended. /qa can't test this project until a cloud-only, MFA-exempt QA account
-exists — or run the checks by hand against {app-url}.
-```
+- a differential re-check on the baseline — record `not checked — no stored credentials for {baseline}`;
+- a second role for checklist row 14 — record `NOT TESTABLE — one interactive session per run`;
+- returning to the admin account after impersonation ends — later screens run as the target user.
+
+Say all of this in the plan, so the developer can choose to set the variables instead.
+
+**Why offer it at all?** When the agent fills a login form, the password is a tool argument. It is stored in the session transcript on this machine and sent to the model, like every other tool call. For a throwaway QA account that is acceptable. For a developer's own **System Administrator** password it may not be. The hand-off is how a developer tests as themselves without that.
+
+### 4b. Method `microsoft`
+
+Two ways in. Pick by the role's row in the test-account table:
+
+- **The row names credential variables, and the `Sign-in:` line says the account is MFA-exempt** → **unattended**. Run the same per-environment presence check as 4a. The agent signs in on the Microsoft page itself.
+- **Otherwise** → **hand-off**. The person running `/qa` signs in once in the browser window Playwright opened. MFA is fine, and no credential enters any transcript. Nothing is checked here; the hand-off runs in Step 7a, after the plan is approved, so nobody signs in for a run they then cancel.
+
+Under `microsoft`, a hand-off costs less than under `form`. The session persists in the Playwright profile, and Microsoft often signs a second host in silently, so the baseline re-check usually still works. Role gating (checklist row 14) still needs a second sign-in, so it stays `NOT TESTABLE — one interactive session per run` unless `--as` supplies a second persona.
+
+### 4c. Impersonation — only when `--as` is given
+
+1. **The project must describe it.** No `**Impersonation:**` block in `## Environment URLs`:
+   ```
+   This project's CLAUDE.md doesn't describe an impersonation feature, so --as can't be used.
+   If the app has one, add an **Impersonation:** block to ## Environment URLs — the Claude Kit
+   Workflow section of CLAUDE.md shows the format.
+   ```
+2. **The environment must offer it.** The block lists where impersonation exists. If the target environment isn't listed, stop: `Impersonation isn't available on {environment} — the project lists {envs}. Run on one of those, or drop --as.`
+3. **Resolve the target.** If `--as` matches a persona name, case-insensitively, it is a **persona**: take the search term and role from the row. Anything else is an **ad-hoc user**: the value itself is the search term, and `--as-role` gives the role if one is needed.
+4. **The sign-in account is the one the block names as able to impersonate**, in the role it requires. That replaces `--role`; if both were given, say `--role` was ignored.
+5. **An ad-hoc user means a read-only run.** The app records everything done while impersonating as that user. So the agent submits nothing, and checklist rows 8–10 and 12, plus every criterion that needs a write, become `NOT TESTABLE — would write as {target}`. Say this in the plan. If the story *is* a write path, suggest a persona instead.
 
 ## Step 5: Gate — Is the Code Actually There?
 
@@ -217,7 +264,8 @@ Then present the plan and **wait**:
 
 Work item: {title} ({type}, {state})
 Target: {environment} — {app-url}
-Role: {role} ({USERNAME_VAR})
+Role: {role} ({USERNAME_VAR} | you'll sign in yourself in the browser window | Microsoft, unattended from {USERNAME_VAR})
+Impersonating: {persona} ({role}) | {search term} — ad-hoc user, READ-ONLY run | none
 Build: {n} of {n} commits on `{branch}`, {pipeline} run {id} green
 Baseline for attributing failures: {baseline-env} — {baseline-url}
 
@@ -238,7 +286,32 @@ Open the browser and run it? (yes / edit the screen list / cancel)
 
 ## Step 7: Run It, Then Attribute Every Failure
 
-Delegate to the **qa** agent with a brief containing: the work item id, title, type and state; the target App and API URLs; the baseline App URL; the sign-in descriptor; the **names** of the credential variables (never the values — say "they are set, read them yourself, never echo them"); the ordered screen list with each screen's changed files; and the criteria. Above 3 screens, invoke it once per batch so a long sweep can't exhaust its context mid-run.
+### 7a. Sign-in hand-off — whenever Step 4 chose a hand-off, for either method
+
+The agent can't ask anyone to sign in, so this step runs here, in the main loop, in the same browser the agent will use. Use only `browser_navigate`, `browser_find`, `browser_click`, and `browser_wait_for`. **Never type into a login form or a Microsoft page**, and never take a full snapshot of the landing page.
+
+First read the `playwright` entry's `args` in `.mcp.json`. With `--headless` there is no window to sign in through, so stop: `Signing in yourself needs a visible browser, but Playwright MCP is configured --headless. Remove the flag and restart the session.` With `--isolated` the hand-off still works, but a Microsoft session is gone at the end of every run. Say so once.
+
+1. `browser_navigate` to the App URL, then `browser_find` the signed-in marker from the `Sign-in:` line. **Found** → the browser still holds a session. Say `Reusing the session already in the Playwright browser. If that isn't a {role} account, say "switch" and I'll sign out first.`, then go to 7b.
+2. **Not found** → open the sign-in page. For `form`, that is the login route. For `microsoft`, click the app's sign-in button named in the descriptor and wait for `login.microsoftonline.com`. Then ask:
+   ```
+   Sign in to {environment} in the Chromium window Playwright opened, as an account
+   with the {role} role — your own is fine.{ If it asks which role, choose {role}.}
+   I don't see or type your credentials{, and MFA is fine}.
+
+   {microsoft: The session stays in the Playwright browser profile, so later /qa and
+    /repro runs skip this step until it expires.}
+   {form: The session lives in that browser tab — leave the window open until I'm done.}
+
+   Reply "done" when you can see the app.
+   ```
+3. On `done`, `browser_find` the marker again. Still missing → say which page the browser is on and ask once more. A second miss → stop. Microsoft error `AADSTS50011` means `{app-url}` isn't a registered redirect URI on the app registration. That is a configuration problem, not a test failure; say so and stop.
+
+### 7b. Delegate
+
+Delegate to the **qa** agent with a brief containing: task `regression`; the work item id, title, type and state; the target App and API URLs; the baseline App URL; the sign-in method and descriptor, with `session handed over` or `unattended`; the **names** of the credential variables (never the values — say "they are set, read them yourself, never echo them"); the impersonation block and target, marked persona or ad-hoc, if `--as` was given; the ordered screen list with each screen's changed files; and the criteria. Above 3 screens, invoke it once per batch so a long sweep can't exhaust its context mid-run.
+
+If the agent returns `BLOCKED — session ended`, run 7a once more and re-invoke it with only the screens it didn't reach. A second session loss → the report is `INCOMPLETE`. After a handed-over session, close the browser (`browser_close`) yourself once the last batch is done.
 
 When the report comes back, sort every failure using three filters, in order:
 
@@ -254,7 +327,8 @@ Only filter 1's output can drive a `FAIL` verdict. A run that finds nothing but 
 QA — AB#{id}: {title}
 {type} · {state} · {environment} — {app-url}
 Build: {pipeline} run {id} · succeeded · commit {sha7}
-Signed in as: {role} (from {USERNAME_VAR}) — value not shown
+Signed in as: {role} ({from USERNAME_VAR | signed in by you | Microsoft, from USERNAME_VAR}) — value not shown
+Impersonating: {persona | search term} as {role} | none
 Screens tested: {n} · {route list}
 
 ## Acceptance Criteria
@@ -303,7 +377,7 @@ The body, as HTML (Azure DevOps renders HTML in comments):
 <b>Automated QA — {verdict}</b> · {environment} · {date}<br>
 Build: {pipeline} run {id} ({result}) · commit {sha7}<br>
 Screens tested: {route list}<br>
-Signed in as: {role} test account<br><br>
+Signed in as: {role} test account{, impersonating {persona | "an ad-hoc user (read-only run)"}}<br><br>
 
 <b>Acceptance criteria — {x} of {y} pass</b>
 <ul>

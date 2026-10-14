@@ -18,7 +18,7 @@ You (give task)
   ├── deployer → commits, pushes, triggers CD pipeline
   ├── db-admin → queries/fixes MongoDB data
   ├── test-runner → runs xUnit, Vitest, Playwright tests
-  ├── qa → drives a real browser on a deployed environment, regression-tests the affected screens
+  ├── qa → drives a real browser on a running environment: regression-tests a story's screens, reproduces a bug, verifies a fix
   ├── build-validator → confirms builds pass
   ├── lint-checker → runs ESLint and dotnet format
   ├── security-auditor → scans for secrets, vulnerabilities
@@ -83,7 +83,7 @@ These run automatically — no action needed:
 | Server | What It Does |
 |--------|-------------|
 | **Azure DevOps** *(core — drives every slash command)* | Work items, repos, pull requests, pipelines, wiki, test plans, advanced security |
-| **Playwright** | Browser testing (navigate, click, fill, screenshot) — **required by `/qa`** |
+| **Playwright** | Browser testing (navigate, click, fill, screenshot) — **required by `/qa` and `/repro`** |
 | **MongoDB** | Direct database queries and updates |
 | **Microsoft Teams** | Send/read team messages and notifications |
 | **Stripe** | Payment management (when configured) |
@@ -207,7 +207,7 @@ Every environment in the chain has a work item state, so the board shows where e
 | `staging` | Staging | `Ready for Staging` | `Staging` |
 | `prod` | Production | `Ready to Deploy` | `Deployed` |
 
-`/qa` is the exception that proves the rule: it tests a work item in a browser and posts a pass/fail comment, but it **never writes a state** — not even `Ready for Testing`.
+`/qa` and `/repro` are the exceptions that prove the rule: they test a work item in a browser and post a result comment, but they **never write a state** — not even `Ready for Testing`, and not even when `/repro` finds a bug `FIXED`.
 
 Human-only transitions — no slash command ever makes these: `Code Review → Ready for Testing` (the developer confirms the change on Dev), `Testing → Ready for Staging` (QA sign-off), `Staging → Ready to Deploy` (stakeholder / UAT sign-off), `Deployed → Closed` (verified in production).
 
@@ -395,7 +395,8 @@ All deployment and release operations are available as slash commands:
 | `/rollback` | `/rollback AB#1234 prod` | Revert commits on an environment |
 | `/track` | `/track release 24` | Check release, pipeline, environment, or work item status; flags work items whose state lags their environment |
 | `/where` | `/where AB#1234` | Show which environment branches contain a work item's commits |
-| `/qa` | `/qa AB#1234 [env]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in as a test account → full regression of the screens the story touched → pass/fail comment (never a state change) |
+| `/qa` | `/qa AB#1234 [env] [--as=<user>]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in (app login form, or Microsoft) and optionally impersonate a user → full regression of the screens the story touched → pass/fail comment (never a state change) |
+| `/repro` | `/repro AB#1234 [env] [--as=<user>]` | Follow a bug's repro steps in a real browser. Before the fix: confirm it reproduces and point at the code to read. After the fix is deployed: prove the bug is gone, against a control run on a build without the fix → result comment (never a state change) |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
 | `/plan-sprint` | `/plan-sprint [project] [--next]` | Sweep the current sprint (or the next one with `--next`) for stories/bugs with no child tasks → propose one child task with hours per item |
 | `/quote-backlog` | `/quote-backlog [project]` | Sweep backlog for unpointed items ready to estimate — stories in `Design Approved`, **bugs in `New`** (bugs have no design states) → review completeness, check for duplicates, suggest rewrites, propose points (+ Investment Category / Impact where unset) + creator comments (10 at a time, approval-gated). Pointed items move to Dev Ready; stories that can't be quoted move back to **Design Review**, bugs that can't be quoted get a **`needs-info`** tag, so the next sweep skips them. Every run also audits the drop-out queue (tagged bugs **and** stories bounced to Design Review) and reports any whose creator answered but which nobody returned to the sweep — neither mechanism expires, so those are otherwise invisible forever |
@@ -467,7 +468,7 @@ Glasswing and Monarch (not yet migrated — 1 environment):
 
 ### Environment URLs
 
-`/qa` opens the app in a real browser, so it needs to know where each environment is hosted and which test account to sign in as. Without this section `/qa` reports and stops rather than guessing a hostname.
+`/qa` and `/repro` open the app in a real browser. They need to know where each environment is hosted, how sign-in works, and which test account to use. Without this section they report and stop rather than guessing a hostname.
 
 Add this to your project's `CLAUDE.md` — **above the `## Claude Kit Workflow` heading.** Everything from that heading to the end of the file is replaced on each kit update, so configuration placed below it is lost.
 
@@ -481,35 +482,92 @@ Add this to your project's `CLAUDE.md` — **above the `## Claude Kit Workflow` 
 | test | Test | https://test.myapp.example.com | https://test.api.myapp.example.com |
 | staging | Staging | https://staging.myapp.example.com | https://staging.api.myapp.example.com |
 
-**Sign-in:** form at `/login` — app-issued JWT, no SSO. Signed-in landing: `/dashboard`.
+**Sign-in:** `form` at `/login` — app-issued JWT, no SSO. Signed-in landing: `/dashboard`.
 
-**Test accounts** — values live in environment variables; never write a password here.
+**Test accounts** — each developer sets the values on their own machine; never write a password here.
 
 | Role | Username variable | Password variable | Default |
 |------|-------------------|-------------------|---------|
 | Admin | `MYAPP_QA_ADMIN_USERNAME` | `MYAPP_QA_ADMIN_PASSWORD` | yes |
 | Provider | `MYAPP_QA_PROVIDER_USERNAME` | `MYAPP_QA_PROVIDER_PASSWORD` | |
+
+**Impersonation:** local, dev, test. Sign in as the `Admin` test account first.
+- Start: `/admin/impersonate` → type into "Search users" → "Search" → the row's "Impersonate" button → "Impersonate" in the confirm dialog.
+- You're the target when: the target's landing route loads.
+- End: "Logout" → `/login`. This ends the whole session; sign in again as the admin to continue.
+
+| Persona | Search term | Role | Notes |
+|---------|-------------|------|-------|
+| Provider | `qa-provider@example.com` | Provider | profile complete |
 ```
 
 **Rules for slash commands:**
 - **Branch names must match the `## Pipeline Configuration` table** row for row. The two tables are joined on the branch column — `/qa` reads the URL here and the pipeline ID there. A mismatch is a configuration error worth reporting.
-- **There is no `prod` row, deliberately.** `/qa` refuses production: an unattended regression pass signs in and clicks through live member data.
-- **Include the rows below the one you test.** The row immediately below the target serves the pre-change build, which is how `/qa` tells a regression this story caused from a bug that was already there.
+- **There is no `prod` row, deliberately.** `/qa` and `/repro` refuse production: an unattended run signs in and clicks through live member data.
+- **Include the rows below the one you test.** The row immediately below the target serves the pre-change build. That is how `/qa` tells a regression this story caused from a bug that was already there, and how `/repro` runs its *control*: it proves the steps still trigger the bug on a build without the fix, so a clean run on the fixed build means **fixed**, not *never triggered*.
 - **App URL is required; API URL is optional** — it is used to attribute a failing network call to the backend rather than the screen.
-- **`Sign-in:`** is optional prose. Include it when the login route is not `/login`, when the landing page is not obvious, or — importantly — when sign-in goes through **SSO / Entra ID with MFA**. Say so, and `/qa` reports that it cannot sign in unattended instead of hanging on a browser prompt.
-- **Test accounts** are required by `/qa` and nothing else. The `Default` column marks the account used when `--role` is not given; if no row is marked, the first row wins. A second role lets `/qa` verify that restricted controls are correctly *absent* — a class of bug a manual checklist rarely catches.
-- **Never put a credential in this table.** Only variable names. The values belong in your shell profile — see Environment Setup below.
+- **`Sign-in:`** starts with the method, then optional prose: the login route, the landing page, and an element that only exists once you're signed in.
+  - `` `form` `` — the app's own login form, with no MFA. If the developer has set the role's credential variables, the `qa` agent fills the form in itself. If not, the developer signs in by hand in the browser window — see Test accounts below.
+  - `` `microsoft` `` — Entra ID / MSAL redirect. Name the app's sign-in button and the signed-in marker. **By default the person running the command signs in by hand**, once, in the Chromium window Playwright opens. MFA is fine, and no credential enters any transcript. Playwright MCP keeps a persistent browser profile, so later runs reuse that session until it expires. For a fully unattended run, give the role's row credential variables **and** state on the `Sign-in:` line that the account is a cloud-only, **MFA-exempt** QA account. The agent then types them into the Microsoft page itself.
+  - A line naming neither method is read as `microsoft` only if it says sign-in goes through Microsoft / Entra ID, and as `form` otherwise. Name the method explicitly; that is less fragile than relying on this.
+- **Test accounts** are used by `/qa` and `/repro` and nothing else. The table declares the variable **names**. **Each developer sets the values on their own machine** — usually for their own account, which must hold the row's role on the environment being tested.
+  - **Per environment:** `{VAR}_{ENV}` overrides `{VAR}`, where `{ENV}` is `LOCAL`, `DEV`, `TEST`, or `STAGING`. Use it when your account's password differs on an environment with its own database — for example `COMPASS_QA_ADMIN_PASSWORD_TEST`.
+  - **Not set?** Then `/qa` and `/repro` don't stop. They offer to let you **sign in yourself** in the browser window, and your password never passes through Claude. The cost: the agent can't sign in anywhere else on its own, so on a `form` app there is no re-check on the baseline environment, and no second role.
+  - **Which to choose:** when the agent fills a form, the password is a tool argument. It is stored in the session transcript on your machine and sent to the model with every other tool call. For a dedicated QA account that's fine. **For your own administrator account, prefer signing in yourself.**
+  - The `Default` column marks the row used when `--role` is not given; if no row is marked, the first row wins. A second role lets `/qa` verify that restricted controls are correctly *absent* — a class of bug a manual checklist rarely catches. Under `microsoft` with a hand-off, the variable columns can be `—`; the role still says which account to sign in with.
+- **`Impersonation:`** is optional. Add it only if the app has a "sign in as another user" feature. It is what makes `--as=<user>` work, and it describes four things:
+  - **where** it's available — impersonation is often environment-gated;
+  - **which test account** can impersonate, and in which role;
+  - **how to start it**, using the visible labels of the controls;
+  - **how to end it** — say so if ending it signs you out completely.
 
-**Example from an actual project:**
+  The persona table names QA test users to impersonate by role. Use dedicated QA users, never a real person. `--as=<persona>` uses the row. Any other `--as` value is searched for literally, as an **ad-hoc user** — typically the person who reported a bug. The app records everything done while impersonating as that user, so an ad-hoc run is **read-only**: `/qa` submits nothing, and `/repro` asks you to approve each writing step.
+- **Never put a credential in these tables.** Only variable names. The values belong in your shell profile — see Environment Setup below.
 
-COMPASS:
+**Examples from actual projects:**
+
+COMPASS — `form` sign-in, plus impersonation:
 ```markdown
 | Branch | Environment | App URL | API URL |
 |--------|------------|---------|---------|
-| (none) | local | http://localhost:5173 | https://localhost:7169 |
+| (none) | local | http://localhost:3000 | http://localhost:5191 |
 | dev | Dev | https://dev.compass.caresolutions.com | https://dev.api.compass.caresolutions.com |
 | test | Test | https://test.compass.caresolutions.com | https://test.api.compass.caresolutions.com |
 | staging | Staging | https://staging.compass.caresolutions.com | https://staging.api.compass.caresolutions.com |
+
+**Sign-in:** `form` at `/login` — app-issued JWT, no SSO, no MFA. If the account holds several roles, the login page asks which one; choose the table's role. Admin lands on `/admin/dashboard`.
+
+**Test accounts** — each developer uses **their own System Administrator account**, set on their own machine. Local and dev share a database; test has its own, so set `COMPASS_QA_ADMIN_PASSWORD_TEST` if your test password differs.
+
+| Role | Username variable | Password variable | Default |
+|------|-------------------|-------------------|---------|
+| System Administrator | `COMPASS_QA_ADMIN_USERNAME` | `COMPASS_QA_ADMIN_PASSWORD` | yes |
+
+**Impersonation:** local, dev, test — **not staging** (the API returns 404 there). Sign in as the `Admin` test account in the **System Administrator** role.
+- Start: `/admin/impersonate` → type into "Search users" → "Search" → on the row, "Impersonate" (or "Impersonate as <Role>" for a multi-role user) → "Impersonate" in the "Impersonate this user?" dialog.
+- You're the target when: the target's landing route loads. There is no impersonation banner.
+- End: "Logout" (drawer bottom row, or the avatar menu) → `/login`. This signs you out completely; sign in again as the admin to continue.
+- The token has no `impersonatedBy` claim — every action is recorded as the target.
+```
+
+CSIPay — `microsoft` sign-in, no impersonation:
+```markdown
+| Branch | Environment | App URL | API URL |
+|--------|------------|---------|---------|
+| (none) | local | http://localhost:3001 | https://localhost:5001/api |
+| dev | Dev | https://dev.csipay.caresolutions.com | https://dev.api.csipay.caresolutions.com/api |
+| test | Test | https://test.csipay.caresolutions.com | https://test.api.csipay.caresolutions.com/api |
+| staging | Staging | https://staging.csipay.caresolutions.com | https://staging.api.csipay.caresolutions.com/api |
+
+**Sign-in:** `microsoft` — Entra ID redirect via MSAL, single tenant. Any URL shows the "Sign in with Microsoft" button when signed out. Signed-in marker: the "Dashboard" heading at `/`. Roles are Entra app roles (`Admin`, `Developer`).
+
+| Role | Username variable | Password variable | Default |
+|------|-------------------|-------------------|---------|
+| Developer | — | — | yes |
+| Admin | — | — | |
+| User (no app role) | — | — | |
+
+Each developer signs in with their own Microsoft account. `Admin` and `Developer` see unmasked identifiers on Payees, which the sensitive-data hook blocks on sight. To test Payees content, sign in with an account that has no app role.
 ```
 
 ### Environment Setup
@@ -529,14 +587,16 @@ az login
 # Microsoft Teams MCP — no env vars needed. First invocation prints a
 # device code + URL to sign in via Microsoft Graph (OAuth device flow).
 
-# QA test accounts (required for /qa — browser testing on a deployed environment).
-# One pair per role. The variable NAMES are declared in the project's
-# `## Environment URLs` section; the VALUES live only here, never in any file.
-# Use throwaway QA accounts with least privilege, never a personal login.
-export COMPASS_QA_ADMIN_USERNAME="qa-admin@example.com"
+# QA sign-in for /qa and /repro — OPTIONAL. Set these only if you want the agent
+# to sign in unattended. Leave them unset and you'll be asked to sign in yourself in
+# the browser window, so your password never passes through Claude.
+# The variable NAMES come from the project's `## Environment URLs` section. The
+# VALUES are yours — usually your own account with the role the table names — and
+# they live only here, never in any file. `_TEST` / `_DEV` / `_LOCAL` / `_STAGING`
+# versions override the plain one on that environment.
+export COMPASS_QA_ADMIN_USERNAME="you@caresolutions.com"
 export COMPASS_QA_ADMIN_PASSWORD="..."
-export COMPASS_QA_PROVIDER_USERNAME="qa-provider@example.com"
-export COMPASS_QA_PROVIDER_PASSWORD="..."
+export COMPASS_QA_ADMIN_PASSWORD_TEST="..."   # only if your test password differs
 ```
 
-`/qa` reads these itself **inside a subagent** and fills the login form directly. It never prints a value, never writes one to a file, and never includes one in a report or a work item comment. If your app's sign-in requires MFA or SSO, unattended login is not possible — say so in the `Sign-in:` line of `## Environment URLs` and `/qa` will report that instead of hanging on a browser prompt.
+When these are set, `/qa` and `/repro` read them **inside a subagent** and fill the login form directly. They never print a value, never write one to a file, and never include one in a report or a work item comment. The value is still a tool argument, so it lands in that subagent's local transcript. That is why signing in yourself is the better choice for a personal administrator account. Apps that sign in through Microsoft need no variables at all: you sign in once in the browser window, and the session persists in the Playwright profile.

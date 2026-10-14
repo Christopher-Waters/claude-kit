@@ -692,6 +692,15 @@ async function main() {
       await fs.writeFile(gitignorePath, claudeBlock.trim());
       console.log(chalk.green('  ✓ Created .gitignore'));
     }
+
+    // Playwright MCP drops console logs and page snapshots into .playwright-mcp/ in
+    // the project root. /qa and /repro render real screens, so keep them out of git.
+    // Checked separately so installs that predate this line still pick it up.
+    const current = await fs.readFile(gitignorePath, 'utf8');
+    if (!/^\/?\.playwright-mcp\/?\s*$/m.test(current)) {
+      await fs.appendFile(gitignorePath, `${current.endsWith('\n') ? '' : '\n'}.playwright-mcp/\n`);
+      console.log(chalk.green('  ✓ Added .playwright-mcp/'));
+    }
   }
 
   // ── Install Manifest ──────────────────────────────────────────────────

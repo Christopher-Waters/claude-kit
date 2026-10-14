@@ -32,6 +32,7 @@ Every agent sets `model:` in its frontmatter. Three valid forms, picked delibera
 - Never widen a browser agent's tool list without re-reading its sensitive-data rules.
 - Verify every `mcp__*` name against the running server before shipping — the harness accepts any string, and a typo means the agent silently lacks the tool.
 - Re-check the allowlist when bumping `@playwright/mcp`. A renamed tool disappears silently, which is why `qa.md` is instructed to report a missing capability rather than improvise around it.
+- **Add a browser task to `qa.md`; don't fork it.** `/qa` (task `regression`) and `/repro` (tasks `reproduce` and `verify-fix`) share the one agent, so there is one allowlist to audit. A second browser agent means a second copy of the security model, and the copies will drift.
 
 ## File shape
 
