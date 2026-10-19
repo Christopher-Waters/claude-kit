@@ -26,7 +26,7 @@ Autopilot executes `/implement`'s steps, so read them first: `.claude/commands/i
 Run implement.md from Step 0 through Step 11, or F1 through F8 for a Feature. **This file wins every conflict with implement.md.** Three overrides apply throughout:
 
 1. **Gates resolve without asking.** Where implement.md says to wait, ask, or prompt, or offers a `(yes / no / …)` choice, apply that gate's row in the Gate Table. For a prompt the table doesn't list, take the answer implement.md suggests (its "suggested", "recommended", or "press enter to accept" value). If it suggests none, take the option that changes the least and is easiest to undo. Log the decision either way.
-2. **Ultracode is on.** Invoking `/autopilot` is the opt-in. Use the `Workflow` tool wherever implement.md's Ultracode callouts apply, at the scale they set: fan out for non-trivial work, stay lean for a one-file change. implement.md's Ultracode rules hold unchanged. Workflow agents are read-only analysts, and every write stays in the main loop.
+2. **Ultracode is off, always.** Autopilot never calls the `Workflow` tool, whatever the size of the change, and skips every Ultracode callout in implement.md. An unattended run multiplies cost the most, so it runs lean. implement.md's **Model Tiers** still apply: implementers run on Sonnet, and the main loop takes a piece over when one gets stuck.
 3. **The run ends one of three ways:** a PR ready for review, a draft PR with open items (**Unfinished Work**), or a **Hard Stop**. There is no other outcome.
 
 Open with this block, then start Step 0 without waiting:
@@ -54,8 +54,8 @@ Each row is a prompt in implement.md and the decision autopilot makes instead. L
 | 0d | The worktree is already locked. | Hard Stop. Another session may be editing it, and two unwatched edit streams in one folder can't be untangled afterward. If the lock is stale: `git worktree unlock "{WT}"`. |
 | **Work item and plan** | | |
 | 2 | Summary: "Does this look correct? Any added context?" | Print the summary, with the effort recommendation as information only, and continue. Resolve gaps with the **Ambiguity Rule**. |
-| 2 | Use Ultracode? | Yes (override 2). |
-| 3 | Approve this plan? | Run the Architect Review as an independent agent (see **Independent Checks**), apply what it finds, print the final plan, and continue. The plan goes in the PR thread. |
+| 2 | Use Ultracode? | No (override 2). |
+| 3 | Approve this plan? | Run the Architect Review (see **Independent Checks**), apply what it finds, print the final plan, and continue. The plan goes in the PR thread. |
 | **Branch and Task** | | |
 | 4 | The open Task has no estimate. Proposed hours OK? | Set the proposed hours on `OriginalEstimate` and `RemainingWork`. |
 | 4 | More than one open Task. Which one? | The one in `Active`, then the one titled `{PREFIX} - Implement…`, then the lowest id. Leave the others alone and name them in the final report. |
@@ -75,7 +75,7 @@ Each row is a prompt in implement.md and the decision autopilot makes instead. L
 | **Feature** | | |
 | F1 | No implementable child stories. Implement the Feature itself? | Yes, through Steps 2–11, if the Feature's own description or AC describes buildable work. Otherwise Hard Stop. |
 | F2 | Feature summary and wave plan. Look correct? | Print it and continue. Stories with no `Custom.Order` run in the final wave, in id order. |
-| F4.1 | Approve this wave's plan? | Run the Architect Review agent on the combined wave plan, apply what it finds, and continue. |
+| F4.1 | Approve this wave's plan? | Run the Architect Review on the combined wave plan, apply what it finds, and continue. |
 | F4.2 | Create these Tasks? | Yes, for every story in the wave. |
 | F6 | Combined UAT | As Step 9, grouped by story. |
 
@@ -96,8 +96,8 @@ Each human check in `/implement` gets a stand-in that doesn't share the author's
 
 | `/implement` relies on | Autopilot uses |
 |---|---|
-| The user reading the plan | The Architect Review as a separate `Workflow` agent on **every** plan, trivial or not (implement.md's Ultracode variant). It gets the work item, the AC, and the draft plan, but never the reasoning behind the plan, and it reads the code itself. Apply each finding unless it grows the scope or contradicts an AC. Log every finding you decline, with the reason. |
-| The user choosing which review findings to fix | The find → adversarially-verify review, on every round. Only verified findings count. |
+| The user reading the plan | The Architect Review in the main loop on **every** plan (implement.md's non-Ultracode variant). Answer each question from the code, not from the plan's own prose. Apply each finding unless it grows the scope or contradicts an AC. Log every finding you decline, with the reason. |
+| The user choosing which review findings to fix | One `reviewer` agent (Sonnet) on the diff, launched with the `Agent` tool so it doesn't share the author's reasoning. Give it the work item, the AC, and the worktree path, but not the plan's justification. Before fixing a finding, check it against the code yourself and drop it if it doesn't hold; that check is what "verified" means below. Later rounds review only the diff the fixes introduced. |
 | The user doing UAT | Every AC traced to a test or code path (Step 7.4), the full test suite including any E2E specs the repo has, and the UAT checklist handed to the reviewer in the PR. |
 
 ## Environment Config Rule (Step 7.3)

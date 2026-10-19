@@ -15,9 +15,22 @@ When Ultracode is in use, these rules apply:
 - **Never fan out an interactive gate or a write.** Every user prompt (Steps 3, 4-approval, 5, 10-decisions, 11) and every work-item or git mutation (Step 0 worktree, Step 5 create, Step 6 branch, Step 7 implement, Step 12 push/PR/close, Step 13 cleanup) stays in the **main loop**. Workflow agents here are **read-only analysts** — they use MCP read tools, `Read`, and `Grep`, and they return data. They do not create or close work items, switch branches, write code, or ask the user anything.
 - **Give every Workflow agent the ticket's worktree path** (Step 0) — that is where the code under analysis lives, not the folder the session started in.
 - **Stay in the loop between phases.** Run one `Workflow` per phase, read its results, present/await the user as the steps require, then launch the next phase's workflow. This is several short workflows in sequence — not one monolithic run that tries to swallow the approval gates.
-- **Review uses the canonical find → adversarially-verify pipeline** (Step 10): fan out per dimension, then spawn skeptic verifiers per finding and drop findings the majority refute, so only confirmed issues reach the user.
+- **Review uses the canonical find → adversarially-verify pipeline** (Step 10): fan out per dimension, then spawn one skeptic verifier per finding and drop the findings it refutes, so only confirmed issues reach the user.
 
 If the `Workflow` tool is somehow unavailable, fall back to running each phase sequentially in the main loop — the output is identical, just slower.
+
+## Model Tiers (token efficiency)
+
+Most of a run's tokens go to subagents re-reading their context on every turn, not to the code they write. The main loop runs on the session model and does the work that needs frontier judgment. Everything else runs on Sonnet, which costs half as much per input and output token:
+
+| Work | Model | How |
+|---|---|---|
+| Feedback synthesis, plan, gates, fixing review findings | Session model | The main loop |
+| Architect Review (Step 4) | Session model | Omit `model` on its `Workflow` agent. It is the one analysis pass where a stronger reviewer changes the outcome |
+| Feedback gathering, exploration, per-AC coverage, review finders, review verifiers | Sonnet | `model: 'sonnet'` on every other `Workflow` `agent()` call. `agentType: 'reviewer'` is already Sonnet |
+| Implementation | Sonnet | The `backend` and `frontend` agents are Sonnet by frontmatter. A `general-purpose` implementer gets `model: "sonnet"` on its `Agent` call |
+
+**Escalation keeps quality up.** The plan the implementer follows was written by the main loop, and the code is reviewed afterward. If an implementer reports it is blocked, or the same build or test failure survives two of its attempts, stop delegating that piece: the main loop fixes it directly. Don't relaunch a Sonnet agent on a problem it has already failed twice.
 
 ## Step 1: Find the Latest Pull Request
 
@@ -415,7 +428,7 @@ After the update, **read the work item back** (`wit_work_item`, action `get`) an
 
 **In a worktree**, install frontend dependencies first — only if the approved plan touches the frontend. A new worktree has no `node_modules`, so run `npm install` in its client folder (`cd "{WT}/{client folder}" && npm install`). A backend-only plan skips the install; `dotnet build` restores its own packages. Steps 8–9 then skip the uninstalled client folder and report it as `frontend skipped — untouched by this rework, not installed in the worktree` rather than failing on it.
 
-1. **Implement** the rework using backend and/or frontend agents according to the approved plan — each agent is told to work only in `WT` (Step 0e)
+1. **Implement** the rework using backend and/or frontend agents according to the approved plan — each agent is told to work only in `WT` (Step 0e). They run on Sonnet; see **Model Tiers** for when the main loop takes a piece over
 2. **Write the unit tests** listed in the plan's "Unit Tests" section alongside the implementation — not after. Include any regression test that would have caught the original issue
 3. **Generate mockup** if there are UI changes
 
@@ -444,7 +457,9 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
 ## Step 10: Code Review
 
-> **Ultracode (if opted in):** Run the review as a `Workflow` find → verify pipeline. **Find:** fan out one agent per dimension — correctness/quality, security, Clean Architecture compliance, CLAUDE.md adherence, and regression risk from the rework — each scoped to the files changed since the last PR and returning structured findings. **Verify:** for each finding, spawn independent skeptic agents prompted to *refute* it, and drop any finding the majority refute. Only confirmed findings reach the user. Use the `reviewer` agent type for the dimension agents (`agentType: 'reviewer'`) so they inherit its review rules. The fix/decision loop below stays in the main loop — workflow agents never edit code.
+> **Ultracode (if opted in):** Run the review as a `Workflow` find → verify pipeline. **Find:** fan out one agent per dimension — correctness/quality, security, Clean Architecture compliance, CLAUDE.md adherence, and regression risk from the rework — each scoped to the files changed since the last PR and returning structured findings. **Verify:** for each finding, spawn **one** independent skeptic agent (`model: 'sonnet'`) prompted to *refute* it, and drop the finding if it does. Only confirmed findings reach the user. Use the `reviewer` agent type for the dimension agents (`agentType: 'reviewer'`) so they inherit its review rules. The fix/decision loop below stays in the main loop — workflow agents never edit code.
+>
+> **Re-reviews are scoped to the fix.** After fixing findings, review only the diff the fixes introduced (`git diff` against the commit reviewed last time), not the whole change again. The first review already covered everything else.
 
 Review the rework diff for quality, security, Clean Architecture compliance, and CLAUDE.md adherence. Focus the review on the files changed since the last PR — call out any regression risk introduced by the rework. Review is read-only — it reports findings, you act on them.
 
@@ -465,8 +480,8 @@ Present the confirmed findings to the user grouped by severity:
 Address must-fix items? (yes / select / skip)
 ```
 
-- `yes` → fix every must-fix item, then re-run the review (the Step 10 find → verify workflow) on the updated diff
-- `select` → ask which items to address; fix only those, then re-run the review workflow
+- `yes` → fix every must-fix item, then re-run the review (the Step 10 find → verify workflow) on the fix diff only
+- `select` → ask which items to address; fix only those, then re-run the review workflow on the fix diff only
 - `skip` → proceed without fixes (only allowed if there are no must-fix items, or the user explicitly overrides)
 
 Loop until the review reports no must-fix items, or the user explicitly accepts remaining findings. Do not proceed to UAT with unresolved must-fix items unless the user overrides.

@@ -6,9 +6,9 @@ Conventions for the agent `.md` files under `templates/agents/`. These live here
 
 Every agent sets `model:` in its frontmatter. Three valid forms, picked deliberately:
 
-1. **`inherit`** — the agent uses whatever frontier model the session is on. For agents whose quality should track user intent: the user picked Opus for a reason, and that reason applies to the implementers too. Currently `backend`, `frontend`, `mockup`.
+1. **`inherit`** — the agent uses whatever frontier model the session is on. For agents whose quality should track user intent. Currently `mockup`.
 2. **Tier alias** (`opus`, `sonnet`, `haiku`) — a fixed tier regardless of session model, for work with a known cost/capability target. Aliases auto-resolve to the latest model in the tier, so they don't rot.
-   - `sonnet` — specialized agents that don't need frontier reasoning: `azure-ops`, `legacy`, `qa`, `reviewer`, `security-auditor`, `test-runner`.
+   - `sonnet` — specialized agents that don't need frontier reasoning: `backend`, `frontend`, `azure-ops`, `legacy`, `qa`, `reviewer`, `security-auditor`, `test-runner`.
    - `haiku` — cheap mechanical agents: `build-validator`, `lint-checker`.
 3. **Pinned model ID** — **don't.** Pinned IDs rot the moment a new model ships, and a typo'd ID silently breaks the agent at runtime because the harness accepts any string. The kit briefly pinned `claude-opus-4-8` (which didn't exist) in 2.1.13 and rolled back in 2.1.14.
 

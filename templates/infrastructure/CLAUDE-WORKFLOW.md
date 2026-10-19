@@ -49,11 +49,11 @@ Ultracode is **opt-in**. It is on only when a system-reminder confirms it, when 
 
 Short, single-query operations (`/track`, `/explain`, `/close-orphan-tasks`) do **not** need ultracode — they are already one pass and gain nothing from fan-out. Reach for `Workflow` when the work-list is large and the per-item work is independent.
 
-**`/rework` always uses ultracode** — it does not wait to be asked. It fans out feedback gathering, codebase exploration, per-acceptance-criterion coverage checks, and the find → adversarially-verify review, while keeping every approval gate and write in the main loop.
+**`/implement` and `/rework` ask** — once, at their first confirmation, with a suggestion: yes for multi-subsystem / multi-AC work, no for a small targeted change. When on, they fan out exploration, per-acceptance-criterion coverage, and the find → verify review, while keeping every approval gate and write in the main loop.
 
-**`/implement` uses ultracode scaled to the change** — its code review always fans out (find → adversarially-verify), but exploration and per-AC coverage fan out only for non-trivial / full-stack stories; a one-line config change runs lean. It's the daily driver, so it doesn't blanket-fan-out like `/rework`.
+**`/autopilot` never uses it.** An unattended run is where fan-out costs the most, so it runs lean: the Architect Review runs in the main loop, and one Sonnet `reviewer` agent stands in for the user's review.
 
-**`/autopilot` always uses it**, at `/implement`'s scale — invoking the command is the opt-in. With no human approving the plan or choosing review fixes, the independent Architect Review agent and the find → adversarially-verify review are what stand in for that scrutiny.
+**Model tiers.** In `/implement`, `/rework`, and `/autopilot`, the main loop (your session model) plans, synthesizes, and fixes review findings. Implementers (`backend`, `frontend`) and every Workflow analyst run on Sonnet, except the Architect Review, which stays on the session model. If a Sonnet implementer is blocked or fails the same way twice, the main loop takes that piece over.
 
 **`/plan-backlog`, `/plan-sprint`, and `/quote-backlog` use it opt-in** — only when ultracode is on.
 

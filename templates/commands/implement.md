@@ -16,6 +16,19 @@ The remaining rules apply whenever Ultracode is in use:
 
 If the `Workflow` tool is unavailable, run each phase sequentially in the main loop — the output is identical, just slower.
 
+## Model Tiers (token efficiency)
+
+Most of a run's tokens go to subagents re-reading their context on every turn, not to the code they write. The main loop runs on the session model and does the work that needs frontier judgment. Everything else runs on Sonnet, which costs half as much per input and output token:
+
+| Work | Model | How |
+|---|---|---|
+| Summary, plan, synthesis, gates, conflict resolution, fixing review findings | Session model | The main loop |
+| Architect Review (Step 3) | Session model | Omit `model` on its `Workflow` agent. It is the one analysis pass where a stronger reviewer changes the outcome |
+| Exploration, per-AC coverage, review finders, review verifiers | Sonnet | `model: 'sonnet'` on every other `Workflow` `agent()` call. `agentType: 'reviewer'` is already Sonnet |
+| Implementation | Sonnet | The `backend` and `frontend` agents are Sonnet by frontmatter. A `general-purpose` implementer gets `model: "sonnet"` on its `Agent` call |
+
+**Escalation keeps quality up.** The plan the implementer follows was written by the main loop, and the code is reviewed afterward. If an implementer reports it is blocked, or the same build or test failure survives two of its attempts, stop delegating that piece: the main loop fixes it directly. Don't relaunch a Sonnet agent on a problem it has already failed twice.
+
 ## Step 0: Set Up the Ticket's Workspace
 
 Developers run several Claude Code sessions against the same repo at once, one per ticket. If every session `git checkout`s in the folder it started in, they clobber each other's working tree. So each ticket gets its own **git worktree** in a sibling folder, `../{repo}-AB{id}` (e.g. `../CSIPay-AB5373`), and every later step runs there. The folder the session started in is never checked out, committed to, or edited.
@@ -406,7 +419,7 @@ Remember the Task ID. Step 10 closes it.
 
 **In a worktree**, install frontend dependencies first — only if the approved plan touches the frontend. A new worktree has no `node_modules`, so run `npm install` in its client folder (`cd "{WT}/{client folder}" && npm install`). A backend-only plan skips the install; `dotnet build` restores its own packages. Steps 6–7 then skip the uninstalled client folder and report it as `frontend skipped — untouched by this change, not installed in the worktree` rather than failing on it.
 
-1. **Implement** using backend and/or frontend agents according to the approved plan — each agent is told to work only in `WT` (Step 0f)
+1. **Implement** using backend and/or frontend agents according to the approved plan — each agent is told to work only in `WT` (Step 0f). They run on Sonnet; see **Model Tiers** for when the main loop takes a piece over
 2. **Write the unit tests** listed in the plan's "Unit Tests" section alongside the implementation — not after
 3. **Generate mockup** if there are UI changes
 
@@ -443,7 +456,9 @@ Run a build check **before** any other quality checks. Use the `build-validator`
 
 ## Step 8: Code Review
 
-> **Ultracode (if opted in):** Run the review as a `Workflow` find → verify pipeline. **Find:** fan out one agent per dimension — correctness/quality, security, Clean Architecture compliance, and CLAUDE.md adherence — each scoped to the diff and returning structured findings. **Verify:** for each finding, spawn independent skeptic agents prompted to *refute* it, and drop any finding the majority refute. Only confirmed findings reach the user. Use the `reviewer` agent type for the dimension agents (`agentType: 'reviewer'`) so they inherit its review rules. The fix/decision loop below stays in the main loop — workflow agents never edit code.
+> **Ultracode (if opted in):** Run the review as a `Workflow` find → verify pipeline. **Find:** fan out one agent per dimension — correctness/quality, security, Clean Architecture compliance, and CLAUDE.md adherence — each scoped to the diff and returning structured findings. **Verify:** for each finding, spawn **one** independent skeptic agent (`model: 'sonnet'`) prompted to *refute* it, and drop the finding if it does. Only confirmed findings reach the user. Use the `reviewer` agent type for the dimension agents (`agentType: 'reviewer'`) so they inherit its review rules. The fix/decision loop below stays in the main loop — workflow agents never edit code.
+>
+> **Re-reviews are scoped to the fix.** After fixing findings, review only the diff the fixes introduced (`git diff` against the commit reviewed last time), not the whole change again. The first review already covered everything else.
 
 Review the diff for quality, security, Clean Architecture compliance, and CLAUDE.md adherence. Review is read-only — it reports findings, you act on them.
 
@@ -464,8 +479,8 @@ Present the confirmed findings to the user grouped by severity:
 Address must-fix items? (yes / select / skip)
 ```
 
-- `yes` → fix every must-fix item, then re-run the review (the Step 8 find → verify workflow) on the updated diff
-- `select` → ask which items to address; fix only those, then re-run the review workflow
+- `yes` → fix every must-fix item, then re-run the review (the Step 8 find → verify workflow) on the fix diff only
+- `select` → ask which items to address; fix only those, then re-run the review workflow on the fix diff only
 - `skip` → proceed without fixes (only allowed if there are no must-fix items, or the user explicitly overrides)
 
 Loop until the review reports no must-fix items, or the user explicitly accepts remaining findings. Do not proceed to UAT with unresolved must-fix items unless the user overrides.
@@ -699,7 +714,7 @@ For each wave in ascending order:
      git -C "{WT}" worktree add "{scratchpad}/wt-{story-id}" -b "story/AB#{story-id}-{sanitized-title}" "{feature-branch}"
      ```
 
-     Launch **one implementation agent per story, all in a single message** so they run concurrently (`backend`/`frontend`/`general-purpose` per the approved plan; if a story needs both backend and frontend work, give one agent the whole story rather than splitting it). Each agent's prompt must include: the approved plan for its story, the story's full AC, its worktree path, and these rules — work **only** inside your worktree, implement the plan plus its unit tests, run the tests you added, commit to the story branch, and report what you changed. Agents never push, never create PRs, never touch work items, and never ask the user anything.
+     Launch **one implementation agent per story, all in a single message** so they run concurrently (`backend`/`frontend` per the approved plan; if a story needs both backend and frontend work, give one `general-purpose` agent the whole story with `model: "sonnet"` rather than splitting it — see **Model Tiers**). Each agent's prompt must include: the approved plan for its story, the story's full AC, its worktree path, and these rules — work **only** inside your worktree, implement the plan plus its unit tests, run the tests you added, commit to the story branch, and report what you changed. Agents never push, never create PRs, never touch work items, and never ask the user anything.
    - **Merge back (main loop):** merge each story branch into the feature branch in the Feature's worktree (`git -C "{WT}" merge --no-ff "story/…"`), resolving conflicts yourself using both stories' plans as the guide. Then `git worktree remove` and delete the story branch. Merge in `Custom.Order`-then-ID order so conflict resolution is deterministic.
 3. **Wave gate:** run Step 6 (build validation) and Step 7.1–7.2 (full test suite + lint) on the merged feature branch, in the Feature's worktree. Fix failures before starting the next wave — the next wave branches from this merged, green state.
 
