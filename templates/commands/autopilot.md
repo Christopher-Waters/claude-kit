@@ -17,7 +17,7 @@ What stays fixed:
 
 ## Arguments
 
-`$ARGUMENTS` is the work item id, as `1234` or `AB#1234`. It can be followed by `work in place` or `no worktree`, the same opt-out `/implement` takes. Strip the phrase before reading the id.
+`$ARGUMENTS` is the work item id, as `1234` or `AB#1234`. It can be followed by `work in place` or `no worktree`, the same opt-out `/implement` takes, and by `--opus`, `--sonnet`, or `--haiku` to pin every subagent to one model (implement.md's **Model override**). Strip both before reading the id. With a flag, the `reviewer` agent in **Independent Checks** runs on the pinned tier too, and the model note goes in the opening block instead of a Step 2 summary.
 
 ## Before Step 0: Load `/implement`
 
@@ -26,7 +26,7 @@ Autopilot executes `/implement`'s steps, so read them first: `.claude/commands/i
 Run implement.md from Step 0 through Step 11, or F1 through F8 for a Feature. **This file wins every conflict with implement.md.** Three overrides apply throughout:
 
 1. **Gates resolve without asking.** Where implement.md says to wait, ask, or prompt, or offers a `(yes / no / …)` choice, apply that gate's row in the Gate Table. For a prompt the table doesn't list, take the answer implement.md suggests (its "suggested", "recommended", or "press enter to accept" value). If it suggests none, take the option that changes the least and is easiest to undo. Log the decision either way.
-2. **Ultracode is off, always.** Autopilot never calls the `Workflow` tool, whatever the size of the change, and skips every Ultracode callout in implement.md. An unattended run multiplies cost the most, so it runs lean. implement.md's **Model Tiers** still apply: implementers run on Sonnet, and the main loop takes a piece over when one gets stuck.
+2. **Ultracode is off, always.** Autopilot never calls the `Workflow` tool, whatever the size of the change, and skips every Ultracode callout in implement.md. An unattended run multiplies cost the most, so it runs lean. implement.md's **Model Tiers** still apply: implementers run on Sonnet (or the tier a `--opus` / `--sonnet` / `--haiku` flag pins), and the main loop takes a piece over when one gets stuck.
 3. **The run ends one of three ways:** a PR ready for review, a draft PR with open items (**Unfinished Work**), or a **Hard Stop**. There is no other outcome.
 
 Open with this block, then start Step 0 without waiting:
@@ -37,6 +37,7 @@ Running /implement end to end with no approval gates. Every decision is logged a
 I stop only on a hard stop; the PR is where you review.
 Claude Code's own permission prompts can still appear. Edits in the ticket's worktree (../{repo}-AB{id})
 prompt once unless you've added it with /add-dir or are in auto mode.
+{only with a model flag: Subagents pinned to {tier}. This session runs on {session model}, so planning and fixes stay there.}
 ```
 
 ## Gate Table

@@ -53,7 +53,7 @@ Short, single-query operations (`/track`, `/explain`, `/close-orphan-tasks`) do 
 
 **`/autopilot` never uses it.** An unattended run is where fan-out costs the most, so it runs lean: the Architect Review runs in the main loop, and one Sonnet `reviewer` agent stands in for the user's review.
 
-**Model tiers.** In `/implement`, `/rework`, and `/autopilot`, the main loop (your session model) plans, synthesizes, and fixes review findings. Implementers (`backend`, `frontend`) and every Workflow analyst run on Sonnet, except the Architect Review, which stays on the session model. If a Sonnet implementer is blocked or fails the same way twice, the main loop takes that piece over.
+**Model tiers.** In `/implement`, `/rework`, and `/autopilot`, the main loop (your session model) plans, synthesizes, and fixes review findings. Implementers (`backend`, `frontend`) and every Workflow analyst run on Sonnet, except the Architect Review, which stays on the session model. If a Sonnet implementer is blocked or fails the same way twice, the main loop takes that piece over. Add `--opus`, `--sonnet`, or `--haiku` to pin every subagent to one model for the run (`/implement AB#1234 --opus`). The main loop stays on the session model, so run `/model opus` first to put the whole run on Opus.
 
 **`/plan-backlog`, `/plan-sprint`, and `/quote-backlog` use it opt-in** — only when ultracode is on.
 

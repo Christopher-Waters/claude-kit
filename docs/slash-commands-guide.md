@@ -115,6 +115,8 @@ Claude creates the PR targeting `main`, links AB#4521, closes the child Task wit
 
 To skip the worktree and work in the current folder as before, add **work in place**: `/implement AB#4521 work in place`.
 
+To run every subagent on one model, add **--opus**, **--sonnet**, or **--haiku**: `/implement AB#4521 --opus`. `/rework` and `/autopilot` take the same flag. The main loop stays on the session model, so run `/model opus` first to put the whole run on Opus.
+
 ---
 
 ### Example: Implementing a Bug Fix

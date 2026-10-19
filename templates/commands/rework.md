@@ -32,9 +32,23 @@ Most of a run's tokens go to subagents re-reading their context on every turn, n
 
 **Escalation keeps quality up.** The plan the implementer follows was written by the main loop, and the code is reviewed afterward. If an implementer reports it is blocked, or the same build or test failure survives two of its attempts, stop delegating that piece: the main loop fixes it directly. Don't relaunch a Sonnet agent on a problem it has already failed twice.
 
+### Model override (`--opus`, `--sonnet`, `--haiku`)
+
+The user can pin one model for the whole run: `/rework 1234 --opus`. Match the flag case-insensitively (`--Opus` works), strip it before reading the id, and remember the tier. Without a flag, the table above applies.
+
+With a flag, **every subagent the run launches uses that tier**, and the table's Sonnet and session-model rows no longer split the work:
+
+- Every `Workflow` `agent()` call gets `model: '{tier}'`, the Architect Review included.
+- Every `Agent` call gets `model: "{tier}"`, including `backend`, `frontend`, and `reviewer`. The parameter overrides the agent's frontmatter.
+- Anywhere else this file says to run something on Sonnet, read it as the pinned tier.
+
+**The main loop can't switch itself.** It stays on the session model, and a command can't change that. If the session isn't already on the pinned tier, say so in the Step 3 summary: `Subagents pinned to {tier}. This session runs on {session model}, so planning and fixes stay there. Run /model {tier} first to put the whole run on {tier}.` Then carry on; don't stop to wait for it.
+
+The escalation rule still holds: an implementer that is blocked or fails the same way twice hands that piece to the main loop. Under `--opus` that's still worth doing, since the main loop has the full plan and context and a relaunched agent doesn't.
+
 ## Step 1: Find the Latest Pull Request
 
-Handle `$ARGUMENTS` as either `1234` or `AB#1234` — strip the `AB#` prefix when calling the MCP API. If it also says "work in place" or "no worktree", strip that and remember it for Step 0.
+Handle `$ARGUMENTS` as either `1234` or `AB#1234` — strip the `AB#` prefix when calling the MCP API. If it also says "work in place" or "no worktree", strip that and remember it for Step 0. Strip a `--opus` / `--sonnet` / `--haiku` flag too, and apply it per **Model override**.
 
 Find the most recent PR linked to this work item:
 

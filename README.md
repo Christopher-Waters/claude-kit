@@ -520,6 +520,8 @@ Claude will:
 
 Say `/implement AB#1234 work in place` to skip the worktree and work in the current folder, as before.
 
+Add `--opus`, `--sonnet`, or `--haiku` to run every subagent on one model instead of the default Sonnet split: `/implement AB#1234 --opus`. `/rework` and `/autopilot` take the same flag. The main loop stays on your session model, so switch with `/model opus` first if you want the whole run on Opus.
+
 The PR merges into `main`. **That merge deploys nothing** — `main` is the compare branch. The work reaches Dev when `main` is promoted:
 
 ```
