@@ -58,7 +58,7 @@ Find the fix's commits the way `/qa` Step 5a does: linked PRs → `lastMergeComm
 | some | not all | **reproduce** — the fix exists but isn't fully on {environment}, so this run confirms the bug on the old build |
 | some | all | **verify-fix** |
 
-For `local`, also count it as verify-fix when the current branch matches `*AB#<id>-*` and the working tree has uncommitted changes — that is a fix in progress. Remind the user that the running dev server must be serving this working tree.
+For `local`, also count it as verify-fix when the current branch matches `*AB#<id>-*` and the working tree has uncommitted changes — that is a fix in progress. A server that `/qa`'s local step starts already serves this tree. If it reuses one that was already running, remind the user that it must be serving this working tree.
 
 **Overrides.** `--reproduce` always wins. `--verify` on a target that lacks some fix commits is refused: verifying a fix that isn't deployed only tests the old build.
 
@@ -70,7 +70,7 @@ Run /repro AB#{id} {environment} to confirm the bug on this build, or verify whe
 fix is: {environments whose branch has every commit, or "nowhere yet"}.
 ```
 
-**Verify-fix on `dev` / `test` / `staging`** → also run `/qa` **Step 5b**. The pipeline that deployed the fix must be green. Being merged is not being deployed. **`local`, either mode** → run `/qa` Step 5's `local` probe. Reproduce mode on a deployed environment needs no pipeline gate, because it tests whatever is there.
+**Verify-fix on `dev` / `test` / `staging`** → also run `/qa` **Step 5b**. The pipeline that deployed the fix must be green. Being merged is not being deployed. **`local`, either mode** → run `/qa` Step 5's `local` section. It starts the API and client if they aren't already running. Reproduce mode on a deployed environment needs no pipeline gate, because it tests whatever is there.
 
 **Pick the control** — verify-fix only. The control is what tells *fixed* apart from *these steps never triggered it*. Take the first one of these that applies:
 

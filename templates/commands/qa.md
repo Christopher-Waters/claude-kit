@@ -221,18 +221,46 @@ No commits at all → `No commits found referencing this work item — nothing t
 
 ### For `local`
 
-No commit or pipeline gate — you are testing the working tree. Instead, probe the local App URL. If nothing answers:
+No commit or pipeline gate — you are testing the working tree. Instead, make sure the app is running there, and **start whatever isn't**. Nobody should have to open two terminals before `/qa` will run.
+
+**Which tree.** Serve the current directory, unless `git worktree list` shows the item's branch (`*AB#<id>-*`) checked out in a sibling worktree. Then serve that worktree instead, and say so. Check whether the chosen tree contains the item's commits (`git log --grep="AB#<id>"` on its `HEAD`). If not, warn but continue. The user may be mid-implementation, which is a legitimate reason to run `/qa local`.
+
+**1. Probe.** Probe the local App URL, and the API URL if the row has one. Any HTTP status means the server is up, even a 404 or 401. Only `000` (refused or timed out) means it is down:
+
+```bash
+curl -sk -o /dev/null -w '%{http_code}' --max-time 3 "{url}"
+```
+
+If everything answers, proceed and record `already running` for each server. You can't tell which tree a server you didn't start is serving, so say once: `Reusing the servers already running — make sure they're serving {tree}.`
+
+**2. Find the start command** for each server that is down. Use the `**Local start:**` block in `## Environment URLs` if the project has one. Otherwise infer it:
+
+- **API** → `Glob("**/Properties/launchSettings.json")`, skipping `bin/`, `obj/`, and test projects. Pick the profile whose `applicationUrl` contains the API URL's port. The command is `dotnet run --project {csproj} --launch-profile {profile}`.
+- **Client** → `Glob("**/package.json")`, skipping `node_modules`. Pick the package whose `scripts` has `dev` (else `start`) and whose dev-server port matches the App URL's port. The port comes from `vite.config.*`, the script itself, or the framework default. Use the package manager named by its lockfile.
+
+If there is exactly one candidate, use it, and after the run suggest saving it as a `**Local start:**` block. If there are none, or more than one, ask the user and list the candidates. Never guess between two APIs.
+
+**Check where the client sends API calls**, whether you started it or not. Grep the client's dev-mode env file (`.env.development`, `.env.local`) for the single base-URL key, and echo **only that value**. If it is an absolute URL other than the local API URL, warn: `The local client calls {value}, not the local API — backend changes in this tree won't be exercised.` Then continue.
+
+**3. Start it in the background**, from the chosen tree, with Bash `run_in_background`. Never start it in the foreground: a dev server doesn't exit, so the call hangs until it times out. Start the API first, because the client usually proxies to it. If the client folder has no `node_modules` (a fresh worktree never does), install first: `npm ci` when there's a lockfile, `npm install` otherwise. Use the equivalent command for pnpm or yarn.
+
+**4. Wait until it answers.** Wait with `Monitor`, using an until-loop on the step 1 probe. Never use a foreground `sleep`. Allow 3 minutes for the API, because a first `dotnet run` builds, and 90 seconds for the client. Watch the background task too. If it exits before the URL answers, the start failed, so stop:
 
 ```
-Nothing is listening on {local-url}.
+Couldn't start the {API | client} for /qa local.
 
-/qa doesn't manage dev servers — start the app first:
-  {the project's start commands, e.g. `dotnet run --project src/API` and `npm run dev`}
+  {command}   (in {dir})
+  {exited with code {n} | didn't answer on {url} within {timeout}}
 
-Then re-run /qa AB#{id} local.
+Last lines of its output:
+  {up to 20 lines}
+
+Fix it and re-run /qa AB#{id} local, or start it yourself — /qa reuses a running server.
 ```
 
-Also check whether the working tree actually contains the item's commits (`git log --grep="AB#<id>"` on `HEAD`). If not, warn but continue — the user may be mid-implementation, which is a legitimate reason to run `/qa local`.
+Omit any output line that carries a connection string, key, or token, because dev servers sometimes log their configuration. `address already in use` means something else holds the port. `lsof -iTCP:{port} -sTCP:LISTEN` names it. Say what it is and stop. **Never kill a process you didn't start.**
+
+**5. Leave them running.** Servers started by `/qa` stay up for the rest of the session, so a re-run or `/repro … local` reuses them. Record each one's background task id for the report. Stop them (`TaskStop`) only when the user asks. They end with the session anyway.
 
 ## Step 6: Scope the Affected Screens, Then Get Approval
 
@@ -267,6 +295,7 @@ Target: {environment} — {app-url}
 Role: {role} ({USERNAME_VAR} | you'll sign in yourself in the browser window | Microsoft, unattended from {USERNAME_VAR})
 Impersonating: {persona} ({role}) | {search term} — ad-hoc user, READ-ONLY run | none
 Build: {n} of {n} commits on `{branch}`, {pipeline} run {id} green
+       | local working tree {dir} — API {started by /qa | already running}, client {started by /qa | already running}
 Baseline for attributing failures: {baseline-env} — {baseline-url}
 
 Screens the story touched:
@@ -326,7 +355,8 @@ Only filter 1's output can drive a `FAIL` verdict. A run that finds nothing but 
 ```
 QA — AB#{id}: {title}
 {type} · {state} · {environment} — {app-url}
-Build: {pipeline} run {id} · succeeded · commit {sha7}
+Build: {pipeline} run {id} · succeeded · commit {sha7}  |  local working tree {dir} · commit {sha7}
+Local servers: API {started by /qa (task {id}) | already running}, client {…} — the ones /qa started are still running; say "stop servers" to stop them
 Signed in as: {role} ({from USERNAME_VAR | signed in by you | Microsoft, from USERNAME_VAR}) — value not shown
 Impersonating: {persona | search term} as {role} | none
 Screens tested: {n} · {route list}

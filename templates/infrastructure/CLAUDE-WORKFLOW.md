@@ -482,6 +482,10 @@ Add this to your project's `CLAUDE.md` — **above the `## Claude Kit Workflow` 
 | test | Test | https://test.myapp.example.com | https://test.api.myapp.example.com |
 | staging | Staging | https://staging.myapp.example.com | https://staging.api.myapp.example.com |
 
+**Local start:** (optional — paths from the repo root)
+- API: `dotnet run --project src/API/API.csproj --launch-profile https`
+- Client: `npm run dev` in `Client/`
+
 **Sign-in:** `form` at `/login` — app-issued JWT, no SSO. Signed-in landing: `/dashboard`.
 
 **Test accounts** — each developer sets the values on their own machine; never write a password here.
@@ -506,6 +510,7 @@ Add this to your project's `CLAUDE.md` — **above the `## Claude Kit Workflow` 
 - **There is no `prod` row, deliberately.** `/qa` and `/repro` refuse production: an unattended run signs in and clicks through live member data.
 - **Include the rows below the one you test.** The row immediately below the target serves the pre-change build. That is how `/qa` tells a regression this story caused from a bug that was already there, and how `/repro` runs its *control*: it proves the steps still trigger the bug on a build without the fix, so a clean run on the fixed build means **fixed**, not *never triggered*.
 - **App URL is required; API URL is optional** — it is used to attribute a failing network call to the backend rather than the screen.
+- **`Local start:`** is optional. On `local`, `/qa` and `/repro` probe the local row's URLs and start any server that doesn't answer. They run it in the background from the working tree under test, wait for it to come up, and leave it running for the rest of the session. A server that is already running is reused, never restarted. Without this block, the commands are inferred: the API from the `Properties/launchSettings.json` profile whose `applicationUrl` has the API port, and the client from the `package.json` with a `dev` (else `start`) script on the App URL's port. Add the block when inference picks the wrong project or finds more than one.
 - **`Sign-in:`** starts with the method, then optional prose: the login route, the landing page, and an element that only exists once you're signed in.
   - `` `form` `` — the app's own login form, with no MFA. If the developer has set the role's credential variables, the `qa` agent fills the form in itself. If not, the developer signs in by hand in the browser window — see Test accounts below.
   - `` `microsoft` `` — Entra ID / MSAL redirect. Name the app's sign-in button and the signed-in marker. **By default the person running the command signs in by hand**, once, in the Chromium window Playwright opens. MFA is fine, and no credential enters any transcript. Playwright MCP keeps a persistent browser profile, so later runs reuse that session until it expires. For a fully unattended run, give the role's row credential variables **and** state on the `Sign-in:` line that the account is a cloud-only, **MFA-exempt** QA account. The agent then types them into the Microsoft page itself.
