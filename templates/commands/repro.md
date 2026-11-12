@@ -233,7 +233,7 @@ Next: {REPRODUCED → `/implement AB#{id}`
 
 ## Step 9: Comment on the Work Item
 
-Draft the comment, preview it, and **wait**, exactly as in `/qa` Step 9. Before drafting, check the existing comments for a `/repro` result with the **same mode and commit**. If one exists: `A /repro {mode} comment already exists for commit {sha7} ({date}). Post an updated one anyway? (yes / skip)`.
+Draft the comment, preview it, and **wait**, exactly as in `/qa` Step 9. `/qa` skips its comment on `local`, but `/repro` does not, on any environment. Before drafting, check the existing comments for a `/repro` result with the **same mode and commit**. If one exists: `A /repro {mode} comment already exists for commit {sha7} ({date}). Post an updated one anyway? (yes / skip)`.
 
 This comment matters more than `/qa`'s, because the next `/repro` reads it. A `REPRODUCED` here becomes the control that lets a later verify-fix say `FIXED` rather than `FIXED — UNCONFIRMED`. So **always include the script and the signature** — they are what make two runs comparable.
 

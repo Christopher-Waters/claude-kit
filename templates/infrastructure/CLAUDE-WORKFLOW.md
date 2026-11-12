@@ -395,7 +395,7 @@ All deployment and release operations are available as slash commands:
 | `/rollback` | `/rollback AB#1234 prod` | Revert commits on an environment |
 | `/track` | `/track release 24` | Check release, pipeline, environment, or work item status; flags work items whose state lags their environment |
 | `/where` | `/where AB#1234` | Show which environment branches contain a work item's commits |
-| `/qa` | `/qa AB#1234 [env] [--as=<user>]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in (app login form, or Microsoft) and optionally impersonate a user → full regression of the screens the story touched → pass/fail comment (never a state change) |
+| `/qa` | `/qa AB#1234 [env] [--as=<user>]` | Verify the item is fully deployed with a green pipeline → open the app in a real browser → sign in (app login form, or Microsoft) and optionally impersonate a user → full regression of the screens the story touched → pass/fail comment, except on `local` (never a state change) |
 | `/repro` | `/repro AB#1234 [env] [--as=<user>]` | Follow a bug's repro steps in a real browser. Before the fix: confirm it reproduces and point at the code to read. After the fix is deployed: prove the bug is gone, against a control run on a build without the fix → result comment (never a state change) |
 | `/plan-backlog` | `/plan-backlog [project]` | Sweep backlog for Dev Ready stories with points and no tasks → propose child tasks with hours |
 | `/plan-sprint` | `/plan-sprint [project] [--next]` | Sweep the current sprint (or the next one with `--next`) for stories/bugs with no child tasks → propose one child task with hours per item |

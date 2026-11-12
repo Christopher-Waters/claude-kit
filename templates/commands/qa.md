@@ -393,9 +393,12 @@ Screens tested: {n} · {route list}
 
 Verdict: PASS | PASS WITH FINDINGS | FAIL | INCOMPLETE
 Work item state unchanged — `Ready for Staging` is yours to set.
+Local run — nothing posted to AB#{id}.        ← `local` only; Step 9 is skipped
 ```
 
 ## Step 9: Comment on the Work Item
+
+**`local` skips this step.** Draft nothing, preview nothing, ask nothing, and don't read the item's comments to look for an earlier run. The run ends at the Step 8 report. The comment exists to record a result at a build other people can reach, for whoever later sets `Ready for Staging`. A local run tests one developer's working tree, often with uncommitted changes, so it would record a build that nobody else can open. Ask about a comment only on `dev`, `test`, or `staging`. If the user asks you to post a local result anyway, run this step as written.
 
 Draft the comment, preview it, and **wait**. Before drafting, check the item's existing comments for a prior `/qa` result on the same commit SHA — three runs should not leave three near-identical comments. If one exists: `A /qa comment already exists for commit {sha7} ({date}). Post an updated one anyway? (yes / skip)`.
 
