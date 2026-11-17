@@ -686,7 +686,7 @@ Claude reviews for:
 
 | Command | Usage | What It Does |
 |---------|-------|-------------|
-| `/implement` | `/implement AB#1234` | Read work item → summarize → approve plan → implement → quality checks → UAT → PR. On a Feature: implements child stories in `Custom.Order` waves, same-order stories in parallel |
+| `/implement` | `/implement AB#1234` | Read work item → summarize (offers to bring it into the current sprint if it isn't there) → approve plan → implement → quality checks → UAT → PR. On a Feature: implements child stories in `Custom.Order` waves, same-order stories in parallel |
 | `/autopilot` | `/autopilot AB#1234` | `/implement` with no approval gates — Claude decides, logs every decision to the PR, and stops at the PR. Never merges or deploys. Draft PR if it can't finish cleanly |
 | `/review` | `/review 142` | Full code review on a PR with inline comments |
 | `/deep-review` | `/deep-review 142` | Deep, Ultracode-orchestrated review: checks out the branch, builds/tests it, verifies every requirement, checks for regressions, flags out-of-scope changes, then comments + votes |

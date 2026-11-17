@@ -158,6 +158,7 @@ Read the work item from Azure DevOps via MCP. Extract:
 - **System.WorkItemType** — determines branch prefix
 - **System.Title** — determines branch suffix
 - **Acceptance criteria / description** — needed for implementation
+- **System.IterationPath** — compared with the current sprint (see **Current Sprint** below)
 
 Handle `$ARGUMENTS` as either `1234` or `AB#1234` — strip the `AB#` prefix when calling the MCP API. Strip a `--opus` / `--sonnet` / `--haiku` flag too, and apply it per **Model override**.
 
@@ -170,6 +171,16 @@ The description and acceptance criteria fields may contain embedded images (scre
 ### Comments
 
 Read the work item comments via `wit_work_item` (action `list_comments`). Comments often contain clarifications, scope changes, or additional requirements added after the work item was created. Incorporate any relevant information from comments into your understanding of the work item.
+
+### Current Sprint
+
+Find out whether the item is in its team's current sprint. If it isn't, Step 2 asks the user whether to bring it in. This check only reads: nothing moves until Step 4.
+
+1. **Team.** The project is the item's `System.TeamProject`, which can differ from the repo's name. Use the team whose name matches the item's Area Path, else the project's default team (named after the project). If `mcp__azure-devops__core_list_project_teams` shows several teams and neither rule picks one, ask which team in the Step 2 prompt instead of guessing.
+2. **Sprint.** Call `mcp__azure-devops__work` (action `list_team_iterations`, `timeframe: current`). Capture the sprint's name, its full **iteration path**, and its dates.
+3. **Compare.** The item is in the sprint when `System.IterationPath` equals the sprint's path or sits under it (compare case-insensitively). Anything else is outside it: the backlog (the bare project root), an earlier sprint it was carried over from, a future sprint, or a `Release #N` iteration.
+
+If the team has no current sprint, or the lookup fails, say so in one line in the Step 2 summary and skip the question. This check never blocks implementation.
 
 ## Step 2: Summarize and Confirm
 
@@ -194,6 +205,7 @@ Present a summary of the work item to the user:
 **Type:** {work item type}
 **State:** {state}
 **Assigned To:** {assigned to}
+**Sprint:** {✓ {sprint} | {iteration path, or "Backlog"} — not in the current sprint | not checked: {no active sprint for {team} | lookup failed}}
 
 ### Description
 {description summary}
@@ -208,10 +220,16 @@ Effort is set by you, not me. If your current level differs, run `/effort` to ad
 
 Use **Ultracode effort** for this run? Ultracode fans out exploration, AC-coverage checks, and code review across parallel agents — more thorough, but slower and more token-hungry. (yes / no — suggested: {yes for multi-subsystem / multi-AC work, no for trivial changes})
 
-Reply with your Ultracode choice (and any added context). Say **ready** once your effort level is set, or **go** to proceed at your current level.
+{only when the item is outside the current sprint:}
+AB#{id} is in {iteration path | the backlog}, not the current sprint, {sprint} ({start} – {finish}).
+Bring it into {sprint}? (yes / no)
+
+Reply with your Ultracode choice{, your sprint answer} (and any added context). Say **ready** once your effort level is set, or **go** to proceed at your current level.
 ```
 
-**Wait for the user to respond.** Do NOT proceed until the user confirms or replies `ready`/`go`. If they add context, incorporate it into the plan. Record the Ultracode answer — it governs whether the `Workflow` fan-outs in Steps 3, 7, and 8 run at all. Never try to set the effort level yourself; only recommend it.
+When the item sits in a `Release #N` iteration, add one line under the sprint question: `Moving it takes it out of Release #{N}'s iteration. Its release-{N} tag keeps it in the release.`
+
+**Wait for the user to respond.** Do NOT proceed until the user confirms or replies `ready`/`go`. If they add context, incorporate it into the plan. Record the Ultracode answer — it governs whether the `Workflow` fan-outs in Steps 3, 7, and 8 run at all. Record the sprint answer too; Step 4 applies it. If the item is outside the current sprint and the reply doesn't answer that question, ask it again on its own before going on. Don't decide it for the user. Never try to set the effort level yourself; only recommend it.
 
 ## Step 3: Explore & Plan
 
@@ -331,6 +349,18 @@ git checkout -b "<branch-name>"
 If the branch already exists, switch to it with `git checkout "<branch-name>"` instead of failing. In a worktree, Step 0d has already put the worktree on an existing branch for this ticket — there is nothing to create.
 
 Remember the `BASE_BRANCH` — you will need it for the PR step.
+
+### Bring the Work Item into the Sprint
+
+Only if the user answered **yes** to the sprint question in Step 2. Otherwise leave every iteration as it is.
+
+Set the item's iteration to the current sprint's full path from Step 1, via `wit_work_item_write` (action `update`):
+- **path**: `/fields/System.IterationPath`
+- **value**: `{sprint iteration path}`
+
+Move its **open** child Tasks with it (`update_batch`, same path and value; "open" as defined in "Ensure an Open Child Task Exists" below), so the work shows on the sprint's taskboard. Closed Tasks stay where they are, because their hours belong to the sprint they were logged in. A Task created later in this step copies the parent's new iteration.
+
+Read the item back and confirm the path changed. Report `Moved AB#{id} into {sprint}` and name any Tasks that moved with it. If the update fails, say so and carry on. The sprint is bookkeeping, and a failure here doesn't block the work.
 
 ### Move the Work Item to Active
 
@@ -662,11 +692,12 @@ The single-work-item gates still exist, but they are **batched per wave** so par
 ### F1: Load Child Stories and Build Waves
 
 1. Fetch the Feature with `expand: Relations` (Step 1 rules apply — description, embedded images, comments).
-2. Collect children (`System.LinkTypes.Hierarchy-Forward`) and fetch them via `wit_work_item` `get_batch` with fields: `System.Id`, `System.Title`, `System.State`, `System.WorkItemType`, `System.AssignedTo`, `Custom.Order`, `Microsoft.VSTS.Scheduling.StoryPoints`.
+2. Collect children (`System.LinkTypes.Hierarchy-Forward`) and fetch them via `wit_work_item` `get_batch` with fields: `System.Id`, `System.Title`, `System.State`, `System.WorkItemType`, `System.AssignedTo`, `System.IterationPath`, `Custom.Order`, `Microsoft.VSTS.Scheduling.StoryPoints`.
 3. Keep children of type **User Story** or **Bug** that are not already `Closed`, `Resolved`, or `Removed`. List anything skipped (and why) in the F2 summary.
 4. Group the remaining stories by `Custom.Order` ascending — each distinct value is one **wave**. Stories with equal order values share a wave and run in parallel.
 5. Stories with **no** `Custom.Order` value form a final catch-all wave — flag them in F2 so the user can either accept that placement or set order values in Azure DevOps and re-run.
 6. Read each story fully per Step 1 (description, acceptance criteria, embedded images, comments).
+7. Run Step 1's **Current Sprint** check for each story. One team and sprint lookup covers them all. The Feature's own iteration is never checked or changed: like its state, it belongs to the parent container.
 
 If the Feature has **no** implementable child stories, stop and tell the user; offer to implement the Feature itself via the standard single-work-item flow (Steps 2–10) if its own description/AC support that.
 
@@ -684,14 +715,18 @@ Present the Feature summary plus the wave plan:
 
 ### Execution Waves (Custom.Order)
 
-| Wave | Order | Story | Title | Points | State |
-|------|-------|-------|-------|--------|-------|
-| 1 | 1 | AB#6242 | ... | 3 | Dev Ready |
-| 1 | 1 | AB#6243 | ... | 2 | Dev Ready |
-| 2 | 2 | AB#6244 | ... | 5 | Dev Ready |
-| 3 | — | AB#6245 | ... | 3 | Dev Ready |  ← no Custom.Order set; runs last
+| Wave | Order | Story | Title | Points | State | Sprint |
+|------|-------|-------|-------|--------|-------|--------|
+| 1 | 1 | AB#6242 | ... | 3 | Dev Ready | ✓ |
+| 1 | 1 | AB#6243 | ... | 2 | Dev Ready | ✓ |
+| 2 | 2 | AB#6244 | ... | 5 | Dev Ready | Backlog |
+| 3 | — | AB#6245 | ... | 3 | Dev Ready | Sprint 41 |  ← no Custom.Order set; runs last
 
 Stories in the same wave are implemented in parallel; waves run in order.
+
+{only when a story is outside the current sprint:}
+{n} of these stories aren't in the current sprint, {sprint} ({start} – {finish}): AB#6244, AB#6245.
+Bring them into {sprint}? (yes / no / list the ids to bring)
 
 Does this look correct? Any stories to skip, reorder, or context to add?
 ```
@@ -708,7 +743,8 @@ For each wave in ascending order:
 
 1. **Explore & plan** each story in the wave (Step 3 rules; Ultracode fan-outs apply per story if opted in). Present **one combined plan** with a section per story — each section covering approach, files, unit tests, and agents — plus a note on any files touched by more than one story in the wave (a conflict warning). The **Architect Review** runs on the combined wave plan before you present it, and the shared-file conflicts are exactly what question 4 is for. **One approval gate per wave**; wait for the user.
 2. **Implement:**
-   - **Move every story in the wave to `Active`** first (same rules and fallbacks as "Move the Work Item to Active" in Step 4). The Feature's state is never changed.
+   - **Bring the wave's stories into the sprint** if the user chose them in F2, along with their open Tasks (Step 4's "Bring the Work Item into the Sprint", applied per story). Stories the user didn't choose stay where they are.
+   - **Move every story in the wave to `Active`** (same rules and fallbacks as "Move the Work Item to Active" in Step 4). The Feature's state is never changed.
    - **Ensure each story in the wave has an open child Task** (Step 4's "Ensure an Open Child Task Exists" rules, applied per story — Tasks hang off the stories, never off the Feature). Batch the proposals into **one** table covering the whole wave and take a single approval, so parallel agents never wait on a prompt:
 
      ```

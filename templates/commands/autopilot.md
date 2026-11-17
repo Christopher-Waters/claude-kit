@@ -56,6 +56,7 @@ Each row is a prompt in implement.md and the decision autopilot makes instead. L
 | **Work item and plan** | | |
 | 2 | Summary: "Does this look correct? Any added context?" | Print the summary, with the effort recommendation as information only, and continue. Resolve gaps with the **Ambiguity Rule**. |
 | 2 | Use Ultracode? | No (override 2). |
+| 2 | The item isn't in the current sprint. Bring it in? | No. Leave its iteration alone, because what goes into a sprint is a planning decision and nobody is here to make it. Name the item's iteration and the current sprint in the final report. |
 | 3 | Approve this plan? | Run the Architect Review (see **Independent Checks**), apply what it finds, print the final plan, and continue. The plan goes in the PR thread. |
 | **Branch and Task** | | |
 | 4 | The open Task has no estimate. Proposed hours OK? | Set the proposed hours on `OriginalEstimate` and `RemainingWork`. |
@@ -76,6 +77,7 @@ Each row is a prompt in implement.md and the decision autopilot makes instead. L
 | **Feature** | | |
 | F1 | No implementable child stories. Implement the Feature itself? | Yes, through Steps 2–11, if the Feature's own description or AC describes buildable work. Otherwise Hard Stop. |
 | F2 | Feature summary and wave plan. Look correct? | Print it and continue. Stories with no `Custom.Order` run in the final wave, in id order. |
+| F2 | Some stories aren't in the current sprint. Bring them in? | No, as in Step 2. List them in the final report. |
 | F4.1 | Approve this wave's plan? | Run the Architect Review on the combined wave plan, apply what it finds, and continue. |
 | F4.2 | Create these Tasks? | Yes, for every story in the wave. |
 | F6 | Combined UAT | As Step 9, grouped by story. |
@@ -180,6 +182,7 @@ When Step 11 is done, print:
 PR #{n} → {BASE_BRANCH}   {ready for review | DRAFT — see ⚠ in the description}
 Work item: {state}   Task AB#{t}: {closed, {h}h logged (the estimate; edit it if actual differs) | left open}
 Decisions: {n} (in the PR thread)   Open items: {n}   Other open Tasks left alone: {ids, or omit}
+{only when an item is outside the current sprint: Not in the current sprint ({sprint}): AB#{id} ({iteration or Backlog}). Move it if it belongs there.}
 
 Next: review the PR and run its UAT checklist. Once it's on Dev, run /qa AB#{id}.
 ```
