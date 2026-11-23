@@ -77,6 +77,8 @@ These run automatically — no action needed:
 | **After any file edit** | Test suggestions appear for related test files |
 | **When Claude stops** | UAT reminder if a feature was implemented |
 | **When Claude stops** | Self-improvement prompt to save learnings to memory |
+| **Status line** | Shows plan usage: 5-hour and weekly limits (Pro, Max, Team, Enterprise seats) or a gateway spend limit. Yellow from 75%, red from 90%. If you have your own status line in `~/.claude/settings.json`, the usage is added to the end of it |
+| **Session start, each prompt, when Claude stops** | Usage warning once a plan limit reaches 90%, once per limit window (`CLAUDE_KIT_USAGE_WARN_PCT` changes the threshold). Silent on API-key sessions, which have no plan limits |
 
 ### MCP Servers Available
 

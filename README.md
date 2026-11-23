@@ -27,7 +27,7 @@ Every session Claude learns from your feedback and gets better at helping you sp
 |-----------|-------|----------------|-------------|
 | **Global Agents** | 10 | `~/.claude/agents/` (your machine, all projects) | backend, frontend, legacy (Lucee/CFML), mockup, reviewer, test-runner, build-validator, lint-checker, azure-ops, security-auditor |
 | **Project Agents** | 2 | `.claude/agents/` (in the project) | deployer, db-admin |
-| **Hooks** | 10 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, work item intent, UAT reminder, self-improve |
+| **Hooks** | 13 | `.claude/hooks/` (in the project) | Secret blocker, sensitive data blocker (Bash + MCP + output), protected files, auto-format, test suggestions, work item intent, UAT reminder, self-improve, kit update check, usage status line + 90% usage warning |
 | **Slash Commands** | 26 | `.claude/commands/` (in the project) | `/implement`, `/autopilot`, `/review`, `/deep-review`, `/resolve-feedback`, `/fix-review`, `/deploy`, `/create-release`, `/deploy-release`, `/add-to-release`, `/cherry-pick`, `/promote`, `/rollback`, `/track`, `/plan-backlog`, `/plan-sprint`, `/quote-backlog`, `/cleanup-branches`, `/close-orphan-tasks`, `/quote`, `/explain`, `/create-work-item`, `/edit-work-item` |
 | **MCP Servers** | Up to 6 | `.mcp.json` (in the project) | **Azure DevOps** (work items, repos, pipelines, wiki), Playwright, MongoDB/SQL/Postgres, Teams, Stripe, Azure CLI |
 | **Workflow Template** | 1 | Appended to `CLAUDE.md` | Documents the full development process |
@@ -105,7 +105,7 @@ npx @chris1807/claude-kit init --all
 This installs:
 - ✅ Global agents (backend, frontend, legacy, mockup, reviewer, test-runner, build-validator, lint-checker, azure-ops, security-auditor)
 - ✅ Project agents (deployer, db-admin)
-- ✅ All 10 hooks
+- ✅ All 13 hooks (including the usage status line)
 - ✅ All 13 slash commands
 - ✅ MCP servers: Playwright, Teams, Azure CLI (+ your DB choice)
 - ✅ Settings, CLAUDE.md workflow, .gitignore
@@ -203,7 +203,10 @@ your-project/                      ← Project-specific
 │   │   ├── test-on-change.sh      # Suggests related tests after edits
 │   │   ├── work-item-intent.sh    # Routes "create a bug/story" prompts to /create-work-item
 │   │   ├── uat-reminder.sh        # Reminds to run UAT after features
-│   │   └── self-improve.sh        # Saves learnings after each session
+│   │   ├── self-improve.sh        # Saves learnings after each session
+│   │   ├── kit-update-check.sh    # Re-runs the installer when a newer kit is published
+│   │   ├── usage-statusline.sh    # Status line: plan usage (5h / weekly / spend limit)
+│   │   └── usage-warning.sh       # Warns once a plan limit reaches 90%
 │   │
 │   ├── commands/
 │   │   ├── implement.md           # /implement AB#1234
@@ -730,6 +733,21 @@ These run automatically — no action needed:
 | **After** any file edit | `test-on-change.sh` | Suggests the relevant test command for the modified file |
 | **When Claude stops** | `uat-reminder.sh` | Reminds to run UAT if a feature was implemented |
 | **When Claude stops** | `self-improve.sh` | Prompts Claude to save learnings to memory for next time |
+| **Status line** | `usage-statusline.sh` | Shows plan usage after the model and context: `Opus 5.5 · ctx 34% · 5h 42% · 7d 78%`. Yellow from 75%, red with ⚠ from 90%. If you already have a status line in `~/.claude/settings.json`, it runs yours and adds the usage to the end. Saves the numbers for `usage-warning.sh`. |
+| **Session start, each prompt, when Claude stops** | `usage-warning.sh` | Shows a warning once any plan limit reaches 90%, e.g. *"⚠️ Claude usage: 91% of your 5-hour limit used — resets 3:40 PM (in 1h 12m)."* Warns once per limit window, shared across your open sessions. Never blocks. |
+
+#### Plan usage tracking
+
+Claude Code gives plan usage only to the status line command (hooks never see it), so the status line script writes it to `~/.cache/claude-kit/usage.json` and the warning hook reads it from there. It reads whatever limits Claude Code reports, so it works on every plan:
+
+| Plan | Limits shown |
+|------|--------------|
+| Pro, Max | 5-hour and weekly (plus per-model weekly limits when reported) |
+| Team, Enterprise seats | Same as Pro/Max: your own seat's 5-hour and weekly limits |
+| Behind a Claude gateway with a spend limit | Spend so far vs. the limit (daily / weekly / monthly) |
+| API key, Bedrock, Vertex | Nothing: no plan limits, so no usage segment and no warning |
+
+Set `CLAUDE_KIT_USAGE_WARN_PCT` (e.g. `export CLAUDE_KIT_USAGE_WARN_PCT=80`) to warn earlier. If a project sets its own `statusLine` in `.claude/settings.json` or `settings.local.json`, the kit's status line isn't used and the warning stays quiet, because nothing saves the usage.
 
 ---
 
